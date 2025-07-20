@@ -103,74 +103,74 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 1.3: SQLite Database Foundation
 
-- [ ] Add database dependencies
-  - [ ] Add sqlx with sqlite and runtime-tokio-rustls features
-  - [ ] Add uuid crate with v4 feature for ID generation
-  - [ ] Add chrono for datetime handling (if needed)
-- [ ] Create database module structure
-  - [ ] Create src/database/mod.rs with public exports
-  - [ ] Create src/database/sqlite/mod.rs
-  - [ ] Create src/database/sqlite/models.rs
-  - [ ] Create src/database/sqlite/queries.rs
-- [ ] Define data models
-  - [ ] Create Site struct matching sites table schema
-  - [ ] Create CrawlQueueItem struct matching crawl_queue schema
-  - [ ] Create IndexedChunk struct matching indexed_chunks schema
-  - [ ] Add serde derives for JSON serialization
-  - [ ] Add proper type conversions for database fields
-- [ ] Create database schema
-  - [ ] Write CREATE TABLE statement for sites table
-  - [ ] Write CREATE TABLE statement for crawl_queue table
-  - [ ] Write CREATE TABLE statement for indexed_chunks table
-  - [ ] Add proper indexes for performance
-  - [ ] Add foreign key constraints
-- [ ] Implement database connection management
-  - [ ] Create connection pool with sqlx
-  - [ ] Add database file path management (~/.docs-mcp/metadata.db)
-  - [ ] Implement connection initialization
-  - [ ] Add connection health checking
-- [ ] Create migration system
-  - [ ] Implement database initialization from scratch
-  - [ ] Add schema migration functions
-  - [ ] Create migration tracking table
-  - [ ] Add migration rollback capability (if needed)
-- [ ] Implement CRUD operations for sites table
-  - [ ] Add insert_site function
-  - [ ] Add get_site_by_id function
-  - [ ] Add get_site_by_url function
-  - [ ] Add update_site_status function
-  - [ ] Add delete_site function
-  - [ ] Add list_all_sites function
-- [ ] Implement CRUD operations for crawl_queue table
-  - [ ] Add insert_queue_item function
-  - [ ] Add get_pending_queue_items function
-  - [ ] Add update_queue_item_status function
-  - [ ] Add delete_queue_item function
-  - [ ] Add get_queue_stats function
-- [ ] Implement CRUD operations for indexed_chunks table
-  - [ ] Add insert_chunk function
-  - [ ] Add get_chunks_by_site function
-  - [ ] Add delete_chunks_by_site function
-  - [ ] Add get_chunk_count function
-- [ ] Add transaction support
-  - [ ] Implement transaction wrapper functions
-  - [ ] Add rollback capability for failed operations
-  - [ ] Test transaction behavior under various scenarios
-- [ ] Create comprehensive unit tests
-  - [ ] Test database initialization and migration
-  - [ ] Test all CRUD operations for each table
-  - [ ] Test foreign key constraint enforcement
-  - [ ] Test concurrent access patterns
-  - [ ] Test transaction rollback scenarios
-  - [ ] Test error handling for database corruption
-- [ ] Add integration tests
-  - [ ] Test complete database lifecycle
-  - [ ] Test database file creation and permissions
-  - [ ] Test cross-platform database operations
-- [ ] Performance testing
-  - [ ] Test query performance with large datasets
-  - [ ] Test concurrent access performance
-  - [ ] Optimize slow queries with indexes
+- [x] Add database dependencies
+  - [x] Add sqlx with sqlite and runtime-tokio-rustls features
+  - [x] Add uuid crate with v4 feature for ID generation
+  - [x] Add chrono for datetime handling (if needed)
+- [x] Create database module structure
+  - [x] Create src/database/mod.rs with public exports
+  - [x] Create src/database/sqlite/mod.rs
+  - [x] Create src/database/sqlite/models.rs
+  - [x] Create src/database/sqlite/queries.rs
+- [x] Define data models
+  - [x] Create Site struct matching sites table schema
+  - [x] Create CrawlQueueItem struct matching crawl_queue schema
+  - [x] Create IndexedChunk struct matching indexed_chunks schema
+  - [x] Add serde derives for JSON serialization
+  - [x] Add proper type conversions for database fields
+- [x] Create database schema
+  - [x] Write CREATE TABLE statement for sites table
+  - [x] Write CREATE TABLE statement for crawl_queue table
+  - [x] Write CREATE TABLE statement for indexed_chunks table
+  - [x] Add proper indexes for performance
+  - [x] Add foreign key constraints
+- [x] Implement database connection management
+  - [x] Create connection pool with sqlx
+  - [x] Add database file path management (~/.docs-mcp/metadata.db)
+  - [x] Implement connection initialization
+  - [x] Add connection health checking
+- [x] Create migration system
+  - [x] Implement database initialization from scratch
+  - [x] Add schema migration functions
+  - [x] Create migration tracking table
+  - [x] Add migration rollback capability (if needed)
+- [x] Implement CRUD operations for sites table
+  - [x] Add insert_site function
+  - [x] Add get_site_by_id function
+  - [x] Add get_site_by_url function
+  - [x] Add update_site_status function
+  - [x] Add delete_site function
+  - [x] Add list_all_sites function
+- [x] Implement CRUD operations for crawl_queue table
+  - [x] Add insert_queue_item function
+  - [x] Add get_pending_queue_items function
+  - [x] Add update_queue_item_status function
+  - [x] Add delete_queue_item function
+  - [x] Add get_queue_stats function
+- [x] Implement CRUD operations for indexed_chunks table
+  - [x] Add insert_chunk function
+  - [x] Add get_chunks_by_site function
+  - [x] Add delete_chunks_by_site function
+  - [x] Add get_chunk_count function
+- [x] Add transaction support
+  - [x] Implement transaction wrapper functions
+  - [x] Add rollback capability for failed operations
+  - [x] Test transaction behavior under various scenarios
+- [x] Create comprehensive unit tests
+  - [x] Test database initialization and migration
+  - [x] Test all CRUD operations for each table
+  - [x] Test foreign key constraint enforcement
+  - [x] Test concurrent access patterns
+  - [x] Test transaction rollback scenarios
+  - [x] Test error handling for database corruption
+- [x] Add integration tests
+  - [x] Test complete database lifecycle
+  - [x] Test database file creation and permissions
+  - [x] Test cross-platform database operations
+- [x] Performance testing
+  - [x] Test query performance with large datasets
+  - [x] Test concurrent access performance
+  - [x] Optimize slow queries with indexes
 
 ## Phase 2: Content Processing Foundation
 
