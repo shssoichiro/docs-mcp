@@ -97,7 +97,7 @@ mod tests {
     use clap::error::ErrorKind;
 
     #[test]
-    fn test_cli_parsing() {
+    fn cli_parsing() {
         let cli = Cli::try_parse_from(["docs-mcp", "list"]);
         assert!(cli.is_ok());
 
@@ -107,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_command_with_url() {
+    fn add_command_with_url() {
         let cli = Cli::try_parse_from(["docs-mcp", "add", "https://example.com"]);
         assert!(cli.is_ok());
 
@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_command_with_name() {
+    fn add_command_with_name() {
         let cli = Cli::try_parse_from([
             "docs-mcp",
             "add",
@@ -139,7 +139,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serve_command_default_port() {
+    fn serve_command_default_port() {
         let cli = Cli::try_parse_from(["docs-mcp", "serve"]);
         assert!(cli.is_ok());
 
@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn test_serve_command_custom_port() {
+    fn serve_command_custom_port() {
         let cli = Cli::try_parse_from(["docs-mcp", "serve", "--port", "8080"]);
         assert!(cli.is_ok());
 
@@ -163,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn test_config_show_flag() {
+    fn config_show_flag() {
         let cli = Cli::try_parse_from(["docs-mcp", "config", "--show"]);
         assert!(cli.is_ok());
 
@@ -175,7 +175,7 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_command() {
+    fn invalid_command() {
         let cli = Cli::try_parse_from(["docs-mcp", "invalid"]);
         assert!(cli.is_err());
 
@@ -185,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn test_help_message() {
+    fn help_message() {
         let cli = Cli::try_parse_from(["docs-mcp", "--help"]);
         assert!(cli.is_err());
 
