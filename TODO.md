@@ -13,93 +13,93 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [x] Add tracing and tracing-subscriber for logging
   - [x] Add tokio with full features
   - [x] Add serde and serde_json
-- [ ] Create basic CLI structure in main.rs
-  - [ ] Define main CLI struct with clap derive
-  - [ ] Add all subcommands: config, add, list, delete, update, status, serve
-  - [ ] Implement basic argument parsing for each command
-  - [ ] Add help text and descriptions for all commands
-- [ ] Create lib.rs with common types
-  - [ ] Define Result type alias
-  - [ ] Create custom error enum with thiserror
-  - [ ] Add common utility functions
-  - [ ] Export public API for modules
-- [ ] Set up basic project module structure
-  - [ ] Create src/config/mod.rs (empty initially)
-  - [ ] Create src/database/mod.rs (empty initially)
-  - [ ] Create src/crawler/mod.rs (empty initially)
-  - [ ] Create src/embeddings/mod.rs (empty initially)
-  - [ ] Create src/indexer/mod.rs (empty initially)
-  - [ ] Create src/mcp/mod.rs (empty initially)
-- [ ] Implement tracing/logging setup
-  - [ ] Configure tracing subscriber in main.rs
-  - [ ] Add log levels and filtering
-  - [ ] Test logging output in different scenarios
-- [ ] Add unit tests for CLI parsing
-  - [ ] Test all command parsing scenarios
-  - [ ] Test help message generation
-  - [ ] Test invalid command combinations
-  - [ ] Test argument validation
-- [ ] Implement "not implemented" messages
-  - [ ] Each command shows helpful placeholder message
-  - [ ] Messages indicate which command was called
-  - [ ] Messages are consistent and professional
-- [ ] Verify compilation and basic functionality
-  - [ ] All commands compile without warnings
-  - [ ] Help messages display correctly
-  - [ ] Error handling works as expected
+- [x] Create basic CLI structure in main.rs
+  - [x] Define main CLI struct with clap derive
+  - [x] Add all subcommands: config, add, list, delete, update, status, serve
+  - [x] Implement basic argument parsing for each command
+  - [x] Add help text and descriptions for all commands
+- [x] Create lib.rs with common types
+  - [x] Define Result type alias
+  - [x] Create custom error enum with thiserror
+  - [x] Add common utility functions
+  - [x] Export public API for modules
+- [x] Set up basic project module structure
+  - [x] Create src/config/mod.rs (empty initially)
+  - [x] Create src/database/mod.rs (empty initially)
+  - [x] Create src/crawler/mod.rs (empty initially)
+  - [x] Create src/embeddings/mod.rs (empty initially)
+  - [x] Create src/indexer/mod.rs (empty initially)
+  - [x] Create src/mcp/mod.rs (empty initially)
+- [x] Implement tracing/logging setup
+  - [x] Configure tracing subscriber in main.rs
+  - [x] Add log levels and filtering
+  - [x] Test logging output in different scenarios
+- [x] Add unit tests for CLI parsing
+  - [x] Test all command parsing scenarios
+  - [x] Test help message generation
+  - [x] Test invalid command combinations
+  - [x] Test argument validation
+- [x] Implement "not implemented" messages
+  - [x] Each command shows helpful placeholder message
+  - [x] Messages indicate which command was called
+  - [x] Messages are consistent and professional
+- [x] Verify compilation and basic functionality
+  - [x] All commands compile without warnings
+  - [x] Help messages display correctly
+  - [x] Error handling works as expected
 
 ### Step 1.2: Configuration Management System
 
-- [ ] Create config module structure
-  - [ ] Create src/config/mod.rs with public exports
-  - [ ] Create src/config/settings.rs with Config struct
-- [ ] Add configuration dependencies
-  - [ ] Add toml crate for TOML parsing
-  - [ ] Add dirs crate for cross-platform directories
-  - [ ] Add serde derive features for Config struct
-- [ ] Define Config struct
-  - [ ] Add ollama section with host, port, model, batch_size
-  - [ ] Implement serde Serialize and Deserialize
-  - [ ] Add Default implementation with sensible defaults
-  - [ ] Add validation methods for each field
-- [ ] Implement cross-platform config directory handling
-  - [ ] Use dirs crate to find appropriate config directory
-  - [ ] Create ~/.docs-mcp/ or %APPDATA%/docs-mcp/ as needed
-  - [ ] Handle directory creation with proper permissions
-  - [ ] Add error handling for permission issues
-- [ ] Implement config file operations
-  - [ ] Add config file reading with TOML parsing
-  - [ ] Add config file writing with proper formatting
-  - [ ] Handle missing config files gracefully
-  - [ ] Add config validation on load
-- [ ] Implement interactive config command
-  - [ ] Prompt for Ollama host with default (localhost)
-  - [ ] Prompt for Ollama port with default (11434)
-  - [ ] Prompt for embedding model with default (nomic-embed-text)
-  - [ ] Prompt for batch size with default (64)
-  - [ ] Save configuration after validation
-- [ ] Add config validation functions
-  - [ ] Validate Ollama host format (URL or hostname)
-  - [ ] Validate port range (1-65535)
-  - [ ] Validate model name format
-  - [ ] Validate batch size range (1-1000)
-- [ ] Create comprehensive unit tests
-  - [ ] Test config struct serialization/deserialization
-  - [ ] Test config directory discovery on different platforms
-  - [ ] Test config file reading with valid TOML
-  - [ ] Test config file reading with invalid TOML
-  - [ ] Test config validation with various inputs
-  - [ ] Test interactive prompts with mocked input
-  - [ ] Test error handling for file permission issues
-- [ ] Add integration tests
-  - [ ] Test complete config workflow end-to-end
-  - [ ] Test config persistence across application restarts
-  - [ ] Test config updates and migrations
-- [ ] Verify config command functionality
-  - [ ] docs-mcp config runs interactive setup
-  - [ ] Config file is created in correct location
-  - [ ] Config validation works properly
-  - [ ] Error messages are helpful and actionable
+- [x] Create config module structure
+  - [x] Create src/config/mod.rs with public exports
+  - [x] Create src/config/settings.rs with Config struct
+- [x] Add configuration dependencies
+  - [x] Add toml crate for TOML parsing
+  - [x] Add dirs crate for cross-platform directories
+  - [x] Add serde derive features for Config struct
+- [x] Define Config struct
+  - [x] Add ollama section with host, port, model, batch_size
+  - [x] Implement serde Serialize and Deserialize
+  - [x] Add Default implementation with sensible defaults
+  - [x] Add validation methods for each field
+- [x] Implement cross-platform config directory handling
+  - [x] Use dirs crate to find appropriate config directory
+  - [x] Create ~/.docs-mcp/ or %APPDATA%/docs-mcp/ as needed
+  - [x] Handle directory creation with proper permissions
+  - [x] Add error handling for permission issues
+- [x] Implement config file operations
+  - [x] Add config file reading with TOML parsing
+  - [x] Add config file writing with proper formatting
+  - [x] Handle missing config files gracefully
+  - [x] Add config validation on load
+- [x] Implement interactive config command
+  - [x] Prompt for Ollama host with default (localhost)
+  - [x] Prompt for Ollama port with default (11434)
+  - [x] Prompt for embedding model with default (nomic-embed-text)
+  - [x] Prompt for batch size with default (64)
+  - [x] Save configuration after validation
+- [x] Add config validation functions
+  - [x] Validate Ollama host format (URL or hostname)
+  - [x] Validate port range (1-65535)
+  - [x] Validate model name format
+  - [x] Validate batch size range (1-1000)
+- [x] Create comprehensive unit tests
+  - [x] Test config struct serialization/deserialization
+  - [x] Test config directory discovery on different platforms
+  - [x] Test config file reading with valid TOML
+  - [x] Test config file reading with invalid TOML
+  - [x] Test config validation with various inputs
+  - [x] Test interactive prompts with mocked input
+  - [x] Test error handling for file permission issues
+- [x] Add integration tests
+  - [x] Test complete config workflow end-to-end
+  - [x] Test config persistence across application restarts
+  - [x] Test config updates and migrations
+- [x] Verify config command functionality
+  - [x] docs-mcp config runs interactive setup
+  - [x] Config file is created in correct location
+  - [x] Config validation works properly
+  - [x] Error messages are helpful and actionable
 
 ### Step 1.3: SQLite Database Foundation
 

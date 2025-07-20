@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use docs_mcp::Result;
+use docs_mcp::config::{run_interactive_config, show_config};
 use tracing::info;
 
 #[derive(Parser)]
@@ -57,11 +58,10 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Config { show } => {
             if show {
-                info!("Configuration display not implemented yet");
+                show_config()?;
             } else {
-                info!("Interactive configuration setup not implemented yet");
+                run_interactive_config()?;
             }
-            println!("Configuration command not implemented yet");
         }
         Commands::Add { url, name } => {
             info!(
