@@ -5,13 +5,14 @@ This checklist tracks the implementation progress of the documentation MCP serve
 ## Phase 1: Foundation & Core Infrastructure
 
 ### Step 1.1: Project Setup and Basic CLI Framework
-- [ ] Update Cargo.toml with core dependencies
-  - [ ] Add clap with derive features
-  - [ ] Add anyhow for error handling
-  - [ ] Add thiserror for custom error types
-  - [ ] Add tracing and tracing-subscriber for logging
-  - [ ] Add tokio with full features
-  - [ ] Add serde and serde_json
+
+- [x] Update Cargo.toml with core dependencies
+  - [x] Add clap with derive features
+  - [x] Add anyhow for error handling
+  - [x] Add thiserror for custom error types
+  - [x] Add tracing and tracing-subscriber for logging
+  - [x] Add tokio with full features
+  - [x] Add serde and serde_json
 - [ ] Create basic CLI structure in main.rs
   - [ ] Define main CLI struct with clap derive
   - [ ] Add all subcommands: config, add, list, delete, update, status, serve
@@ -48,6 +49,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Error handling works as expected
 
 ### Step 1.2: Configuration Management System
+
 - [ ] Create config module structure
   - [ ] Create src/config/mod.rs with public exports
   - [ ] Create src/config/settings.rs with Config struct
@@ -100,6 +102,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Error messages are helpful and actionable
 
 ### Step 1.3: SQLite Database Foundation
+
 - [ ] Add database dependencies
   - [ ] Add sqlx with sqlite and runtime-tokio-rustls features
   - [ ] Add uuid crate with v4 feature for ID generation
@@ -172,6 +175,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 ## Phase 2: Content Processing Foundation
 
 ### Step 2.1: URL Validation and Basic HTTP Client
+
 - [ ] Add web crawling dependencies
   - [ ] Add reqwest with json features
   - [ ] Add url crate for URL parsing
@@ -229,6 +233,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Test error handling scenarios
 
 ### Step 2.2: HTML Content Extraction and Basic Chunking
+
 - [ ] Add content processing dependencies
   - [ ] Ensure scraper crate is available for HTML parsing
   - [ ] Add any additional text processing dependencies
@@ -288,6 +293,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Optimize slow extraction operations
 
 ### Step 2.3: Basic Site Crawling Without JavaScript
+
 - [ ] Integrate URL validation, robots.txt, and content extraction
   - [ ] Connect all crawler components together
   - [ ] Create main crawling orchestration function
@@ -344,6 +350,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 ## Phase 3: Embedding Integration
 
 ### Step 3.1: Ollama Client Implementation
+
 - [ ] Add Ollama integration dependencies
   - [ ] Ensure reqwest is configured for Ollama API calls
   - [ ] Add any additional JSON processing dependencies
@@ -401,6 +408,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Add performance metrics and logging
 
 ### Step 3.2: LanceDB Integration
+
 - [ ] Add LanceDB dependencies
   - [ ] Add lancedb crate to Cargo.toml
   - [ ] Add any additional vector processing dependencies
@@ -458,6 +466,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Add performance metrics and monitoring
 
 ### Step 3.3: End-to-End Embedding Pipeline
+
 - [ ] Integrate content extraction with embedding generation
   - [ ] Connect chunking output to Ollama client input
   - [ ] Handle text preprocessing for embeddings
@@ -516,6 +525,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 ## Phase 4: Background Processing
 
 ### Step 4.1: Process Coordination and File Locking
+
 - [ ] Add process coordination dependencies
   - [ ] Add file locking utilities (fs2 or similar)
   - [ ] Add signal handling dependencies
@@ -573,6 +583,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Test recovery from various failure modes
 
 ### Step 4.2: Indexing Queue Management
+
 - [ ] Create queue management module
   - [ ] Create src/indexer/queue.rs
   - [ ] Define queue management interfaces
@@ -626,6 +637,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Optimize database access patterns
 
 ### Step 4.3: Complete Background Indexer
+
 - [ ] Integrate process coordination with queue management
   - [ ] Combine file locking with queue processing
   - [ ] Coordinate heartbeats with queue operations
@@ -686,6 +698,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 ## Phase 5: MCP Server Implementation
 
 ### Step 5.1: Basic MCP Protocol Implementation
+
 - [ ] Research MCP protocol specification
   - [ ] Study MCP protocol documentation
   - [ ] Understand message formats and flows
@@ -739,6 +752,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Ensure compatibility with MCP clients
 
 ### Step 5.2: Search Tool Implementation
+
 - [ ] Implement search_docs tool structure
   - [ ] Define tool metadata and description
   - [ ] Create JSON schema for parameters
@@ -798,6 +812,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Optimize memory usage during search
 
 ### Step 5.3: Complete MCP Server with All Tools
+
 - [ ] Implement list_sites tool
   - [ ] Define tool metadata and schema
   - [ ] Query sites from SQLite database
@@ -854,6 +869,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 ## Phase 6: CLI Polish and Integration
 
 ### Step 6.1: Complete CLI Commands Implementation
+
 - [ ] Implement "docs-mcp delete" command
   - [ ] Parse command arguments (name_or_url, version)
   - [ ] Handle site identification and disambiguation
@@ -908,6 +924,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Ensure consistent and intuitive behavior
 
 ### Step 6.2: JavaScript Rendering Support
+
 - [ ] Add headless browser dependencies
   - [ ] Add headless_chrome crate to Cargo.toml
   - [ ] Add any additional browser automation dependencies
@@ -966,6 +983,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
   - [ ] Add performance metrics for browser operations
 
 ### Step 6.3: Final Integration and Production Readiness
+
 - [ ] Complete end-to-end integration testing
   - [ ] Test complete system with real documentation sites
   - [ ] Verify all components work together correctly
@@ -1020,6 +1038,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 ## Continuous Tasks Throughout Development
 
 ### Code Quality and Maintenance
+
 - [ ] Maintain consistent code style and formatting
 - [ ] Keep dependencies up to date
 - [ ] Perform regular security audits
@@ -1027,6 +1046,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 - [ ] Ensure comprehensive test coverage
 
 ### Documentation
+
 - [ ] Keep CLAUDE.md updated with project changes
 - [ ] Update SPEC.md as requirements evolve
 - [ ] Maintain accurate code documentation
@@ -1034,6 +1054,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 - [ ] Keep user documentation current
 
 ### Testing and Quality Assurance
+
 - [ ] Run all tests before committing changes
 - [ ] Perform integration testing regularly
 - [ ] Monitor test coverage and quality
@@ -1041,6 +1062,7 @@ This checklist tracks the implementation progress of the documentation MCP serve
 - [ ] Validate performance and resource usage
 
 ### Monitoring and Metrics
+
 - [ ] Monitor system performance continuously
 - [ ] Track resource usage and optimization opportunities
 - [ ] Monitor error rates and failure patterns

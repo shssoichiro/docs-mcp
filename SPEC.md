@@ -74,15 +74,18 @@ src/
 ### Data Storage
 
 #### Configuration File Location
+
 - Linux/macOS: `~/.docs-mcp/config.toml`
 - Windows: `%APPDATA%/docs-mcp/config.toml`
 
 #### Database Files Location
+
 - SQLite database: `~/.docs-mcp/metadata.db`
 - LanceDB files: `~/.docs-mcp/embeddings/`
 - Lock file: `~/.docs-mcp/.indexer.lock`
 
 #### Configuration File Format (TOML)
+
 ```toml
 [ollama]
 host = "localhost"
@@ -96,6 +99,7 @@ batch_size = 64
 #### SQLite Tables
 
 **sites**
+
 ```sql
 CREATE TABLE sites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,6 +118,7 @@ CREATE TABLE sites (
 ```
 
 **crawl_queue**
+
 ```sql
 CREATE TABLE crawl_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,6 +133,7 @@ CREATE TABLE crawl_queue (
 ```
 
 **indexed_chunks**
+
 ```sql
 CREATE TABLE indexed_chunks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,6 +150,7 @@ CREATE TABLE indexed_chunks (
 ```
 
 #### LanceDB Schema
+
 ```rust
 struct EmbeddingRecord {
     vector_id: String,        // UUID
@@ -166,10 +173,13 @@ struct ChunkMetadata {
 ### Commands
 
 #### Configuration
+
 ```bash
 docs-mcp config
 ```
+
 Interactive configuration setup:
+
 1. Prompt for Ollama host (default: localhost)
 2. Prompt for Ollama port (default: 11434)
 3. Prompt for embedding model (default: nomic-embed-text)
@@ -178,6 +188,7 @@ Interactive configuration setup:
 6. Save configuration
 
 #### Site Management
+
 ```bash
 # Add new site to index
 docs-mcp add <url> <name> [version]
@@ -200,6 +211,7 @@ docs-mcp status <name_or_url> [version]
 ```
 
 #### MCP Server
+
 ```bash
 docs-mcp serve [--port PORT]
 # Starts MCP server (default port: 8080)
@@ -209,11 +221,13 @@ docs-mcp serve [--port PORT]
 ## Crawling Behavior
 
 ### URL Filtering Rules
+
 1. Only crawl URLs reachable from base URL (directly or recursively)
 2. Only crawl URLs that match or begin with the base URL (excluding trailing filenames)
    - Example: Base URL `https://docs.rs/regex/1.10.6/regex/` only crawls URLs starting with `https://docs.rs/regex/1.10.6/regex/`
 
 ### Crawling Configuration
+
 - **Rate Limiting**: 250ms delay between requests
 - **User Agent**: Chromium-like user agent string
 - **Processing**: Sequential (not concurrent) per site
@@ -224,11 +238,13 @@ docs-mcp serve [--port PORT]
 ### Content Extraction
 
 #### Supported Formats
+
 - Rendered HTML (including JavaScript-generated content)
 - Plain text files
 - Preserve and utilize page titles and heading structures
 
 #### Content Chunking Strategy
+
 1. **Semantic Chunking**: Split by heading hierarchy
 2. **Target Size**: 500-800 tokens per chunk
 3. **Context Preservation**: Include page title and heading breadcrumb in each chunk
@@ -236,6 +252,7 @@ docs-mcp serve [--port PORT]
 5. **Overlap Strategy**: Include heading hierarchy in adjacent chunks for context
 
 #### Chunk Format Example
+
 ```
 Page Title: Python Documentation > Functions > Built-in Functions
 
@@ -248,12 +265,14 @@ The print() function outputs text to the console...
 ## Background Processing
 
 ### Process Coordination
+
 - **Process Discovery**: File locking with `.indexer.lock` file + heartbeat mechanism
 - **Lock File**: Exclusive lock held by background indexer process
 - **Heartbeat**: Update SQLite with timestamp every 30 seconds
 - **Stale Detection**: If lock exists but heartbeat >60 seconds old, start new indexer
 
 ### Indexing Queue Management
+
 1. **Queue Processing**: Sequential processing of sites
 2. **Progress Tracking**: Save progress after each successfully crawled page
 3. **Resume Capability**: Resume indexing from last saved state after interruption
@@ -261,8 +280,9 @@ The print() function outputs text to the console...
 5. **Auto-start**: Background process starts when CLI commands run or MCP server starts
 
 ### Embedding Generation
+
 - **Batch Processing**: Process 32-64 chunks per batch
-- **Error Handling**: 
+- **Error Handling**:
   - Recoverable errors (Ollama down): Retry every minute
   - Unrecoverable errors: Mark site as failed, store error message
 - **Progress Updates**: Update progress in SQLite after each batch
@@ -272,6 +292,7 @@ The print() function outputs text to the console...
 ### Tools Provided
 
 #### search_docs
+
 ```json
 {
   "name": "search_docs",
@@ -286,7 +307,7 @@ The print() function outputs text to the console...
       "description": "Optional: Search specific site by ID"
     },
     "sites_filter": {
-      "type": "string", 
+      "type": "string",
       "description": "Optional: Regex pattern to filter sites (e.g., 'docs.rs')"
     },
     "limit": {
@@ -298,6 +319,7 @@ The print() function outputs text to the console...
 ```
 
 **Response Format:**
+
 ```json
 {
   "results": [
@@ -315,6 +337,7 @@ The print() function outputs text to the console...
 ```
 
 #### list_sites
+
 ```json
 {
   "name": "list_sites",
@@ -324,6 +347,7 @@ The print() function outputs text to the console...
 ```
 
 **Response Format:**
+
 ```json
 {
   "sites": [
@@ -341,6 +365,7 @@ The print() function outputs text to the console...
 ```
 
 ### Server Behavior
+
 - **Filtering**: Only show completed sites to MCP clients
 - **Concurrent Operation**: MCP server runs while indexing is in progress
 - **Search Results**: Return results sorted by relevance score
@@ -350,13 +375,15 @@ The print() function outputs text to the console...
 ### Crawling Errors
 
 #### Retryable Errors
+
 - Network timeouts
-- HTTP 5xx server errors  
+- HTTP 5xx server errors
 - Temporary connection failures
 
 **Handling**: Retry up to 3 times with 30-second delays, then mark page as failed
 
 #### Non-Retryable Errors
+
 - HTTP 4xx client errors (except 429 rate limiting)
 - robots.txt restrictions
 - Invalid URLs
@@ -366,6 +393,7 @@ The print() function outputs text to the console...
 ### Embedding Errors
 
 #### Recoverable Errors
+
 - Ollama service unavailable
 - Temporary model loading issues
 - Network connectivity issues
@@ -373,6 +401,7 @@ The print() function outputs text to the console...
 **Handling**: Retry every minute indefinitely while updating status
 
 #### Unrecoverable Errors
+
 - Model not found and auto-pull disabled
 - Invalid chunk content
 - Persistent API errors
@@ -380,11 +409,13 @@ The print() function outputs text to the console...
 **Handling**: Mark site indexing as failed, store detailed error message
 
 ### Database Errors
+
 - **SQLite Lock Errors**: Retry with exponential backoff
 - **Corruption**: Attempt recovery, report to user if unsuccessful
 - **Disk Space**: Check available space before operations, warn user
 
 ### Configuration Errors
+
 - **Invalid Ollama Config**: Validate during setup, re-run config command
 - **Missing Config**: Prompt user to run config command
 - **Permission Issues**: Clear error messages with suggested fixes
@@ -392,23 +423,27 @@ The print() function outputs text to the console...
 ## Testing Strategy
 
 ### Unit Tests
+
 - **Database Operations**: Test SQLite and LanceDB operations
 - **Content Extraction**: Test chunking algorithms with various HTML structures
 - **URL Filtering**: Test crawling scope rules
 - **Configuration**: Test TOML parsing and validation
 
 ### Integration Tests
+
 - **End-to-End Crawling**: Test with mock documentation sites
 - **Embedding Pipeline**: Test with local Ollama instance
 - **MCP Interface**: Test MCP tool implementations
 - **CLI Commands**: Test all CLI operations
 
 ### Test Data
+
 - **Mock Sites**: Create test HTML with various structures
 - **Sample Embeddings**: Pre-computed embeddings for consistent search testing
 - **Edge Cases**: Test with large sites, malformed HTML, network failures
 
 ### Performance Tests
+
 - **Crawling Speed**: Measure pages/minute with rate limiting
 - **Search Performance**: Measure query response times
 - **Memory Usage**: Monitor memory consumption during large site indexing
@@ -417,36 +452,42 @@ The print() function outputs text to the console...
 ## Implementation Phases
 
 ### Phase 1: Core Infrastructure
+
 1. Project setup with Clap CLI framework
 2. Configuration management system
 3. SQLite database schema and operations
 4. Basic crawling infrastructure
 
 ### Phase 2: Content Processing
+
 1. Web crawler with JavaScript rendering
 2. Content extraction and chunking
 3. robots.txt compliance
 4. URL filtering logic
 
 ### Phase 3: Embedding Integration
+
 1. Ollama client implementation
 2. Embedding generation pipeline
 3. LanceDB integration
 4. Batch processing system
 
 ### Phase 4: Background Processing
+
 1. Process coordination with file locking
 2. Indexing queue management
 3. Progress tracking and resume capability
 4. Error handling and retry logic
 
 ### Phase 5: MCP Server
+
 1. MCP protocol implementation
 2. Search functionality
 3. Site listing tools
 4. Result formatting and filtering
 
 ### Phase 6: CLI Polish
+
 1. All CLI commands implementation
 2. Interactive configuration setup
 3. Status reporting and progress display
@@ -455,6 +496,7 @@ The print() function outputs text to the console...
 ## Dependencies
 
 ### Required Crates
+
 ```toml
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
