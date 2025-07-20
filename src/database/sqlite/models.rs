@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
 
@@ -8,14 +8,14 @@ pub struct Site {
     pub base_url: String,
     pub name: String,
     pub version: String,
-    pub indexed_date: Option<DateTime<Utc>>,
+    pub indexed_date: Option<NaiveDateTime>,
     pub status: SiteStatus,
-    pub progress_percent: i32,
-    pub total_pages: i32,
-    pub indexed_pages: i32,
+    pub progress_percent: i64,
+    pub total_pages: i64,
+    pub indexed_pages: i64,
     pub error_message: Option<String>,
-    pub created_date: DateTime<Utc>,
-    pub last_heartbeat: Option<DateTime<Utc>>,
+    pub created_date: NaiveDateTime,
+    pub last_heartbeat: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -49,12 +49,12 @@ pub struct NewSite {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SiteUpdate {
     pub status: Option<SiteStatus>,
-    pub progress_percent: Option<i32>,
-    pub total_pages: Option<i32>,
-    pub indexed_pages: Option<i32>,
+    pub progress_percent: Option<i64>,
+    pub total_pages: Option<i64>,
+    pub indexed_pages: Option<i64>,
     pub error_message: Option<String>,
-    pub last_heartbeat: Option<DateTime<Utc>>,
-    pub indexed_date: Option<DateTime<Utc>>,
+    pub last_heartbeat: Option<NaiveDateTime>,
+    pub indexed_date: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, FromRow)]
@@ -63,9 +63,9 @@ pub struct CrawlQueueItem {
     pub site_id: i64,
     pub url: String,
     pub status: CrawlStatus,
-    pub retry_count: i32,
+    pub retry_count: i64,
     pub error_message: Option<String>,
-    pub created_date: DateTime<Utc>,
+    pub created_date: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -98,7 +98,7 @@ pub struct NewCrawlQueueItem {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrawlQueueUpdate {
     pub status: Option<CrawlStatus>,
-    pub retry_count: Option<i32>,
+    pub retry_count: Option<i64>,
     pub error_message: Option<String>,
 }
 
@@ -110,9 +110,9 @@ pub struct IndexedChunk {
     pub page_title: Option<String>,
     pub heading_path: Option<String>,
     pub chunk_content: String,
-    pub chunk_index: i32,
+    pub chunk_index: i64,
     pub vector_id: String,
-    pub indexed_date: DateTime<Utc>,
+    pub indexed_date: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,7 +122,7 @@ pub struct NewIndexedChunk {
     pub page_title: Option<String>,
     pub heading_path: Option<String>,
     pub chunk_content: String,
-    pub chunk_index: i32,
+    pub chunk_index: i64,
     pub vector_id: String,
 }
 
@@ -175,6 +175,8 @@ impl CrawlQueueItem {
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+
     use super::*;
 
     #[test]
@@ -206,7 +208,7 @@ mod tests {
             total_pages: 100,
             indexed_pages: 50,
             error_message: None,
-            created_date: Utc::now(),
+            created_date: Utc::now().naive_utc(),
             last_heartbeat: None,
         };
 
@@ -225,7 +227,7 @@ mod tests {
             status: CrawlStatus::Failed,
             retry_count: 2,
             error_message: Some("Network error".to_string()),
-            created_date: Utc::now(),
+            created_date: Utc::now().naive_utc(),
         };
 
         assert!(item.can_retry());

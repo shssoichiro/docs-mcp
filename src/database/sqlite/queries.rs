@@ -32,18 +32,18 @@ impl SiteQueries {
         let result = sqlx::query_as!(
             Site,
             r#"
-            SELECT id as "id: i64", 
-                   base_url, 
-                   name, 
-                   version, 
-                   indexed_date as "indexed_date: _", 
+            SELECT id,
+                   base_url,
+                   name,
+                   version,
+                   indexed_date,
                    status as "status: SiteStatus",
-                   progress_percent as "progress_percent: i32", 
-                   total_pages as "total_pages: i32", 
-                   indexed_pages as "indexed_pages: i32", 
+                   progress_percent,
+                   total_pages,
+                   indexed_pages,
                    error_message,
-                   created_date as "created_date: _", 
-                   last_heartbeat as "last_heartbeat: _"
+                   created_date,
+                   last_heartbeat
             FROM sites WHERE id = ?
             "#,
             id
@@ -64,18 +64,18 @@ impl SiteQueries {
         let result = sqlx::query_as!(
             Site,
             r#"
-            SELECT id as "id: i64", 
-                   base_url, 
-                   name, 
-                   version, 
-                   indexed_date as "indexed_date: _", 
+            SELECT id,
+                   base_url,
+                   name,
+                   version,
+                   indexed_date,
                    status as "status: SiteStatus",
-                   progress_percent as "progress_percent: i32", 
-                   total_pages as "total_pages: i32", 
-                   indexed_pages as "indexed_pages: i32", 
+                   progress_percent,
+                   total_pages,
+                   indexed_pages,
                    error_message,
-                   created_date as "created_date: _", 
-                   last_heartbeat as "last_heartbeat: _"
+                   created_date,
+                   last_heartbeat
             FROM sites WHERE name = ? AND version = ?
             "#,
             name,
@@ -93,18 +93,18 @@ impl SiteQueries {
         let result = sqlx::query_as!(
             Site,
             r#"
-            SELECT id as "id: i64", 
+            SELECT id,
                    base_url, 
                    name, 
                    version, 
-                   indexed_date as "indexed_date: _", 
+                   indexed_date,
                    status as "status: SiteStatus",
-                   progress_percent as "progress_percent: i32", 
-                   total_pages as "total_pages: i32", 
-                   indexed_pages as "indexed_pages: i32", 
+                   progress_percent,
+                   total_pages,
+                   indexed_pages,
                    error_message,
-                   created_date as "created_date: _", 
-                   last_heartbeat as "last_heartbeat: _"
+                   created_date,
+                   last_heartbeat
             FROM sites WHERE base_url = ?
             "#,
             base_url
@@ -121,18 +121,18 @@ impl SiteQueries {
         let sites = sqlx::query_as!(
             Site,
             r#"
-            SELECT id as "id: i64", 
+            SELECT id,
                    base_url, 
                    name, 
                    version, 
-                   indexed_date as "indexed_date: _", 
+                   indexed_date,
                    status as "status: SiteStatus",
-                   progress_percent as "progress_percent: i32", 
-                   total_pages as "total_pages: i32", 
-                   indexed_pages as "indexed_pages: i32", 
+                   progress_percent,
+                   total_pages,
+                   indexed_pages,
                    error_message,
-                   created_date as "created_date: _", 
-                   last_heartbeat as "last_heartbeat: _"
+                   created_date,
+                   last_heartbeat
             FROM sites ORDER BY created_date DESC
             "#
         )
@@ -148,18 +148,18 @@ impl SiteQueries {
         let sites = sqlx::query_as!(
             Site,
             r#"
-            SELECT id as "id: i64", 
+            SELECT id,
                    base_url, 
                    name, 
                    version, 
-                   indexed_date as "indexed_date: _", 
+                   indexed_date,
                    status as "status: SiteStatus",
-                   progress_percent as "progress_percent: i32", 
-                   total_pages as "total_pages: i32", 
-                   indexed_pages as "indexed_pages: i32", 
+                   progress_percent,
+                   total_pages,
+                   indexed_pages,
                    error_message,
-                   created_date as "created_date: _", 
-                   last_heartbeat as "last_heartbeat: _"
+                   created_date,
+                   last_heartbeat
             FROM sites WHERE status = 'completed' ORDER BY indexed_date DESC
             "#
         )
@@ -208,12 +208,12 @@ impl SiteQueries {
 
         if let Some(heartbeat) = update.last_heartbeat {
             query_parts.push("last_heartbeat = ?");
-            query_values.push(heartbeat.to_rfc3339());
+            query_values.push(heartbeat.to_string());
         }
 
         if let Some(indexed_date) = update.indexed_date {
             query_parts.push("indexed_date = ?");
-            query_values.push(indexed_date.to_rfc3339());
+            query_values.push(indexed_date.to_string());
         }
 
         if query_parts.is_empty() {
@@ -368,13 +368,13 @@ impl CrawlQueueQueries {
         let result = sqlx::query_as!(
             CrawlQueueItem,
             r#"
-            SELECT id as "id: i64", 
-                   site_id as "site_id: i64", 
+            SELECT id,
+                   site_id,
                    url, 
-                   status as "status: CrawlStatus", 
-                   retry_count as "retry_count: i32", 
+                   status as "status: CrawlStatus",
+                   retry_count,
                    error_message, 
-                   created_date as "created_date: _"
+                   created_date
             FROM crawl_queue 
             WHERE site_id = ? AND (status = 'pending' OR (status = 'failed' AND retry_count < 3))
             ORDER BY created_date ASC
@@ -447,13 +447,13 @@ impl CrawlQueueQueries {
         let result = sqlx::query_as!(
             CrawlQueueItem,
             r#"
-            SELECT id as "id: i64", 
-                   site_id as "site_id: i64", 
+            SELECT id,
+                   site_id,
                    url, 
-                   status as "status: CrawlStatus", 
-                   retry_count as "retry_count: i32", 
-                   error_message, 
-                   created_date as "created_date: _"
+                   status as "status: CrawlStatus",
+                   retry_count,
+                   error_message,
+                   created_date
             FROM crawl_queue WHERE id = ?
             "#,
             id
@@ -524,7 +524,7 @@ impl IndexedChunkQueries {
             .context("Failed to begin transaction for batch chunk insert")?;
 
         let mut created_chunks = Vec::new();
-        let now = Utc::now();
+        let now = Utc::now().naive_utc();
 
         for chunk in chunks {
             let id = sqlx::query(
@@ -576,15 +576,15 @@ impl IndexedChunkQueries {
         let result = sqlx::query_as!(
             IndexedChunk,
             r#"
-            SELECT id as "id: i64", 
-                   site_id as "site_id: i64", 
+            SELECT id,
+                   site_id,
                    url, 
                    page_title, 
                    heading_path, 
                    chunk_content, 
-                   chunk_index as "chunk_index: i32", 
+                   chunk_index,
                    vector_id, 
-                   indexed_date as "indexed_date: _"
+                   indexed_date
             FROM indexed_chunks WHERE vector_id = ?
             "#,
             vector_id
@@ -601,15 +601,15 @@ impl IndexedChunkQueries {
         let result = sqlx::query_as!(
             IndexedChunk,
             r#"
-            SELECT id as "id: i64", 
-                   site_id as "site_id: i64", 
+            SELECT id,
+                   site_id,
                    url, 
                    page_title, 
                    heading_path, 
                    chunk_content, 
-                   chunk_index as "chunk_index: i32", 
+                   chunk_index,
                    vector_id, 
-                   indexed_date as "indexed_date: _"
+                   indexed_date
             FROM indexed_chunks WHERE id = ?
             "#,
             id
@@ -626,15 +626,15 @@ impl IndexedChunkQueries {
         let chunks = sqlx::query_as!(
             IndexedChunk,
             r#"
-            SELECT id as "id: i64", 
-                   site_id as "site_id: i64", 
+            SELECT id,
+                   site_id,
                    url, 
                    page_title, 
                    heading_path, 
                    chunk_content, 
-                   chunk_index as "chunk_index: i32", 
+                   chunk_index,
                    vector_id, 
-                   indexed_date as "indexed_date: _"
+                   indexed_date
             FROM indexed_chunks WHERE site_id = ? ORDER BY url, chunk_index
             "#,
             site_id
@@ -730,7 +730,7 @@ mod tests {
             total_pages: Some(100),
             indexed_pages: Some(50),
             error_message: None,
-            last_heartbeat: Some(Utc::now()),
+            last_heartbeat: Some(Utc::now().naive_utc()),
             indexed_date: None,
         };
 

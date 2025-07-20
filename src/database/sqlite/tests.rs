@@ -106,7 +106,7 @@ async fn integration_site_workflow() -> Result<()> {
         total_pages: Some(3),
         indexed_pages: Some(0),
         progress_percent: Some(0),
-        last_heartbeat: Some(Utc::now()),
+        last_heartbeat: Some(Utc::now().naive_utc()),
         error_message: None,
         indexed_date: None,
     };
@@ -156,7 +156,7 @@ async fn integration_site_workflow() -> Result<()> {
             status: None,
             total_pages: None,
             error_message: None,
-            last_heartbeat: Some(Utc::now()),
+            last_heartbeat: Some(Utc::now().naive_utc()),
             indexed_date: None,
         };
         SiteQueries::update(database.pool(), site.id, site_progress_update).await?;
@@ -164,7 +164,7 @@ async fn integration_site_workflow() -> Result<()> {
 
     let completion_update = SiteUpdate {
         status: Some(SiteStatus::Completed),
-        indexed_date: Some(Utc::now()),
+        indexed_date: Some(Utc::now().naive_utc()),
         progress_percent: Some(100),
         total_pages: None,
         indexed_pages: None,

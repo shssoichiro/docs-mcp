@@ -38,7 +38,9 @@ cargo test integration_tests::config_file_persistence # Run specific test
 ```bash
 cargo check          # Quick compile check without producing executable
 cargo clippy         # Run Clippy linter (extensive lint rules configured)
+cargo clippy --tests --benches -- -D warnings # Run clippy with stricter warnings for tests
 cargo fmt            # Format code according to Rust style guidelines
+just precommit       # Run all pre-commit checks (fmt, clippy, test)
 ```
 
 ## Project Structure
@@ -199,3 +201,16 @@ Extensive clippy rules are configured in `Cargo.toml` covering:
 - Use an in-memory database as much as possible for integration tests
 - Use query macros for additional type safety. There is a database at `.sqlx/test.db` which sqlx will check against for its query verification.
   - To run migrations against this test DB, use `cargo sqlx migrate run  --source ./src/database/sqlite/migrations`
+- Assume all datetimes in the SQLite database are UTC. sqlx's sqlite adapter does not provide support for `DateTime<Utc>`, so we are using `NaiveDateTime` instead and storing all datetimes in the database as UTC.
+
+## Quality Assurance
+
+### Pre-commit Workflow
+
+The project uses `just precommit` which runs:
+
+1. `cargo fmt` - Automatic code formatting
+2. `cargo clippy --tests --benches -- -D warnings` - Strict linting with test coverage
+3. `cargo test` - Full test suite
+
+**Always run `just precommit` before committing changes** to ensure code quality standards.
