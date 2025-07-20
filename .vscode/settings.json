@@ -1,0 +1,8 @@
+{
+  "rust-analyzer.cargo.extraEnv": {
+    "DATABASE_URL": "sqlite://.sqlx/test.db"
+  },
+  "rust-analyzer.server.extraEnv": {
+    "DATABASE_URL": "sqlite://.sqlx/test.db"
+  }
+}

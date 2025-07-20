@@ -193,3 +193,9 @@ Extensive clippy rules are configured in `Cargo.toml` covering:
 - **Inline Annotations**: Publicly exported functions marked with `#[inline]` to enable inline analysis in the CLI binary
 - **Comprehensive Validation**: All user inputs validated before processing
 - **Resource Management**: Proper cleanup and error recovery throughout
+
+## Working with sqlx
+
+- Use an in-memory database as much as possible for integration tests
+- Use query macros for additional type safety. There is a database at `.sqlx/test.db` which sqlx will check against for its query verification.
+  - To run migrations against this test DB, use `cargo sqlx migrate run  --source ./src/database/sqlite/migrations`

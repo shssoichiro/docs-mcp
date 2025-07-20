@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, Type};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, FromRow)]
 pub struct Site {
@@ -18,7 +18,8 @@ pub struct Site {
     pub last_heartbeat: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum SiteStatus {
     Pending,
     Indexing,
@@ -67,7 +68,8 @@ pub struct CrawlQueueItem {
     pub created_date: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum CrawlStatus {
     Pending,
     Processing,

@@ -1,7 +1,7 @@
 use super::models::*;
 use anyhow::{Context, Result};
 use chrono::Utc;
-use sqlx::{Row, SqlitePool};
+use sqlx::SqlitePool;
 use tracing::{debug, warn};
 
 pub struct SiteQueries;
@@ -10,13 +10,13 @@ impl SiteQueries {
     #[inline]
     pub async fn create(pool: &SqlitePool, new_site: NewSite) -> Result<Site> {
         let now = Utc::now();
-        let id = sqlx::query(
-            "INSERT INTO sites (base_url, name, version, status, created_date) VALUES (?, ?, ?, 'pending', ?)"
+        let id = sqlx::query!(
+            "INSERT INTO sites (base_url, name, version, status, created_date) VALUES (?, ?, ?, 'pending', ?)",
+            new_site.base_url,
+            new_site.name,
+            new_site.version,
+            now
         )
-        .bind(&new_site.base_url)
-        .bind(&new_site.name)
-        .bind(&new_site.version)
-        .bind(now)
         .execute(pool)
         .await
         .context("Failed to create site")?
@@ -29,46 +29,30 @@ impl SiteQueries {
 
     #[inline]
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Site>> {
-        let row = sqlx::query(
+        let result = sqlx::query_as!(
+            Site,
             r#"
-            SELECT id, base_url, name, version, indexed_date, status,
-                   progress_percent, total_pages, indexed_pages, error_message,
-                   created_date, last_heartbeat
+            SELECT id as "id: i64", 
+                   base_url, 
+                   name, 
+                   version, 
+                   indexed_date as "indexed_date: _", 
+                   status as "status: SiteStatus",
+                   progress_percent as "progress_percent: i32", 
+                   total_pages as "total_pages: i32", 
+                   indexed_pages as "indexed_pages: i32", 
+                   error_message,
+                   created_date as "created_date: _", 
+                   last_heartbeat as "last_heartbeat: _"
             FROM sites WHERE id = ?
             "#,
+            id
         )
-        .bind(id)
         .fetch_optional(pool)
         .await
         .context("Failed to get site by id")?;
 
-        if let Some(row) = row {
-            let status_str: String = row.get("status");
-            let status = match status_str.as_str() {
-                "pending" => SiteStatus::Pending,
-                "indexing" => SiteStatus::Indexing,
-                "completed" => SiteStatus::Completed,
-                "failed" => SiteStatus::Failed,
-                _ => return Err(anyhow::anyhow!("Invalid status: {}", status_str)),
-            };
-
-            Ok(Some(Site {
-                id: row.get("id"),
-                base_url: row.get("base_url"),
-                name: row.get("name"),
-                version: row.get("version"),
-                indexed_date: row.get("indexed_date"),
-                status,
-                progress_percent: row.get("progress_percent"),
-                total_pages: row.get("total_pages"),
-                indexed_pages: row.get("indexed_pages"),
-                error_message: row.get("error_message"),
-                created_date: row.get("created_date"),
-                last_heartbeat: row.get("last_heartbeat"),
-            }))
-        } else {
-            Ok(None)
-        }
+        Ok(result)
     }
 
     #[inline]
@@ -77,168 +61,111 @@ impl SiteQueries {
         name: &str,
         version: &str,
     ) -> Result<Option<Site>> {
-        let row = sqlx::query(
+        let result = sqlx::query_as!(
+            Site,
             r#"
-            SELECT id, base_url, name, version, indexed_date, status,
-                   progress_percent, total_pages, indexed_pages, error_message,
-                   created_date, last_heartbeat
+            SELECT id as "id: i64", 
+                   base_url, 
+                   name, 
+                   version, 
+                   indexed_date as "indexed_date: _", 
+                   status as "status: SiteStatus",
+                   progress_percent as "progress_percent: i32", 
+                   total_pages as "total_pages: i32", 
+                   indexed_pages as "indexed_pages: i32", 
+                   error_message,
+                   created_date as "created_date: _", 
+                   last_heartbeat as "last_heartbeat: _"
             FROM sites WHERE name = ? AND version = ?
             "#,
+            name,
+            version
         )
-        .bind(name)
-        .bind(version)
         .fetch_optional(pool)
         .await
         .context("Failed to get site by name and version")?;
 
-        if let Some(row) = row {
-            let status_str: String = row.get("status");
-            let status = match status_str.as_str() {
-                "pending" => SiteStatus::Pending,
-                "indexing" => SiteStatus::Indexing,
-                "completed" => SiteStatus::Completed,
-                "failed" => SiteStatus::Failed,
-                _ => return Err(anyhow::anyhow!("Invalid status: {}", status_str)),
-            };
-
-            Ok(Some(Site {
-                id: row.get("id"),
-                base_url: row.get("base_url"),
-                name: row.get("name"),
-                version: row.get("version"),
-                indexed_date: row.get("indexed_date"),
-                status,
-                progress_percent: row.get("progress_percent"),
-                total_pages: row.get("total_pages"),
-                indexed_pages: row.get("indexed_pages"),
-                error_message: row.get("error_message"),
-                created_date: row.get("created_date"),
-                last_heartbeat: row.get("last_heartbeat"),
-            }))
-        } else {
-            Ok(None)
-        }
+        Ok(result)
     }
 
     #[inline]
     pub async fn get_by_base_url(pool: &SqlitePool, base_url: &str) -> Result<Option<Site>> {
-        let row = sqlx::query(
+        let result = sqlx::query_as!(
+            Site,
             r#"
-            SELECT id, base_url, name, version, indexed_date, status,
-                   progress_percent, total_pages, indexed_pages, error_message,
-                   created_date, last_heartbeat
+            SELECT id as "id: i64", 
+                   base_url, 
+                   name, 
+                   version, 
+                   indexed_date as "indexed_date: _", 
+                   status as "status: SiteStatus",
+                   progress_percent as "progress_percent: i32", 
+                   total_pages as "total_pages: i32", 
+                   indexed_pages as "indexed_pages: i32", 
+                   error_message,
+                   created_date as "created_date: _", 
+                   last_heartbeat as "last_heartbeat: _"
             FROM sites WHERE base_url = ?
             "#,
+            base_url
         )
-        .bind(base_url)
         .fetch_optional(pool)
         .await
         .context("Failed to get site by base URL")?;
 
-        if let Some(row) = row {
-            let status_str: String = row.get("status");
-            let status = match status_str.as_str() {
-                "pending" => SiteStatus::Pending,
-                "indexing" => SiteStatus::Indexing,
-                "completed" => SiteStatus::Completed,
-                "failed" => SiteStatus::Failed,
-                _ => return Err(anyhow::anyhow!("Invalid status: {}", status_str)),
-            };
-
-            Ok(Some(Site {
-                id: row.get("id"),
-                base_url: row.get("base_url"),
-                name: row.get("name"),
-                version: row.get("version"),
-                indexed_date: row.get("indexed_date"),
-                status,
-                progress_percent: row.get("progress_percent"),
-                total_pages: row.get("total_pages"),
-                indexed_pages: row.get("indexed_pages"),
-                error_message: row.get("error_message"),
-                created_date: row.get("created_date"),
-                last_heartbeat: row.get("last_heartbeat"),
-            }))
-        } else {
-            Ok(None)
-        }
+        Ok(result)
     }
 
     #[inline]
     pub async fn list_all(pool: &SqlitePool) -> Result<Vec<Site>> {
-        let rows = sqlx::query(
+        let sites = sqlx::query_as!(
+            Site,
             r#"
-            SELECT id, base_url, name, version, indexed_date, status,
-                   progress_percent, total_pages, indexed_pages, error_message,
-                   created_date, last_heartbeat
+            SELECT id as "id: i64", 
+                   base_url, 
+                   name, 
+                   version, 
+                   indexed_date as "indexed_date: _", 
+                   status as "status: SiteStatus",
+                   progress_percent as "progress_percent: i32", 
+                   total_pages as "total_pages: i32", 
+                   indexed_pages as "indexed_pages: i32", 
+                   error_message,
+                   created_date as "created_date: _", 
+                   last_heartbeat as "last_heartbeat: _"
             FROM sites ORDER BY created_date DESC
-            "#,
+            "#
         )
         .fetch_all(pool)
         .await
         .context("Failed to list all sites")?;
-
-        let mut sites = Vec::new();
-        for row in rows {
-            let status_str: String = row.get("status");
-            let status = match status_str.as_str() {
-                "pending" => SiteStatus::Pending,
-                "indexing" => SiteStatus::Indexing,
-                "completed" => SiteStatus::Completed,
-                "failed" => SiteStatus::Failed,
-                _ => continue,
-            };
-
-            sites.push(Site {
-                id: row.get("id"),
-                base_url: row.get("base_url"),
-                name: row.get("name"),
-                version: row.get("version"),
-                indexed_date: row.get("indexed_date"),
-                status,
-                progress_percent: row.get("progress_percent"),
-                total_pages: row.get("total_pages"),
-                indexed_pages: row.get("indexed_pages"),
-                error_message: row.get("error_message"),
-                created_date: row.get("created_date"),
-                last_heartbeat: row.get("last_heartbeat"),
-            });
-        }
 
         Ok(sites)
     }
 
     #[inline]
     pub async fn list_completed(pool: &SqlitePool) -> Result<Vec<Site>> {
-        let rows = sqlx::query(
+        let sites = sqlx::query_as!(
+            Site,
             r#"
-            SELECT id, base_url, name, version, indexed_date, status,
-                   progress_percent, total_pages, indexed_pages, error_message,
-                   created_date, last_heartbeat
+            SELECT id as "id: i64", 
+                   base_url, 
+                   name, 
+                   version, 
+                   indexed_date as "indexed_date: _", 
+                   status as "status: SiteStatus",
+                   progress_percent as "progress_percent: i32", 
+                   total_pages as "total_pages: i32", 
+                   indexed_pages as "indexed_pages: i32", 
+                   error_message,
+                   created_date as "created_date: _", 
+                   last_heartbeat as "last_heartbeat: _"
             FROM sites WHERE status = 'completed' ORDER BY indexed_date DESC
-            "#,
+            "#
         )
         .fetch_all(pool)
         .await
         .context("Failed to list completed sites")?;
-
-        let mut sites = Vec::new();
-        for row in rows {
-            sites.push(Site {
-                id: row.get("id"),
-                base_url: row.get("base_url"),
-                name: row.get("name"),
-                version: row.get("version"),
-                indexed_date: row.get("indexed_date"),
-                status: SiteStatus::Completed,
-                progress_percent: row.get("progress_percent"),
-                total_pages: row.get("total_pages"),
-                indexed_pages: row.get("indexed_pages"),
-                error_message: row.get("error_message"),
-                created_date: row.get("created_date"),
-                last_heartbeat: row.get("last_heartbeat"),
-            });
-        }
 
         Ok(sites)
     }
@@ -308,8 +235,7 @@ impl SiteQueries {
 
     #[inline]
     pub async fn delete(pool: &SqlitePool, id: i64) -> Result<bool> {
-        let result = sqlx::query("DELETE FROM sites WHERE id = ?")
-            .bind(id)
+        let result = sqlx::query!("DELETE FROM sites WHERE id = ?", id)
             .execute(pool)
             .await
             .context("Failed to delete site")?;
@@ -323,31 +249,29 @@ impl SiteQueries {
             return Ok(None);
         };
 
-        let chunk_row =
-            sqlx::query("SELECT COUNT(*) as count FROM indexed_chunks WHERE site_id = ?")
-                .bind(site_id)
-                .fetch_one(pool)
-                .await
-                .context("Failed to get chunk count")?;
-        let chunk_count: i64 = chunk_row.get("count");
-
-        let pending_row = sqlx::query(
-            "SELECT COUNT(*) as count FROM crawl_queue WHERE site_id = ? AND status = 'pending'",
+        let chunk_count = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM indexed_chunks WHERE site_id = ?",
+            site_id
         )
-        .bind(site_id)
+        .fetch_one(pool)
+        .await
+        .context("Failed to get chunk count")?;
+
+        let pending_crawl = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM crawl_queue WHERE site_id = ? AND status = 'pending'",
+            site_id
+        )
         .fetch_one(pool)
         .await
         .context("Failed to get pending crawl count")?;
-        let pending_crawl: i64 = pending_row.get("count");
 
-        let failed_row = sqlx::query(
-            "SELECT COUNT(*) as count FROM crawl_queue WHERE site_id = ? AND status = 'failed'",
+        let failed_crawl = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM crawl_queue WHERE site_id = ? AND status = 'failed'",
+            site_id
         )
-        .bind(site_id)
         .fetch_one(pool)
         .await
         .context("Failed to get failed crawl count")?;
-        let failed_crawl: i64 = failed_row.get("count");
 
         Ok(Some(SiteStatistics {
             site,
@@ -364,16 +288,16 @@ impl CrawlQueueQueries {
     #[inline]
     pub async fn add_url(pool: &SqlitePool, new_item: NewCrawlQueueItem) -> Result<CrawlQueueItem> {
         let now = Utc::now();
-        let id = sqlx::query(
+        let id = sqlx::query!(
             r#"
             INSERT INTO crawl_queue (site_id, url, status, created_date)
             VALUES (?, ?, 'pending', ?)
             ON CONFLICT(site_id, url) DO UPDATE SET status = 'pending'
             "#,
+            new_item.site_id,
+            new_item.url,
+            now
         )
-        .bind(new_item.site_id)
-        .bind(&new_item.url)
-        .bind(now)
         .execute(pool)
         .await
         .context("Failed to add URL to crawl queue")?
@@ -441,42 +365,28 @@ impl CrawlQueueQueries {
         pool: &SqlitePool,
         site_id: i64,
     ) -> Result<Option<CrawlQueueItem>> {
-        let row = sqlx::query(
+        let result = sqlx::query_as!(
+            CrawlQueueItem,
             r#"
-            SELECT id, site_id, url, status, retry_count, error_message, created_date
+            SELECT id as "id: i64", 
+                   site_id as "site_id: i64", 
+                   url, 
+                   status as "status: CrawlStatus", 
+                   retry_count as "retry_count: i32", 
+                   error_message, 
+                   created_date as "created_date: _"
             FROM crawl_queue 
             WHERE site_id = ? AND (status = 'pending' OR (status = 'failed' AND retry_count < 3))
             ORDER BY created_date ASC
             LIMIT 1
             "#,
+            site_id
         )
-        .bind(site_id)
         .fetch_optional(pool)
         .await
         .context("Failed to get next pending crawl item")?;
 
-        if let Some(row) = row {
-            let status_str: String = row.get("status");
-            let status = match status_str.as_str() {
-                "pending" => CrawlStatus::Pending,
-                "processing" => CrawlStatus::Processing,
-                "completed" => CrawlStatus::Completed,
-                "failed" => CrawlStatus::Failed,
-                _ => return Err(anyhow::anyhow!("Invalid crawl status: {}", status_str)),
-            };
-
-            Ok(Some(CrawlQueueItem {
-                id: row.get("id"),
-                site_id: row.get("site_id"),
-                url: row.get("url"),
-                status,
-                retry_count: row.get("retry_count"),
-                error_message: row.get("error_message"),
-                created_date: row.get("created_date"),
-            }))
-        } else {
-            Ok(None)
-        }
+        Ok(result)
     }
 
     #[inline]
@@ -534,49 +444,36 @@ impl CrawlQueueQueries {
 
     #[inline]
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<CrawlQueueItem>> {
-        let row = sqlx::query(
+        let result = sqlx::query_as!(
+            CrawlQueueItem,
             r#"
-            SELECT id, site_id, url, status, retry_count, error_message, created_date
+            SELECT id as "id: i64", 
+                   site_id as "site_id: i64", 
+                   url, 
+                   status as "status: CrawlStatus", 
+                   retry_count as "retry_count: i32", 
+                   error_message, 
+                   created_date as "created_date: _"
             FROM crawl_queue WHERE id = ?
             "#,
+            id
         )
-        .bind(id)
         .fetch_optional(pool)
         .await
         .context("Failed to get crawl queue item by id")?;
 
-        if let Some(row) = row {
-            let status_str: String = row.get("status");
-            let status = match status_str.as_str() {
-                "pending" => CrawlStatus::Pending,
-                "processing" => CrawlStatus::Processing,
-                "completed" => CrawlStatus::Completed,
-                "failed" => CrawlStatus::Failed,
-                _ => return Err(anyhow::anyhow!("Invalid crawl status: {}", status_str)),
-            };
-
-            Ok(Some(CrawlQueueItem {
-                id: row.get("id"),
-                site_id: row.get("site_id"),
-                url: row.get("url"),
-                status,
-                retry_count: row.get("retry_count"),
-                error_message: row.get("error_message"),
-                created_date: row.get("created_date"),
-            }))
-        } else {
-            Ok(None)
-        }
+        Ok(result)
     }
 
     #[inline]
     pub async fn delete_completed_for_site(pool: &SqlitePool, site_id: i64) -> Result<usize> {
-        let result =
-            sqlx::query("DELETE FROM crawl_queue WHERE site_id = ? AND status = 'completed'")
-                .bind(site_id)
-                .execute(pool)
-                .await
-                .context("Failed to delete completed crawl queue items")?;
+        let result = sqlx::query!(
+            "DELETE FROM crawl_queue WHERE site_id = ? AND status = 'completed'",
+            site_id
+        )
+        .execute(pool)
+        .await
+        .context("Failed to delete completed crawl queue items")?;
 
         Ok(result.rows_affected() as usize)
     }
@@ -588,20 +485,20 @@ impl IndexedChunkQueries {
     #[inline]
     pub async fn create(pool: &SqlitePool, new_chunk: NewIndexedChunk) -> Result<IndexedChunk> {
         let now = Utc::now();
-        let id = sqlx::query(
+        let id = sqlx::query!(
             r#"
             INSERT INTO indexed_chunks (site_id, url, page_title, heading_path, chunk_content, chunk_index, vector_id, indexed_date)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            "#
+            "#,
+            new_chunk.site_id,
+            new_chunk.url,
+            new_chunk.page_title,
+            new_chunk.heading_path,
+            new_chunk.chunk_content,
+            new_chunk.chunk_index,
+            new_chunk.vector_id,
+            now
         )
-        .bind(new_chunk.site_id)
-        .bind(&new_chunk.url)
-        .bind(&new_chunk.page_title)
-        .bind(&new_chunk.heading_path)
-        .bind(&new_chunk.chunk_content)
-        .bind(new_chunk.chunk_index)
-        .bind(&new_chunk.vector_id)
-        .bind(now)
         .execute(pool)
         .await
         .context("Failed to create indexed chunk")?
@@ -676,92 +573,82 @@ impl IndexedChunkQueries {
         pool: &SqlitePool,
         vector_id: &str,
     ) -> Result<Option<IndexedChunk>> {
-        let row = sqlx::query(
-            "SELECT id, site_id, url, page_title, heading_path, chunk_content, chunk_index, vector_id, indexed_date FROM indexed_chunks WHERE vector_id = ?"
+        let result = sqlx::query_as!(
+            IndexedChunk,
+            r#"
+            SELECT id as "id: i64", 
+                   site_id as "site_id: i64", 
+                   url, 
+                   page_title, 
+                   heading_path, 
+                   chunk_content, 
+                   chunk_index as "chunk_index: i32", 
+                   vector_id, 
+                   indexed_date as "indexed_date: _"
+            FROM indexed_chunks WHERE vector_id = ?
+            "#,
+            vector_id
         )
-        .bind(vector_id)
         .fetch_optional(pool)
         .await
         .context("Failed to get indexed chunk by vector id")?;
 
-        row.map_or_else(
-            || Ok(None),
-            |row| {
-                Ok(Some(IndexedChunk {
-                    id: row.get("id"),
-                    site_id: row.get("site_id"),
-                    url: row.get("url"),
-                    page_title: row.get("page_title"),
-                    heading_path: row.get("heading_path"),
-                    chunk_content: row.get("chunk_content"),
-                    chunk_index: row.get("chunk_index"),
-                    vector_id: row.get("vector_id"),
-                    indexed_date: row.get("indexed_date"),
-                }))
-            },
-        )
+        Ok(result)
     }
 
     #[inline]
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<IndexedChunk>> {
-        let row = sqlx::query(
-            "SELECT id, site_id, url, page_title, heading_path, chunk_content, chunk_index, vector_id, indexed_date FROM indexed_chunks WHERE id = ?"
+        let result = sqlx::query_as!(
+            IndexedChunk,
+            r#"
+            SELECT id as "id: i64", 
+                   site_id as "site_id: i64", 
+                   url, 
+                   page_title, 
+                   heading_path, 
+                   chunk_content, 
+                   chunk_index as "chunk_index: i32", 
+                   vector_id, 
+                   indexed_date as "indexed_date: _"
+            FROM indexed_chunks WHERE id = ?
+            "#,
+            id
         )
-        .bind(id)
         .fetch_optional(pool)
         .await
         .context("Failed to get indexed chunk by id")?;
 
-        row.map_or_else(
-            || Ok(None),
-            |row| {
-                Ok(Some(IndexedChunk {
-                    id: row.get("id"),
-                    site_id: row.get("site_id"),
-                    url: row.get("url"),
-                    page_title: row.get("page_title"),
-                    heading_path: row.get("heading_path"),
-                    chunk_content: row.get("chunk_content"),
-                    chunk_index: row.get("chunk_index"),
-                    vector_id: row.get("vector_id"),
-                    indexed_date: row.get("indexed_date"),
-                }))
-            },
-        )
+        Ok(result)
     }
 
     #[inline]
     pub async fn list_by_site(pool: &SqlitePool, site_id: i64) -> Result<Vec<IndexedChunk>> {
-        let rows = sqlx::query(
-            "SELECT id, site_id, url, page_title, heading_path, chunk_content, chunk_index, vector_id, indexed_date FROM indexed_chunks WHERE site_id = ? ORDER BY url, chunk_index"
+        let chunks = sqlx::query_as!(
+            IndexedChunk,
+            r#"
+            SELECT id as "id: i64", 
+                   site_id as "site_id: i64", 
+                   url, 
+                   page_title, 
+                   heading_path, 
+                   chunk_content, 
+                   chunk_index as "chunk_index: i32", 
+                   vector_id, 
+                   indexed_date as "indexed_date: _"
+            FROM indexed_chunks WHERE site_id = ? ORDER BY url, chunk_index
+            "#,
+            site_id
         )
-        .bind(site_id)
         .fetch_all(pool)
         .await
         .context("Failed to list indexed chunks by site")?;
-
-        let mut chunks = Vec::new();
-        for row in rows {
-            chunks.push(IndexedChunk {
-                id: row.get("id"),
-                site_id: row.get("site_id"),
-                url: row.get("url"),
-                page_title: row.get("page_title"),
-                heading_path: row.get("heading_path"),
-                chunk_content: row.get("chunk_content"),
-                chunk_index: row.get("chunk_index"),
-                vector_id: row.get("vector_id"),
-                indexed_date: row.get("indexed_date"),
-            });
-        }
 
         Ok(chunks)
     }
 
     #[inline]
     pub async fn delete_by_site(pool: &SqlitePool, site_id: i64) -> Result<usize> {
-        let result = sqlx::query("DELETE FROM indexed_chunks WHERE site_id = ?")
-            .bind(site_id)
+        let result = sqlx::query!("DELETE FROM indexed_chunks WHERE site_id = ?", site_id)
             .execute(pool)
             .await
             .context("Failed to delete indexed chunks by site")?;
@@ -771,12 +658,13 @@ impl IndexedChunkQueries {
 
     #[inline]
     pub async fn count_by_site(pool: &SqlitePool, site_id: i64) -> Result<i64> {
-        let row = sqlx::query("SELECT COUNT(*) as count FROM indexed_chunks WHERE site_id = ?")
-            .bind(site_id)
-            .fetch_one(pool)
-            .await
-            .context("Failed to count indexed chunks by site")?;
-        let count: i64 = row.get("count");
+        let count = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM indexed_chunks WHERE site_id = ?",
+            site_id
+        )
+        .fetch_one(pool)
+        .await
+        .context("Failed to count indexed chunks by site")?;
 
         Ok(count)
     }
