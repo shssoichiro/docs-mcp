@@ -1,0 +1,1052 @@
+# Documentation MCP Server - TODO Checklist
+
+This checklist tracks the implementation progress of the documentation MCP server. Each item should be checked off when completed and tested.
+
+## Phase 1: Foundation & Core Infrastructure
+
+### Step 1.1: Project Setup and Basic CLI Framework
+- [ ] Update Cargo.toml with core dependencies
+  - [ ] Add clap with derive features
+  - [ ] Add anyhow for error handling
+  - [ ] Add thiserror for custom error types
+  - [ ] Add tracing and tracing-subscriber for logging
+  - [ ] Add tokio with full features
+  - [ ] Add serde and serde_json
+- [ ] Create basic CLI structure in main.rs
+  - [ ] Define main CLI struct with clap derive
+  - [ ] Add all subcommands: config, add, list, delete, update, status, serve
+  - [ ] Implement basic argument parsing for each command
+  - [ ] Add help text and descriptions for all commands
+- [ ] Create lib.rs with common types
+  - [ ] Define Result type alias
+  - [ ] Create custom error enum with thiserror
+  - [ ] Add common utility functions
+  - [ ] Export public API for modules
+- [ ] Set up basic project module structure
+  - [ ] Create src/config/mod.rs (empty initially)
+  - [ ] Create src/database/mod.rs (empty initially)
+  - [ ] Create src/crawler/mod.rs (empty initially)
+  - [ ] Create src/embeddings/mod.rs (empty initially)
+  - [ ] Create src/indexer/mod.rs (empty initially)
+  - [ ] Create src/mcp/mod.rs (empty initially)
+- [ ] Implement tracing/logging setup
+  - [ ] Configure tracing subscriber in main.rs
+  - [ ] Add log levels and filtering
+  - [ ] Test logging output in different scenarios
+- [ ] Add unit tests for CLI parsing
+  - [ ] Test all command parsing scenarios
+  - [ ] Test help message generation
+  - [ ] Test invalid command combinations
+  - [ ] Test argument validation
+- [ ] Implement "not implemented" messages
+  - [ ] Each command shows helpful placeholder message
+  - [ ] Messages indicate which command was called
+  - [ ] Messages are consistent and professional
+- [ ] Verify compilation and basic functionality
+  - [ ] All commands compile without warnings
+  - [ ] Help messages display correctly
+  - [ ] Error handling works as expected
+
+### Step 1.2: Configuration Management System
+- [ ] Create config module structure
+  - [ ] Create src/config/mod.rs with public exports
+  - [ ] Create src/config/settings.rs with Config struct
+- [ ] Add configuration dependencies
+  - [ ] Add toml crate for TOML parsing
+  - [ ] Add dirs crate for cross-platform directories
+  - [ ] Add serde derive features for Config struct
+- [ ] Define Config struct
+  - [ ] Add ollama section with host, port, model, batch_size
+  - [ ] Implement serde Serialize and Deserialize
+  - [ ] Add Default implementation with sensible defaults
+  - [ ] Add validation methods for each field
+- [ ] Implement cross-platform config directory handling
+  - [ ] Use dirs crate to find appropriate config directory
+  - [ ] Create ~/.docs-mcp/ or %APPDATA%/docs-mcp/ as needed
+  - [ ] Handle directory creation with proper permissions
+  - [ ] Add error handling for permission issues
+- [ ] Implement config file operations
+  - [ ] Add config file reading with TOML parsing
+  - [ ] Add config file writing with proper formatting
+  - [ ] Handle missing config files gracefully
+  - [ ] Add config validation on load
+- [ ] Implement interactive config command
+  - [ ] Prompt for Ollama host with default (localhost)
+  - [ ] Prompt for Ollama port with default (11434)
+  - [ ] Prompt for embedding model with default (nomic-embed-text)
+  - [ ] Prompt for batch size with default (64)
+  - [ ] Save configuration after validation
+- [ ] Add config validation functions
+  - [ ] Validate Ollama host format (URL or hostname)
+  - [ ] Validate port range (1-65535)
+  - [ ] Validate model name format
+  - [ ] Validate batch size range (1-1000)
+- [ ] Create comprehensive unit tests
+  - [ ] Test config struct serialization/deserialization
+  - [ ] Test config directory discovery on different platforms
+  - [ ] Test config file reading with valid TOML
+  - [ ] Test config file reading with invalid TOML
+  - [ ] Test config validation with various inputs
+  - [ ] Test interactive prompts with mocked input
+  - [ ] Test error handling for file permission issues
+- [ ] Add integration tests
+  - [ ] Test complete config workflow end-to-end
+  - [ ] Test config persistence across application restarts
+  - [ ] Test config updates and migrations
+- [ ] Verify config command functionality
+  - [ ] docs-mcp config runs interactive setup
+  - [ ] Config file is created in correct location
+  - [ ] Config validation works properly
+  - [ ] Error messages are helpful and actionable
+
+### Step 1.3: SQLite Database Foundation
+- [ ] Add database dependencies
+  - [ ] Add sqlx with sqlite and runtime-tokio-rustls features
+  - [ ] Add uuid crate with v4 feature for ID generation
+  - [ ] Add chrono for datetime handling (if needed)
+- [ ] Create database module structure
+  - [ ] Create src/database/mod.rs with public exports
+  - [ ] Create src/database/sqlite/mod.rs
+  - [ ] Create src/database/sqlite/models.rs
+  - [ ] Create src/database/sqlite/queries.rs
+- [ ] Define data models
+  - [ ] Create Site struct matching sites table schema
+  - [ ] Create CrawlQueueItem struct matching crawl_queue schema
+  - [ ] Create IndexedChunk struct matching indexed_chunks schema
+  - [ ] Add serde derives for JSON serialization
+  - [ ] Add proper type conversions for database fields
+- [ ] Create database schema
+  - [ ] Write CREATE TABLE statement for sites table
+  - [ ] Write CREATE TABLE statement for crawl_queue table
+  - [ ] Write CREATE TABLE statement for indexed_chunks table
+  - [ ] Add proper indexes for performance
+  - [ ] Add foreign key constraints
+- [ ] Implement database connection management
+  - [ ] Create connection pool with sqlx
+  - [ ] Add database file path management (~/.docs-mcp/metadata.db)
+  - [ ] Implement connection initialization
+  - [ ] Add connection health checking
+- [ ] Create migration system
+  - [ ] Implement database initialization from scratch
+  - [ ] Add schema migration functions
+  - [ ] Create migration tracking table
+  - [ ] Add migration rollback capability (if needed)
+- [ ] Implement CRUD operations for sites table
+  - [ ] Add insert_site function
+  - [ ] Add get_site_by_id function
+  - [ ] Add get_site_by_url function
+  - [ ] Add update_site_status function
+  - [ ] Add delete_site function
+  - [ ] Add list_all_sites function
+- [ ] Implement CRUD operations for crawl_queue table
+  - [ ] Add insert_queue_item function
+  - [ ] Add get_pending_queue_items function
+  - [ ] Add update_queue_item_status function
+  - [ ] Add delete_queue_item function
+  - [ ] Add get_queue_stats function
+- [ ] Implement CRUD operations for indexed_chunks table
+  - [ ] Add insert_chunk function
+  - [ ] Add get_chunks_by_site function
+  - [ ] Add delete_chunks_by_site function
+  - [ ] Add get_chunk_count function
+- [ ] Add transaction support
+  - [ ] Implement transaction wrapper functions
+  - [ ] Add rollback capability for failed operations
+  - [ ] Test transaction behavior under various scenarios
+- [ ] Create comprehensive unit tests
+  - [ ] Test database initialization and migration
+  - [ ] Test all CRUD operations for each table
+  - [ ] Test foreign key constraint enforcement
+  - [ ] Test concurrent access patterns
+  - [ ] Test transaction rollback scenarios
+  - [ ] Test error handling for database corruption
+- [ ] Add integration tests
+  - [ ] Test complete database lifecycle
+  - [ ] Test database file creation and permissions
+  - [ ] Test cross-platform database operations
+- [ ] Performance testing
+  - [ ] Test query performance with large datasets
+  - [ ] Test concurrent access performance
+  - [ ] Optimize slow queries with indexes
+
+## Phase 2: Content Processing Foundation
+
+### Step 2.1: URL Validation and Basic HTTP Client
+- [ ] Add web crawling dependencies
+  - [ ] Add reqwest with json features
+  - [ ] Add url crate for URL parsing
+  - [ ] Add regex crate for pattern matching
+  - [ ] Add scraper crate for HTML parsing
+- [ ] Create crawler module structure
+  - [ ] Create src/crawler/mod.rs with public exports
+  - [ ] Create src/crawler/robots.rs for robots.txt handling
+  - [ ] Create placeholder for extractor.rs and browser.rs
+- [ ] Implement URL validation and normalization
+  - [ ] Add URL parsing and validation functions
+  - [ ] Implement URL normalization (remove fragments, etc.)
+  - [ ] Add relative URL resolution
+  - [ ] Create URL filtering logic based on base URL rules
+  - [ ] Handle URL encoding and decoding properly
+- [ ] Create HTTP client setup
+  - [ ] Configure reqwest client with appropriate headers
+  - [ ] Set proper User-Agent string
+  - [ ] Add timeout configuration (30 seconds)
+  - [ ] Add redirect handling
+  - [ ] Configure connection pooling
+- [ ] Implement robots.txt handling
+  - [ ] Add robots.txt fetching function
+  - [ ] Implement robots.txt parsing
+  - [ ] Add URL permission checking against robots.txt
+  - [ ] Handle missing or malformed robots.txt files
+  - [ ] Cache robots.txt data appropriately
+- [ ] Add rate limiting mechanism
+  - [ ] Implement 250ms delay between requests
+  - [ ] Use tokio time utilities for delays
+  - [ ] Add configurable rate limiting
+  - [ ] Test rate limiting accuracy
+- [ ] Implement retry logic
+  - [ ] Add exponential backoff for network failures
+  - [ ] Distinguish between retryable and non-retryable errors
+  - [ ] Implement maximum retry limits (3 attempts)
+  - [ ] Add logging for retry attempts
+- [ ] Create comprehensive unit tests
+  - [ ] Test URL validation with various formats
+  - [ ] Test URL normalization edge cases
+  - [ ] Test URL filtering rules with complex base URLs
+  - [ ] Test robots.txt parsing with different formats
+  - [ ] Test HTTP client configuration and behavior
+  - [ ] Test rate limiting accuracy and performance
+  - [ ] Test retry logic with simulated failures
+- [ ] Add integration tests with mock servers
+  - [ ] Set up mock HTTP server for testing
+  - [ ] Test complete HTTP request/response cycle
+  - [ ] Test robots.txt integration
+  - [ ] Test timeout and error handling
+- [ ] Error handling implementation
+  - [ ] Define custom error types for network operations
+  - [ ] Add proper error propagation
+  - [ ] Create user-friendly error messages
+  - [ ] Test error handling scenarios
+
+### Step 2.2: HTML Content Extraction and Basic Chunking
+- [ ] Add content processing dependencies
+  - [ ] Ensure scraper crate is available for HTML parsing
+  - [ ] Add any additional text processing dependencies
+  - [ ] Add tokenization library for chunk sizing
+- [ ] Create content extraction module
+  - [ ] Create src/crawler/extractor.rs
+  - [ ] Define content extraction structures
+  - [ ] Add HTML parsing functions
+- [ ] Create chunking module
+  - [ ] Create src/embeddings/chunking.rs
+  - [ ] Define chunking algorithm interfaces
+  - [ ] Add token counting utilities
+- [ ] Implement HTML content extraction
+  - [ ] Extract main content from HTML documents
+  - [ ] Preserve heading hierarchy (h1, h2, h3, etc.)
+  - [ ] Extract page titles from HTML
+  - [ ] Handle meta information extraction
+  - [ ] Remove navigation and footer content
+  - [ ] Preserve code blocks and preformatted text
+- [ ] Implement heading hierarchy detection
+  - [ ] Build heading tree structure from HTML
+  - [ ] Create breadcrumb paths for content sections
+  - [ ] Handle nested heading structures
+  - [ ] Deal with malformed heading hierarchies
+- [ ] Create text cleaning and normalization
+  - [ ] Remove excessive whitespace
+  - [ ] Normalize Unicode characters
+  - [ ] Handle special characters and encoding
+  - [ ] Preserve important formatting markers
+- [ ] Implement basic chunking algorithm
+  - [ ] Target 500-800 tokens per chunk
+  - [ ] Split content by heading boundaries
+  - [ ] Preserve code blocks during splitting
+  - [ ] Handle oversized sections (>1000 tokens)
+  - [ ] Add context preservation with heading paths
+- [ ] Add chunk formatting
+  - [ ] Include page title in each chunk
+  - [ ] Add heading breadcrumb path
+  - [ ] Format chunks according to SPEC.md example
+  - [ ] Ensure consistent chunk structure
+- [ ] Create comprehensive unit tests
+  - [ ] Test HTML parsing with various document structures
+  - [ ] Test heading hierarchy extraction accuracy
+  - [ ] Test content cleaning and normalization
+  - [ ] Test chunking with different content sizes
+  - [ ] Test code block preservation
+  - [ ] Test heading path generation
+  - [ ] Test token counting accuracy
+- [ ] Add test data and fixtures
+  - [ ] Create sample HTML documents for testing
+  - [ ] Include various documentation site structures
+  - [ ] Add edge cases like malformed HTML
+  - [ ] Test with real documentation examples
+- [ ] Performance testing
+  - [ ] Test extraction speed with large documents
+  - [ ] Test memory usage with complex HTML
+  - [ ] Optimize slow extraction operations
+
+### Step 2.3: Basic Site Crawling Without JavaScript
+- [ ] Integrate URL validation, robots.txt, and content extraction
+  - [ ] Connect all crawler components together
+  - [ ] Create main crawling orchestration function
+  - [ ] Add proper error handling throughout pipeline
+- [ ] Implement crawling algorithm
+  - [ ] Create breadth-first crawling implementation
+  - [ ] Add URL queue management
+  - [ ] Implement visited URL tracking
+  - [ ] Handle URL deduplication
+  - [ ] Add crawl depth limiting
+- [ ] Integrate with SQLite database
+  - [ ] Store crawl progress in crawl_queue table
+  - [ ] Update site status during crawling
+  - [ ] Store extracted chunks in indexed_chunks table
+  - [ ] Implement progress tracking with percentages
+- [ ] Implement "docs-mcp add" command
+  - [ ] Parse command arguments (url, name, version)
+  - [ ] Validate input parameters
+  - [ ] Check for duplicate sites
+  - [ ] Initialize crawling process
+  - [ ] Provide user feedback during operation
+- [ ] Add crawl progress tracking
+  - [ ] Calculate and update progress percentages
+  - [ ] Track total and indexed page counts
+  - [ ] Store progress in database
+  - [ ] Display progress to user
+- [ ] Implement error handling and recovery
+  - [ ] Handle various HTTP response codes appropriately
+  - [ ] Implement retry logic for transient failures
+  - [ ] Store error messages for failed operations
+  - [ ] Continue crawling despite individual page failures
+- [ ] Add resource management and cleanup
+  - [ ] Properly close HTTP connections
+  - [ ] Clean up temporary data structures
+  - [ ] Handle interruption gracefully
+  - [ ] Implement memory usage monitoring
+- [ ] Create comprehensive unit tests
+  - [ ] Test crawling algorithm with mock sites
+  - [ ] Test URL deduplication and queue management
+  - [ ] Test database integration during crawling
+  - [ ] Test progress tracking accuracy
+  - [ ] Test error handling and recovery scenarios
+- [ ] Add integration tests
+  - [ ] Set up mock documentation sites for testing
+  - [ ] Test complete crawling workflow
+  - [ ] Test "docs-mcp add" command end-to-end
+  - [ ] Test crawling with various site structures
+- [ ] Performance and reliability testing
+  - [ ] Test crawling speed and efficiency
+  - [ ] Test memory usage during large site crawling
+  - [ ] Test interruption and resume capability
+  - [ ] Test concurrent access to shared resources
+
+## Phase 3: Embedding Integration
+
+### Step 3.1: Ollama Client Implementation
+- [ ] Add Ollama integration dependencies
+  - [ ] Ensure reqwest is configured for Ollama API calls
+  - [ ] Add any additional JSON processing dependencies
+  - [ ] Add async runtime utilities
+- [ ] Create embeddings module structure
+  - [ ] Create src/embeddings/mod.rs with public exports
+  - [ ] Create src/embeddings/ollama.rs for API client
+  - [ ] Ensure chunking.rs is properly integrated
+- [ ] Implement Ollama API client
+  - [ ] Create client struct with configuration
+  - [ ] Implement embedding generation API calls
+  - [ ] Add proper request/response handling
+  - [ ] Handle API authentication if needed
+- [ ] Add model management functions
+  - [ ] Check model availability on Ollama server
+  - [ ] Validate model names and versions
+  - [ ] Handle model pulling if necessary
+  - [ ] Add model health checking
+- [ ] Implement batch processing
+  - [ ] Process multiple text chunks in batches
+  - [ ] Optimize batch sizes for performance
+  - [ ] Handle batch size configuration (32-64 chunks)
+  - [ ] Add progress tracking for batch operations
+- [ ] Add connection management
+  - [ ] Test connectivity to Ollama server
+  - [ ] Handle connection timeouts and failures
+  - [ ] Implement connection pooling if beneficial
+  - [ ] Add health checking and monitoring
+- [ ] Implement comprehensive error handling
+  - [ ] Distinguish between retryable and non-retryable errors
+  - [ ] Add retry logic with exponential backoff
+  - [ ] Handle Ollama service unavailability
+  - [ ] Create descriptive error messages
+- [ ] Add configuration integration
+  - [ ] Use config settings for Ollama host/port
+  - [ ] Respect batch size configuration
+  - [ ] Handle model configuration
+  - [ ] Add connection timeout configuration
+- [ ] Create comprehensive unit tests
+  - [ ] Test API client with mock Ollama responses
+  - [ ] Test batch processing with various sizes
+  - [ ] Test error handling scenarios
+  - [ ] Test retry logic and backoff behavior
+  - [ ] Test model validation and health checking
+  - [ ] Test configuration integration
+- [ ] Add integration tests
+  - [ ] Test with real Ollama instance (optional)
+  - [ ] Test embedding generation with real text
+  - [ ] Test batch processing performance
+  - [ ] Test error recovery scenarios
+- [ ] Performance optimization
+  - [ ] Optimize batch sizes for throughput
+  - [ ] Test memory usage during batch processing
+  - [ ] Monitor API call performance
+  - [ ] Add performance metrics and logging
+
+### Step 3.2: LanceDB Integration
+- [ ] Add LanceDB dependencies
+  - [ ] Add lancedb crate to Cargo.toml
+  - [ ] Add any additional vector processing dependencies
+  - [ ] Ensure async compatibility
+- [ ] Create LanceDB module structure
+  - [ ] Create src/database/lancedb/mod.rs
+  - [ ] Create src/database/lancedb/vector_store.rs
+  - [ ] Update src/database/mod.rs to export LanceDB functions
+- [ ] Define vector data structures
+  - [ ] Create EmbeddingRecord struct matching SPEC.md
+  - [ ] Create ChunkMetadata struct with proper fields
+  - [ ] Add serde derives for serialization
+  - [ ] Implement type conversions and validations
+- [ ] Implement vector database initialization
+  - [ ] Create database in ~/.docs-mcp/embeddings/
+  - [ ] Set up proper database schema
+  - [ ] Handle database creation and migration
+  - [ ] Add database health checking
+- [ ] Add embedding storage functions
+  - [ ] Implement single embedding insertion
+  - [ ] Add batch insertion for multiple embeddings
+  - [ ] Store metadata alongside vectors
+  - [ ] Handle UUID generation for vector IDs
+- [ ] Implement vector similarity search
+  - [ ] Add semantic search functionality
+  - [ ] Implement relevance scoring
+  - [ ] Add result limiting and filtering
+  - [ ] Handle query embedding generation
+- [ ] Add metadata filtering capabilities
+  - [ ] Filter by site_id
+  - [ ] Filter by URL patterns
+  - [ ] Filter by content types
+  - [ ] Add regex-based filtering for site names
+- [ ] Implement database maintenance functions
+  - [ ] Add database cleanup operations
+  - [ ] Implement index optimization
+  - [ ] Add database size monitoring
+  - [ ] Handle database corruption recovery
+- [ ] Create comprehensive unit tests
+  - [ ] Test database initialization and setup
+  - [ ] Test embedding insertion and retrieval
+  - [ ] Test batch operations performance
+  - [ ] Test similarity search accuracy
+  - [ ] Test metadata filtering functionality
+  - [ ] Test database maintenance operations
+- [ ] Add integration tests
+  - [ ] Test with real embedding data
+  - [ ] Test search performance with large datasets
+  - [ ] Test concurrent access patterns
+  - [ ] Test database persistence and recovery
+- [ ] Performance optimization and testing
+  - [ ] Optimize insertion and search performance
+  - [ ] Test memory usage with large vector datasets
+  - [ ] Monitor database size growth
+  - [ ] Add performance metrics and monitoring
+
+### Step 3.3: End-to-End Embedding Pipeline
+- [ ] Integrate content extraction with embedding generation
+  - [ ] Connect chunking output to Ollama client input
+  - [ ] Handle text preprocessing for embeddings
+  - [ ] Add proper error handling throughout pipeline
+- [ ] Integrate embedding storage with vector database
+  - [ ] Connect Ollama output to LanceDB input
+  - [ ] Store embeddings with proper metadata
+  - [ ] Handle batch processing coordination
+- [ ] Implement complete indexing workflow
+  - [ ] Process chunks from crawling to vector storage
+  - [ ] Coordinate between SQLite metadata and LanceDB vectors
+  - [ ] Add transaction-like behavior for consistency
+  - [ ] Handle partial failures and recovery
+- [ ] Add data consistency validation
+  - [ ] Verify SQLite and LanceDB data alignment
+  - [ ] Check for orphaned vectors or metadata
+  - [ ] Implement consistency repair functions
+  - [ ] Add data integrity checks
+- [ ] Implement "docs-mcp list" command
+  - [ ] Query sites from SQLite database
+  - [ ] Format output as table with proper columns
+  - [ ] Show site status, progress, and statistics
+  - [ ] Handle empty database gracefully
+- [ ] Implement "docs-mcp status" command
+  - [ ] Show detailed status for specific sites
+  - [ ] Display progress, error messages, and statistics
+  - [ ] Show embedding and vector storage status
+  - [ ] Provide actionable information for issues
+- [ ] Add comprehensive error handling
+  - [ ] Handle embedding generation failures
+  - [ ] Manage vector storage errors
+  - [ ] Implement cleanup for partial operations
+  - [ ] Provide detailed error reporting
+- [ ] Implement proper resource management
+  - [ ] Monitor memory usage during processing
+  - [ ] Clean up temporary data structures
+  - [ ] Handle large site processing efficiently
+  - [ ] Add memory pressure handling
+- [ ] Create comprehensive unit tests
+  - [ ] Test complete pipeline with mock data
+  - [ ] Test error handling and recovery scenarios
+  - [ ] Test data consistency validation
+  - [ ] Test resource management and cleanup
+  - [ ] Test CLI commands with various inputs
+- [ ] Add integration tests
+  - [ ] Test end-to-end workflow with real sites
+  - [ ] Test data consistency across systems
+  - [ ] Test CLI commands with real databases
+  - [ ] Test error recovery with real failures
+- [ ] Performance testing and optimization
+  - [ ] Test processing speed with large sites
+  - [ ] Monitor memory usage during indexing
+  - [ ] Optimize bottlenecks in the pipeline
+  - [ ] Add performance metrics and monitoring
+
+## Phase 4: Background Processing
+
+### Step 4.1: Process Coordination and File Locking
+- [ ] Add process coordination dependencies
+  - [ ] Add file locking utilities (fs2 or similar)
+  - [ ] Add signal handling dependencies
+  - [ ] Add process management utilities
+- [ ] Create indexer module structure
+  - [ ] Create src/indexer/mod.rs with public exports
+  - [ ] Create src/indexer/process.rs for coordination
+  - [ ] Create placeholders for queue.rs and progress.rs
+- [ ] Implement file locking mechanism
+  - [ ] Create lock file at ~/.docs-mcp/.indexer.lock
+  - [ ] Implement exclusive file locking
+  - [ ] Add lock file creation and removal
+  - [ ] Handle lock file permissions and errors
+- [ ] Add heartbeat system
+  - [ ] Update SQLite with timestamps every 30 seconds
+  - [ ] Add heartbeat column to sites table if needed
+  - [ ] Implement heartbeat monitoring
+  - [ ] Handle heartbeat failures and recovery
+- [ ] Implement stale process detection
+  - [ ] Check for lock files without recent heartbeats
+  - [ ] Detect processes that have crashed or hung
+  - [ ] Remove stale lock files safely
+  - [ ] Start new indexer when stale process detected
+- [ ] Add background process management
+  - [ ] Spawn background indexer processes
+  - [ ] Monitor background process health
+  - [ ] Handle process termination and cleanup
+  - [ ] Implement process restart capability
+- [ ] Implement signal handling
+  - [ ] Handle SIGTERM and SIGINT gracefully
+  - [ ] Clean up lock files on shutdown
+  - [ ] Complete current operations before exit
+  - [ ] Save progress before termination
+- [ ] Add process status monitoring
+  - [ ] Check if background indexer is running
+  - [ ] Report process status to users
+  - [ ] Monitor process resource usage
+  - [ ] Add process health checks
+- [ ] Create comprehensive unit tests
+  - [ ] Test file locking with concurrent processes
+  - [ ] Test heartbeat mechanism and monitoring
+  - [ ] Test stale process detection logic
+  - [ ] Test signal handling and cleanup
+  - [ ] Test process status monitoring
+  - [ ] Test edge cases like system crashes
+- [ ] Add integration tests
+  - [ ] Test process coordination with real processes
+  - [ ] Test lock file behavior across restarts
+  - [ ] Test heartbeat persistence and recovery
+  - [ ] Test concurrent access scenarios
+- [ ] Error handling and edge cases
+  - [ ] Handle lock file corruption
+  - [ ] Deal with permission issues
+  - [ ] Handle filesystem errors
+  - [ ] Test recovery from various failure modes
+
+### Step 4.2: Indexing Queue Management
+- [ ] Create queue management module
+  - [ ] Create src/indexer/queue.rs
+  - [ ] Define queue management interfaces
+  - [ ] Add queue status monitoring functions
+- [ ] Implement queue processing logic
+  - [ ] Process items from crawl_queue table
+  - [ ] Implement priority-based ordering
+  - [ ] Add queue item status transitions
+  - [ ] Handle concurrent queue access
+- [ ] Add resume capability
+  - [ ] Detect interrupted indexing operations
+  - [ ] Resume from last saved state
+  - [ ] Handle partial completions gracefully
+  - [ ] Validate resume state consistency
+- [ ] Implement retry logic
+  - [ ] Add exponential backoff for failures
+  - [ ] Distinguish between retry types
+  - [ ] Track retry counts and limits
+  - [ ] Handle permanent failures appropriately
+- [ ] Add queue monitoring and reporting
+  - [ ] Track queue size and progress
+  - [ ] Monitor processing rates
+  - [ ] Report queue statistics
+  - [ ] Add queue health monitoring
+- [ ] Implement queue maintenance
+  - [ ] Clean up completed queue items
+  - [ ] Remove expired or failed items
+  - [ ] Optimize queue performance
+  - [ ] Add queue integrity checks
+- [ ] Add queue configuration
+  - [ ] Configure retry limits and delays
+  - [ ] Set queue processing priorities
+  - [ ] Configure queue cleanup policies
+  - [ ] Add queue size limits
+- [ ] Create comprehensive unit tests
+  - [ ] Test queue processing with various scenarios
+  - [ ] Test resume capability after interruption
+  - [ ] Test retry logic with different failure types
+  - [ ] Test queue monitoring and statistics
+  - [ ] Test queue maintenance operations
+  - [ ] Test concurrent queue access
+- [ ] Add integration tests
+  - [ ] Test queue processing with real database
+  - [ ] Test resume functionality end-to-end
+  - [ ] Test queue performance under load
+  - [ ] Test queue consistency across restarts
+- [ ] Performance optimization
+  - [ ] Optimize queue query performance
+  - [ ] Monitor memory usage during processing
+  - [ ] Add queue processing metrics
+  - [ ] Optimize database access patterns
+
+### Step 4.3: Complete Background Indexer
+- [ ] Integrate process coordination with queue management
+  - [ ] Combine file locking with queue processing
+  - [ ] Coordinate heartbeats with queue operations
+  - [ ] Handle process management with active queues
+- [ ] Implement auto-start logic
+  - [ ] Start background indexer when needed
+  - [ ] Detect when indexer should be running
+  - [ ] Handle multiple simultaneous start requests
+  - [ ] Prevent duplicate background processes
+- [ ] Add auto-termination logic
+  - [ ] Detect when queue is empty
+  - [ ] Terminate background process gracefully
+  - [ ] Clean up resources on termination
+  - [ ] Handle termination edge cases
+- [ ] Implement comprehensive progress tracking
+  - [ ] Track progress across all operations
+  - [ ] Update progress in real-time
+  - [ ] Provide progress estimates
+  - [ ] Handle progress reporting errors
+- [ ] Add status monitoring and health checks
+  - [ ] Monitor background indexer health
+  - [ ] Report detailed status information
+  - [ ] Add performance monitoring
+  - [ ] Implement health check endpoints
+- [ ] Integrate with CLI commands
+  - [ ] Start background indexer from CLI commands
+  - [ ] Report background status in CLI
+  - [ ] Handle CLI interaction with background processes
+  - [ ] Add CLI commands for background control
+- [ ] Add comprehensive error handling
+  - [ ] Handle all types of background failures
+  - [ ] Implement error recovery strategies
+  - [ ] Report errors appropriately
+  - [ ] Add error logging and monitoring
+- [ ] Implement resource management
+  - [ ] Monitor memory and CPU usage
+  - [ ] Implement resource limits
+  - [ ] Handle resource pressure gracefully
+  - [ ] Add resource usage reporting
+- [ ] Create comprehensive unit tests
+  - [ ] Test complete background system integration
+  - [ ] Test auto-start and termination logic
+  - [ ] Test progress tracking accuracy
+  - [ ] Test health monitoring and reporting
+  - [ ] Test CLI integration
+  - [ ] Test error handling and recovery
+- [ ] Add integration tests
+  - [ ] Test complete background indexing workflow
+  - [ ] Test background system with real sites
+  - [ ] Test system behavior under various loads
+  - [ ] Test recovery from various failure scenarios
+- [ ] Performance testing and optimization
+  - [ ] Test background system performance
+  - [ ] Monitor resource usage patterns
+  - [ ] Optimize background processing efficiency
+  - [ ] Add performance metrics and monitoring
+
+## Phase 5: MCP Server Implementation
+
+### Step 5.1: Basic MCP Protocol Implementation
+- [ ] Research MCP protocol specification
+  - [ ] Study MCP protocol documentation
+  - [ ] Understand message formats and flows
+  - [ ] Review JSON schema requirements
+  - [ ] Identify required protocol features
+- [ ] Add MCP server dependencies
+  - [ ] Add JSON-RPC or similar protocol dependencies
+  - [ ] Add WebSocket or HTTP server dependencies
+  - [ ] Add JSON schema validation dependencies
+  - [ ] Add async server runtime dependencies
+- [ ] Create MCP module structure
+  - [ ] Create src/mcp/mod.rs with public exports
+  - [ ] Create src/mcp/server.rs for server implementation
+  - [ ] Create src/mcp/tools.rs for tool definitions
+- [ ] Implement basic MCP protocol structure
+  - [ ] Define MCP message types and structures
+  - [ ] Implement message parsing and validation
+  - [ ] Add protocol version handling
+  - [ ] Create message routing infrastructure
+- [ ] Add tool registration and discovery
+  - [ ] Implement tool registry system
+  - [ ] Add tool metadata and schema definitions
+  - [ ] Create tool discovery mechanisms
+  - [ ] Handle tool capability advertisement
+- [ ] Implement connection management
+  - [ ] Handle client connections and disconnections
+  - [ ] Manage multiple concurrent clients
+  - [ ] Add connection state tracking
+  - [ ] Implement connection health monitoring
+- [ ] Add JSON schema validation
+  - [ ] Validate incoming MCP messages
+  - [ ] Validate tool parameters and responses
+  - [ ] Add schema error handling
+  - [ ] Implement schema versioning support
+- [ ] Create basic error handling
+  - [ ] Define MCP error response formats
+  - [ ] Implement error code standardization
+  - [ ] Add error logging and monitoring
+  - [ ] Create user-friendly error messages
+- [ ] Create comprehensive unit tests
+  - [ ] Test MCP message parsing and validation
+  - [ ] Test tool registration and discovery
+  - [ ] Test connection management scenarios
+  - [ ] Test error handling and response formatting
+  - [ ] Test protocol compliance
+  - [ ] Test concurrent client handling
+- [ ] Add protocol compliance testing
+  - [ ] Test against MCP specification
+  - [ ] Validate message formats
+  - [ ] Test protocol flow correctness
+  - [ ] Ensure compatibility with MCP clients
+
+### Step 5.2: Search Tool Implementation
+- [ ] Implement search_docs tool structure
+  - [ ] Define tool metadata and description
+  - [ ] Create JSON schema for parameters
+  - [ ] Implement parameter validation
+  - [ ] Add tool registration to MCP server
+- [ ] Integrate with vector search functionality
+  - [ ] Connect to LanceDB vector search
+  - [ ] Generate embeddings for search queries
+  - [ ] Execute similarity search operations
+  - [ ] Handle search errors and timeouts
+- [ ] Add query processing
+  - [ ] Preprocess search queries
+  - [ ] Generate query embeddings using Ollama
+  - [ ] Handle query validation and sanitization
+  - [ ] Add query optimization techniques
+- [ ] Implement result ranking and scoring
+  - [ ] Calculate relevance scores
+  - [ ] Sort results by relevance
+  - [ ] Apply ranking algorithms
+  - [ ] Handle tie-breaking scenarios
+- [ ] Add filtering capabilities
+  - [ ] Implement site_id filtering
+  - [ ] Add sites_filter regex pattern matching
+  - [ ] Filter by content types or metadata
+  - [ ] Handle invalid filter parameters
+- [ ] Implement result limiting and pagination
+  - [ ] Apply limit parameter (default: 10)
+  - [ ] Handle result count validation
+  - [ ] Add pagination support if needed
+  - [ ] Optimize query performance for limits
+- [ ] Create response formatting
+  - [ ] Format results according to SPEC.md
+  - [ ] Include all required fields in responses
+  - [ ] Handle missing or incomplete data
+  - [ ] Add response validation
+- [ ] Add comprehensive error handling
+  - [ ] Handle embedding generation failures
+  - [ ] Manage vector search errors
+  - [ ] Deal with database connectivity issues
+  - [ ] Provide meaningful error messages
+- [ ] Create comprehensive unit tests
+  - [ ] Test search functionality with various queries
+  - [ ] Test result ranking and relevance scoring
+  - [ ] Test filtering with different parameters
+  - [ ] Test result limiting and formatting
+  - [ ] Test error handling scenarios
+  - [ ] Test integration with embedding pipeline
+- [ ] Add integration tests
+  - [ ] Test search with real indexed data
+  - [ ] Test search performance with large datasets
+  - [ ] Test search accuracy and relevance
+  - [ ] Test concurrent search operations
+- [ ] Performance optimization
+  - [ ] Optimize search query performance
+  - [ ] Monitor search response times
+  - [ ] Add search result caching if beneficial
+  - [ ] Optimize memory usage during search
+
+### Step 5.3: Complete MCP Server with All Tools
+- [ ] Implement list_sites tool
+  - [ ] Define tool metadata and schema
+  - [ ] Query sites from SQLite database
+  - [ ] Filter to show only completed sites
+  - [ ] Format response according to SPEC.md
+  - [ ] Add error handling for database issues
+- [ ] Add server startup and configuration
+  - [ ] Implement "docs-mcp serve" CLI command
+  - [ ] Add port configuration (default: 8080)
+  - [ ] Handle server binding and startup errors
+  - [ ] Add graceful shutdown handling
+- [ ] Integrate with background indexing
+  - [ ] Start background indexer with MCP server
+  - [ ] Coordinate MCP server with indexing operations
+  - [ ] Handle indexing status in MCP responses
+  - [ ] Ensure data consistency during concurrent operations
+- [ ] Add comprehensive logging and monitoring
+  - [ ] Log all MCP operations and requests
+  - [ ] Monitor server performance and health
+  - [ ] Add request/response logging
+  - [ ] Implement operational metrics
+- [ ] Implement health checking and status reporting
+  - [ ] Add server health check endpoints
+  - [ ] Monitor database connectivity
+  - [ ] Check Ollama service availability
+  - [ ] Report system status through MCP
+- [ ] Add concurrent client handling
+  - [ ] Support multiple simultaneous MCP clients
+  - [ ] Handle client connection management
+  - [ ] Manage shared resources safely
+  - [ ] Add connection limits and rate limiting
+- [ ] Implement production-ready features
+  - [ ] Add proper error handling and recovery
+  - [ ] Implement request timeout handling
+  - [ ] Add security measures and input validation
+  - [ ] Create comprehensive logging and monitoring
+- [ ] Create comprehensive unit tests
+  - [ ] Test all MCP tools with various parameters
+  - [ ] Test server startup and configuration
+  - [ ] Test concurrent client operations
+  - [ ] Test integration with background systems
+  - [ ] Test error handling and recovery scenarios
+- [ ] Add integration tests
+  - [ ] Test complete MCP server functionality
+  - [ ] Test MCP tools with real data
+  - [ ] Test server performance under load
+  - [ ] Test integration with MCP clients
+- [ ] Performance testing and optimization
+  - [ ] Test server performance with multiple clients
+  - [ ] Monitor memory usage and resource consumption
+  - [ ] Optimize response times for all operations
+  - [ ] Add performance metrics and monitoring
+
+## Phase 6: CLI Polish and Integration
+
+### Step 6.1: Complete CLI Commands Implementation
+- [ ] Implement "docs-mcp delete" command
+  - [ ] Parse command arguments (name_or_url, version)
+  - [ ] Handle site identification and disambiguation
+  - [ ] Prompt for confirmation before deletion
+  - [ ] Clean up SQLite metadata for site
+  - [ ] Clean up LanceDB vectors for site
+  - [ ] Remove crawl queue items for site
+  - [ ] Add comprehensive error handling
+- [ ] Implement "docs-mcp update" command
+  - [ ] Parse command arguments (name_or_url, version)
+  - [ ] Identify existing site for update
+  - [ ] Mark site for re-indexing
+  - [ ] Clean up existing data
+  - [ ] Trigger background re-indexing
+  - [ ] Provide user feedback during update
+- [ ] Enhance status reporting
+  - [ ] Improve "docs-mcp status" output formatting
+  - [ ] Add detailed progress information
+  - [ ] Show error messages and diagnostics
+  - [ ] Display crawl statistics and metrics
+  - [ ] Add timing and performance information
+- [ ] Improve user interface and formatting
+  - [ ] Create consistent table formatting for "list" command
+  - [ ] Add color coding for status indicators
+  - [ ] Implement progress bars for long operations
+  - [ ] Add human-readable file sizes and dates
+  - [ ] Improve command help and usage messages
+- [ ] Add comprehensive input validation
+  - [ ] Validate URLs and site names
+  - [ ] Check for valid version strings
+  - [ ] Prevent invalid command combinations
+  - [ ] Add helpful error messages for invalid inputs
+- [ ] Implement command consistency
+  - [ ] Ensure consistent behavior across all commands
+  - [ ] Standardize error handling and reporting
+  - [ ] Use consistent terminology and messaging
+  - [ ] Add consistent verbosity and quiet options
+- [ ] Create comprehensive unit tests
+  - [ ] Test all CLI commands with various inputs
+  - [ ] Test command validation and error handling
+  - [ ] Test user interface formatting
+  - [ ] Test command consistency and behavior
+- [ ] Add integration tests
+  - [ ] Test complete CLI workflows end-to-end
+  - [ ] Test CLI integration with database and indexing
+  - [ ] Test user experience scenarios
+  - [ ] Test CLI behavior under various system states
+- [ ] User experience testing
+  - [ ] Test CLI usability with real workflows
+  - [ ] Validate help messages and documentation
+  - [ ] Test error message clarity and helpfulness
+  - [ ] Ensure consistent and intuitive behavior
+
+### Step 6.2: JavaScript Rendering Support
+- [ ] Add headless browser dependencies
+  - [ ] Add headless_chrome crate to Cargo.toml
+  - [ ] Add any additional browser automation dependencies
+  - [ ] Ensure compatibility with existing HTTP client
+- [ ] Create browser management module
+  - [ ] Create src/crawler/browser.rs
+  - [ ] Implement browser instance management
+  - [ ] Add browser pool for performance
+  - [ ] Handle browser lifecycle management
+- [ ] Implement JavaScript content rendering
+  - [ ] Launch headless Chrome instances
+  - [ ] Navigate to URLs and wait for rendering
+  - [ ] Extract rendered HTML content
+  - [ ] Handle dynamic content loading
+  - [ ] Wait for page completion indicators
+- [ ] Add browser configuration options
+  - [ ] Configure browser timeout settings
+  - [ ] Add viewport and rendering options
+  - [ ] Set appropriate user agent strings
+  - [ ] Configure JavaScript execution settings
+- [ ] Integrate with existing content extraction
+  - [ ] Modify extractor to handle rendered content
+  - [ ] Detect when JavaScript rendering is needed
+  - [ ] Fall back to static HTML when appropriate
+  - [ ] Preserve existing functionality for static sites
+- [ ] Add comprehensive error handling
+  - [ ] Handle browser launch failures
+  - [ ] Deal with page loading timeouts
+  - [ ] Manage browser crashes and recovery
+  - [ ] Handle JavaScript execution errors
+- [ ] Implement resource management
+  - [ ] Manage browser memory usage
+  - [ ] Control number of concurrent browser instances
+  - [ ] Clean up browser processes properly
+  - [ ] Monitor resource consumption
+- [ ] Add configuration options
+  - [ ] Allow enabling/disabling JavaScript rendering
+  - [ ] Configure browser pool size
+  - [ ] Set timeout and resource limits
+  - [ ] Add debugging and development options
+- [ ] Create comprehensive unit tests
+  - [ ] Test browser management and lifecycle
+  - [ ] Test JavaScript content rendering
+  - [ ] Test integration with content extraction
+  - [ ] Test error handling and recovery
+  - [ ] Test resource management
+- [ ] Add integration tests
+  - [ ] Test with JavaScript-heavy documentation sites
+  - [ ] Test performance with browser rendering
+  - [ ] Test browser pool management under load
+  - [ ] Test fallback to static rendering
+- [ ] Performance testing and optimization
+  - [ ] Test browser rendering performance
+  - [ ] Monitor memory usage with browsers
+  - [ ] Optimize browser pool management
+  - [ ] Add performance metrics for browser operations
+
+### Step 6.3: Final Integration and Production Readiness
+- [ ] Complete end-to-end integration testing
+  - [ ] Test complete system with real documentation sites
+  - [ ] Verify all components work together correctly
+  - [ ] Test system behavior under various load conditions
+  - [ ] Validate data consistency across all operations
+- [ ] Add comprehensive error handling and logging
+  - [ ] Ensure all error paths are handled gracefully
+  - [ ] Add comprehensive logging throughout system
+  - [ ] Implement structured logging with proper levels
+  - [ ] Add error reporting and monitoring capabilities
+- [ ] Implement performance optimizations
+  - [ ] Profile system performance under load
+  - [ ] Optimize database queries and operations
+  - [ ] Improve memory usage and resource management
+  - [ ] Add performance monitoring and metrics
+- [ ] Create user documentation
+  - [ ] Write comprehensive README with setup instructions
+  - [ ] Create user guide with examples and workflows
+  - [ ] Document all CLI commands and options
+  - [ ] Add troubleshooting guide and FAQ
+- [ ] Add monitoring and observability
+  - [ ] Implement health check endpoints
+  - [ ] Add system metrics and monitoring
+  - [ ] Create logging and debugging capabilities
+  - [ ] Add performance monitoring and alerting
+- [ ] Implement backup and recovery procedures
+  - [ ] Add database backup capabilities
+  - [ ] Implement data export and import functions
+  - [ ] Create disaster recovery procedures
+  - [ ] Test backup and restore operations
+- [ ] Perform security review and hardening
+  - [ ] Review code for security vulnerabilities
+  - [ ] Implement input validation and sanitization
+  - [ ] Add security headers and protections
+  - [ ] Review dependency security and updates
+- [ ] Create deployment and distribution
+  - [ ] Create binary release builds
+  - [ ] Add installation scripts and packages
+  - [ ] Create Docker images if appropriate
+  - [ ] Add deployment documentation and guides
+- [ ] Final testing and validation
+  - [ ] Perform comprehensive system testing
+  - [ ] Test on multiple platforms and environments
+  - [ ] Validate performance under production loads
+  - [ ] Test disaster recovery and failure scenarios
+- [ ] Prepare for production release
+  - [ ] Create release notes and changelog
+  - [ ] Prepare documentation and support materials
+  - [ ] Set up monitoring and alerting systems
+  - [ ] Plan rollout and deployment strategy
+
+## Continuous Tasks Throughout Development
+
+### Code Quality and Maintenance
+- [ ] Maintain consistent code style and formatting
+- [ ] Keep dependencies up to date
+- [ ] Perform regular security audits
+- [ ] Monitor and address technical debt
+- [ ] Ensure comprehensive test coverage
+
+### Documentation
+- [ ] Keep CLAUDE.md updated with project changes
+- [ ] Update SPEC.md as requirements evolve
+- [ ] Maintain accurate code documentation
+- [ ] Update TODO.md as tasks are completed
+- [ ] Keep user documentation current
+
+### Testing and Quality Assurance
+- [ ] Run all tests before committing changes
+- [ ] Perform integration testing regularly
+- [ ] Monitor test coverage and quality
+- [ ] Test on multiple platforms and environments
+- [ ] Validate performance and resource usage
+
+### Monitoring and Metrics
+- [ ] Monitor system performance continuously
+- [ ] Track resource usage and optimization opportunities
+- [ ] Monitor error rates and failure patterns
+- [ ] Measure user satisfaction and usability
+- [ ] Track system reliability and uptime
+
+---
+
+**Note**: This checklist should be updated as development progresses. Items should be checked off when completed and tested. New items should be added as requirements evolve or issues are discovered.
