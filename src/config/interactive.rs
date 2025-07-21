@@ -158,12 +158,14 @@ fn configure_ollama(ollama: &mut OllamaConfig) -> Result<()> {
 fn test_ollama_connection(ollama: &OllamaConfig) -> Result<bool> {
     let url = format!("http://{}:{}/api/version", ollama.host, ollama.port);
 
-    match ureq::get(&url)
-        .timeout(std::time::Duration::from_secs(5))
-        .call()
-    {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(std::time::Duration::from_secs(5)))
+        .build()
+        .into();
+
+    match agent.get(&url).call() {
         Ok(_) => Ok(true),
-        Err(ureq::Error::Status(code, _)) if (400..500).contains(&code) => Ok(true),
+        Err(ureq::Error::StatusCode(code)) if (400..500).contains(&code) => Ok(true),
         Err(_) => Ok(false),
     }
 }
