@@ -6,11 +6,19 @@ mod tests;
 
 use anyhow::{Context, Result, anyhow};
 use scraper::{Html, Selector};
+use std::collections::HashSet;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 use ureq::Agent;
 use url::Url;
+
+use self::extractor::{ExtractionConfig, extract_content};
+use self::robots::{RobotsTxt, fetch_robots_txt};
+use crate::database::sqlite::{
+    CrawlQueueQueries, CrawlQueueUpdate, CrawlStatus, DbPool, NewCrawlQueueItem, SiteQueries,
+    SiteStatus, SiteUpdate,
+};
 
 /// Configuration for the web crawler
 #[derive(Debug, Clone)]
@@ -269,4 +277,408 @@ pub fn extract_links(html: &str, base_url: &Url) -> Result<Vec<Url>> {
 
     info!("Extracted {} valid links from {}", links.len(), base_url);
     Ok(links)
+}
+
+/// Main crawler that coordinates the crawling process
+pub struct SiteCrawler {
+    http_client: HttpClient,
+    db_pool: DbPool,
+    config: CrawlerConfig,
+    extraction_config: ExtractionConfig,
+}
+
+/// Result of crawling a single page
+#[derive(Debug, Clone)]
+pub struct CrawlResult {
+    /// The URL that was crawled
+    pub url: Url,
+    /// The extracted content from the page
+    pub content: extractor::ExtractedContent,
+    /// Links found on this page
+    pub links: Vec<Url>,
+    /// Whether this page was successfully processed
+    pub success: bool,
+    /// Error message if crawling failed
+    pub error_message: Option<String>,
+}
+
+/// Statistics about a crawl session
+#[derive(Debug, Clone)]
+pub struct CrawlStats {
+    /// Total URLs discovered
+    pub total_urls: usize,
+    /// URLs successfully crawled
+    pub successful_crawls: usize,
+    /// URLs that failed to crawl
+    pub failed_crawls: usize,
+    /// URLs skipped due to robots.txt
+    pub robots_blocked: usize,
+    /// Duration of crawl session
+    pub duration: Duration,
+}
+
+impl SiteCrawler {
+    /// Create a new site crawler
+    #[inline]
+    pub fn new(db_pool: DbPool, config: CrawlerConfig) -> Self {
+        let http_client = HttpClient::new(config.clone());
+        let extraction_config = ExtractionConfig::default();
+
+        Self {
+            http_client,
+            db_pool,
+            config,
+            extraction_config,
+        }
+    }
+
+    /// Crawl a documentation site from the given base URL
+    #[inline]
+    pub async fn crawl_site(&mut self, site_id: i64, base_url: &str) -> Result<CrawlStats> {
+        let start_time = Instant::now();
+        let base_url = validate_url(base_url)?;
+
+        info!("Starting crawl for site {} at {}", site_id, base_url);
+
+        // Update site status to indexing
+        self.update_site_status(site_id, SiteStatus::Indexing, None)
+            .await?;
+
+        // Fetch robots.txt
+        let robots_txt = match fetch_robots_txt(&mut self.http_client, &base_url).await {
+            Ok(robots) => {
+                debug!("Successfully loaded robots.txt for {}", base_url);
+                robots
+            }
+            Err(e) => {
+                warn!("Failed to fetch robots.txt for {}: {}", base_url, e);
+                RobotsTxt::parse("") // Allow all if robots.txt is unavailable
+            }
+        };
+
+        // Initialize crawl queue with base URL
+        self.init_crawl_queue(site_id, &base_url).await?;
+
+        // Track discovered URLs to avoid duplicates
+        let mut discovered_urls = HashSet::new();
+        discovered_urls.insert(base_url.as_str().to_string());
+
+        let mut stats = CrawlStats {
+            total_urls: 1,
+            successful_crawls: 0,
+            failed_crawls: 0,
+            robots_blocked: 0,
+            duration: Duration::default(),
+        };
+
+        // Main crawling loop - breadth-first approach
+        loop {
+            // Get next URL from queue
+            let Some(queue_item) = self.get_next_queue_item(site_id).await? else {
+                info!("No more URLs in queue, crawl complete");
+                break;
+            };
+
+            // Mark item as processing
+            self.update_queue_item_status(queue_item.id, CrawlStatus::Processing, None)
+                .await?;
+
+            let url = match validate_url(&queue_item.url) {
+                Ok(url) => url,
+                Err(e) => {
+                    error!("Invalid URL in queue: {}: {}", queue_item.url, e);
+
+                    // Set retry count to max to prevent retrying invalid URLs
+                    let update = CrawlQueueUpdate {
+                        status: Some(CrawlStatus::Failed),
+                        retry_count: Some(self.config.max_retries.into()),
+                        error_message: Some(format!("Invalid URL: {}", e)),
+                    };
+                    CrawlQueueQueries::update(&self.db_pool, queue_item.id, update).await?;
+
+                    stats.failed_crawls += 1;
+                    continue;
+                }
+            };
+
+            // Check robots.txt
+            if !robots_txt.is_allowed(&url, &self.config.user_agent) {
+                info!("URL blocked by robots.txt: {}", url);
+
+                // Set retry count to max to prevent it from being retried
+                let update = CrawlQueueUpdate {
+                    status: Some(CrawlStatus::Failed),
+                    retry_count: Some(self.config.max_retries.into()),
+                    error_message: Some("Blocked by robots.txt".to_string()),
+                };
+                CrawlQueueQueries::update(&self.db_pool, queue_item.id, update).await?;
+
+                stats.robots_blocked += 1;
+                continue;
+            }
+
+            // Crawl the page
+            match self.crawl_page(&url, &base_url).await {
+                Ok(crawl_result) => {
+                    if crawl_result.success {
+                        info!("Successfully crawled: {}", url);
+                        stats.successful_crawls += 1;
+
+                        // Mark queue item as completed
+                        self.update_queue_item_status(queue_item.id, CrawlStatus::Completed, None)
+                            .await?;
+
+                        // Add newly discovered URLs to the queue
+                        for link in &crawl_result.links {
+                            let link_str = link.as_str();
+                            if !discovered_urls.contains(link_str) {
+                                discovered_urls.insert(link_str.to_string());
+
+                                // Add to database queue
+                                match self.add_url_to_queue(site_id, link_str).await {
+                                    Ok(_) => {
+                                        debug!("Added URL to queue: {}", link_str);
+                                        stats.total_urls += 1;
+                                    }
+                                    Err(e) => {
+                                        // URL might already exist - that's okay
+                                        debug!(
+                                            "Could not add URL to queue (likely duplicate): {}",
+                                            e
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
+                        // Update site progress
+                        self.update_site_progress(site_id).await?;
+                    } else {
+                        let error_msg = crawl_result.error_message.clone().unwrap_or_default();
+                        error!("Failed to crawl: {} - {}", url, error_msg);
+                        stats.failed_crawls += 1;
+
+                        // Mark queue item as failed
+                        self.update_queue_item_status(
+                            queue_item.id,
+                            CrawlStatus::Failed,
+                            crawl_result.error_message,
+                        )
+                        .await?;
+                    }
+                }
+                Err(e) => {
+                    error!("Error crawling {}: {}", url, e);
+                    stats.failed_crawls += 1;
+
+                    // Mark queue item as failed
+                    self.update_queue_item_status(
+                        queue_item.id,
+                        CrawlStatus::Failed,
+                        Some(e.to_string()),
+                    )
+                    .await?;
+                }
+            }
+
+            // Update progress periodically
+            if (stats.successful_crawls + stats.failed_crawls) % 10 == 0 {
+                self.update_site_progress(site_id).await?;
+            }
+        }
+
+        stats.duration = start_time.elapsed();
+
+        // Final site status update
+        if stats.failed_crawls == 0 {
+            self.update_site_status(site_id, SiteStatus::Completed, None)
+                .await?;
+        } else if stats.successful_crawls == 0 {
+            self.update_site_status(
+                site_id,
+                SiteStatus::Failed,
+                Some(format!("All {} crawl attempts failed", stats.failed_crawls)),
+            )
+            .await?;
+        } else {
+            self.update_site_status(
+                site_id,
+                SiteStatus::Completed,
+                Some(format!(
+                    "{} pages succeeded, {} failed",
+                    stats.successful_crawls, stats.failed_crawls
+                )),
+            )
+            .await?;
+        }
+
+        info!(
+            "Crawl completed for site {}: {} successful, {} failed, {} blocked by robots.txt, took {:?}",
+            site_id,
+            stats.successful_crawls,
+            stats.failed_crawls,
+            stats.robots_blocked,
+            stats.duration
+        );
+
+        Ok(stats)
+    }
+
+    /// Crawl a single page and extract content
+    async fn crawl_page(&mut self, url: &Url, base_url: &Url) -> Result<CrawlResult> {
+        debug!("Crawling page: {}", url);
+
+        // Fetch HTML content
+        let html = match self.http_client.get(url.as_str()).await {
+            Ok(html) => html,
+            Err(e) => {
+                return Ok(CrawlResult {
+                    url: url.clone(),
+                    content: extractor::ExtractedContent {
+                        title: String::new(),
+                        sections: Vec::new(),
+                        raw_text: String::new(),
+                    },
+                    links: Vec::new(),
+                    success: false,
+                    error_message: Some(e.to_string()),
+                });
+            }
+        };
+
+        // Extract content
+        let content = match extract_content(&html, &self.extraction_config) {
+            Ok(content) => content,
+            Err(e) => {
+                return Ok(CrawlResult {
+                    url: url.clone(),
+                    content: extractor::ExtractedContent {
+                        title: String::new(),
+                        sections: Vec::new(),
+                        raw_text: String::new(),
+                    },
+                    links: Vec::new(),
+                    success: false,
+                    error_message: Some(format!("Content extraction failed: {}", e)),
+                });
+            }
+        };
+
+        // Extract links
+        let links = match extract_links(&html, base_url) {
+            Ok(links) => links,
+            Err(e) => {
+                warn!("Failed to extract links from {}: {}", url, e);
+                Vec::new() // Continue without links if extraction fails
+            }
+        };
+
+        debug!(
+            "Successfully processed page {}: {} sections, {} links",
+            url,
+            content.sections.len(),
+            links.len()
+        );
+
+        Ok(CrawlResult {
+            url: url.clone(),
+            content,
+            links,
+            success: true,
+            error_message: None,
+        })
+    }
+
+    /// Initialize the crawl queue with the base URL
+    async fn init_crawl_queue(&self, site_id: i64, base_url: &Url) -> Result<()> {
+        let new_item = NewCrawlQueueItem {
+            site_id,
+            url: base_url.as_str().to_string(),
+        };
+
+        CrawlQueueQueries::create(&self.db_pool, new_item).await?;
+        info!("Initialized crawl queue with base URL: {}", base_url);
+        Ok(())
+    }
+
+    /// Get the next queue item to process
+    async fn get_next_queue_item(
+        &self,
+        site_id: i64,
+    ) -> Result<Option<crate::database::sqlite::CrawlQueueItem>> {
+        CrawlQueueQueries::get_next_pending(&self.db_pool, site_id, self.config.max_retries).await
+    }
+
+    /// Add a new URL to the crawl queue
+    async fn add_url_to_queue(&self, site_id: i64, url: &str) -> Result<()> {
+        let new_item = NewCrawlQueueItem {
+            site_id,
+            url: url.to_string(),
+        };
+
+        CrawlQueueQueries::create(&self.db_pool, new_item).await?;
+        Ok(())
+    }
+
+    /// Update the status of a queue item
+    async fn update_queue_item_status(
+        &self,
+        item_id: i64,
+        status: CrawlStatus,
+        error_message: Option<String>,
+    ) -> Result<()> {
+        let update = CrawlQueueUpdate {
+            status: Some(status),
+            retry_count: None,
+            error_message,
+        };
+
+        CrawlQueueQueries::update(&self.db_pool, item_id, update).await?;
+        if status == CrawlStatus::Failed {
+            CrawlQueueQueries::increment_retry_count(&self.db_pool, item_id).await?;
+        }
+        Ok(())
+    }
+
+    /// Update site status
+    async fn update_site_status(
+        &self,
+        site_id: i64,
+        status: SiteStatus,
+        error_message: Option<String>,
+    ) -> Result<()> {
+        let update = SiteUpdate {
+            status: Some(status),
+            error_message,
+            last_heartbeat: Some(chrono::Utc::now().naive_utc()),
+            ..Default::default()
+        };
+
+        SiteQueries::update(&self.db_pool, site_id, update).await?;
+        Ok(())
+    }
+
+    /// Update site progress based on queue completion
+    async fn update_site_progress(&self, site_id: i64) -> Result<()> {
+        let stats = CrawlQueueQueries::get_stats(&self.db_pool, site_id).await?;
+
+        let total_pages = stats.total as i64;
+        let indexed_pages = stats.completed as i64;
+        let progress_percent = if total_pages > 0 {
+            ((indexed_pages as f64 / total_pages as f64) * 100.0) as i64
+        } else {
+            0
+        };
+
+        let update = SiteUpdate {
+            total_pages: Some(total_pages),
+            indexed_pages: Some(indexed_pages),
+            progress_percent: Some(progress_percent),
+            last_heartbeat: Some(chrono::Utc::now().naive_utc()),
+            ..Default::default()
+        };
+
+        SiteQueries::update(&self.db_pool, site_id, update).await?;
+        Ok(())
+    }
 }

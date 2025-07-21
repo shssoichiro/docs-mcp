@@ -29,6 +29,7 @@ pub enum DocsError {
     Other(#[from] anyhow::Error),
 }
 
+pub mod commands;
 pub mod config;
 pub mod crawler;
 pub mod database;

@@ -118,7 +118,7 @@ async fn integration_site_workflow() -> Result<()> {
     assert_eq!(updated_site.total_pages, 3);
 
     for i in 0..3 {
-        let pending_item = CrawlQueueQueries::get_next_pending(database.pool(), site.id)
+        let pending_item = CrawlQueueQueries::get_next_pending(database.pool(), site.id, 3)
             .await?
             .expect("should get next pending succesfully");
 

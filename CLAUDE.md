@@ -99,6 +99,28 @@ The project follows a modular architecture split across several main components:
 
 ## Key Implementation Notes
 
+### Site Crawling Implementation (`src/crawler/mod.rs`)
+
+The site crawler implements a complete breadth-first crawling system with the following key features:
+
+- **Breadth-First Algorithm**: Uses SQLite queue to process URLs in discovery order
+- **URL Deduplication**: Prevents crawling the same URL multiple times using HashSet
+- **Robots.txt Compliance**: Fetches and respects robots.txt rules before crawling
+- **Progress Tracking**: Real-time updates to site status and progress percentages
+- **Error Handling**: Distinguishes between retryable (5xx, timeouts) and non-retryable (4xx) errors
+- **Rate Limiting**: 250ms delay between requests (configurable)
+- **Queue Management**: Stores crawl progress in SQLite for resume capability
+
+#### Integration Tests with Mock Servers
+
+Comprehensive integration tests using `wiremock` library cover:
+
+- **Basic crawling workflow**: Multi-page site with internal links
+- **Robots.txt compliance**: Proper blocking and respect for robots.txt rules
+- **Error handling**: 404 responses and HTTP error codes
+- **Content extraction**: Complex HTML structures with headings and code blocks
+- **Database operations**: Full SQLite integration with shared cache for testing
+
 ### Content Extraction and Processing
 
 #### HTML Content Extraction (`src/crawler/extractor.rs`)
@@ -265,13 +287,26 @@ The project uses `just precommit` which runs:
 - ✅ HTML content extraction with heading hierarchy preservation
 - ✅ Semantic content chunking with code block preservation
 - ✅ robots.txt handling and URL filtering
+- ✅ **Site crawling integration and orchestration**
+  - ✅ Complete breadth-first crawling implementation
+  - ✅ URL queue management with SQLite integration
+  - ✅ Progress tracking and site status updates
+  - ✅ "docs-mcp add" command implementation
+  - ✅ Comprehensive error handling and recovery
+  - ✅ Integration tests with mock HTTP servers
 
 ### In Progress / Planned Components
 
-- 🚧 Site crawling integration and orchestration
 - 🚧 Ollama integration and embedding generation
 - 🚧 Background indexing process coordination
 - 🚧 MCP server implementation
 - 🚧 Vector database (LanceDB) integration
 
-Most CLI commands beyond `config` currently show placeholder messages and need implementation.
+### CLI Commands Implementation Status
+
+- ✅ `docs-mcp config [--show]`: Interactive setup of Ollama connection or show current config
+- ✅ `docs-mcp add <url> [--name <name>]`: Add new documentation site (fully implemented)
+- ✅ `docs-mcp list`: List all indexed documentation sites (basic implementation)
+- 🚧 `docs-mcp delete <site>`: Delete a documentation site (placeholder)
+- 🚧 `docs-mcp update <site>`: Update/re-index a documentation site (placeholder)
+- 🚧 `docs-mcp serve [--port <port>]`: Start MCP server and background indexer (placeholder)

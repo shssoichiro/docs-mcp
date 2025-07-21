@@ -282,6 +282,15 @@ impl SiteQueries {
     }
 }
 
+#[derive(Debug)]
+pub struct QueueStats {
+    pub total: i64,
+    pub pending: i64,
+    pub processing: i64,
+    pub completed: i64,
+    pub failed: i64,
+}
+
 pub struct CrawlQueueQueries;
 
 impl CrawlQueueQueries {
@@ -364,6 +373,7 @@ impl CrawlQueueQueries {
     pub async fn get_next_pending(
         pool: &SqlitePool,
         site_id: i64,
+        max_retries: u32,
     ) -> Result<Option<CrawlQueueItem>> {
         let result = sqlx::query_as!(
             CrawlQueueItem,
@@ -376,11 +386,12 @@ impl CrawlQueueQueries {
                    error_message, 
                    created_date
             FROM crawl_queue 
-            WHERE site_id = ? AND (status = 'pending' OR (status = 'failed' AND retry_count < 3))
+            WHERE site_id = ? AND (status = 'pending' OR (status = 'failed' AND retry_count < ?))
             ORDER BY created_date ASC
             LIMIT 1
             "#,
-            site_id
+            site_id,
+            max_retries
         )
         .fetch_optional(pool)
         .await
@@ -476,6 +487,63 @@ impl CrawlQueueQueries {
         .context("Failed to delete completed crawl queue items")?;
 
         Ok(result.rows_affected() as usize)
+    }
+
+    #[inline]
+    pub async fn create(pool: &SqlitePool, new_item: NewCrawlQueueItem) -> Result<CrawlQueueItem> {
+        // This is an alias for add_url for consistency with other create methods
+        Self::add_url(pool, new_item).await
+    }
+
+    #[inline]
+    pub async fn update(
+        pool: &SqlitePool,
+        id: i64,
+        update: CrawlQueueUpdate,
+    ) -> Result<Option<CrawlQueueItem>> {
+        // This is an alias for update_status for consistency with other update methods
+        Self::update_status(pool, id, update).await
+    }
+
+    #[inline]
+    pub async fn increment_retry_count(pool: &SqlitePool, id: i64) -> Result<()> {
+        sqlx::query!(
+            "UPDATE crawl_queue SET retry_count = retry_count + 1 WHERE id = ?",
+            id
+        )
+        .execute(pool)
+        .await
+        .context("Failed to increment retry count")?;
+
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn get_stats(pool: &SqlitePool, site_id: i64) -> Result<QueueStats> {
+        let stats = sqlx::query!(
+            r#"
+            SELECT 
+                COUNT(*) as total,
+                COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as "pending!",
+                COALESCE(SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END), 0) as "processing!",
+                COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as "completed!",
+                COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) as "failed!"
+            FROM crawl_queue 
+            WHERE site_id = ?
+            "#,
+            site_id
+        )
+        .fetch_one(pool)
+        .await
+        .context("Failed to get crawl queue statistics")?;
+
+        Ok(QueueStats {
+            total: stats.total,
+            pending: stats.pending,
+            processing: stats.processing,
+            completed: stats.completed,
+            failed: stats.failed,
+        })
     }
 }
 
@@ -781,7 +849,7 @@ mod tests {
         assert_eq!(created_item.site_id, site.id);
         assert_eq!(created_item.status, CrawlStatus::Pending);
 
-        let next_item = CrawlQueueQueries::get_next_pending(&pool, site.id)
+        let next_item = CrawlQueueQueries::get_next_pending(&pool, site.id, 3)
             .await
             .expect("Failed to get next pending")
             .expect("Should have pending item");

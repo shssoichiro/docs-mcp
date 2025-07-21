@@ -18,7 +18,7 @@ pub struct Site {
     pub last_heartbeat: Option<NaiveDateTime>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum SiteStatus {
     Pending,
@@ -46,7 +46,7 @@ pub struct NewSite {
     pub version: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct SiteUpdate {
     pub status: Option<SiteStatus>,
     pub progress_percent: Option<i64>,
@@ -68,7 +68,7 @@ pub struct CrawlQueueItem {
     pub created_date: NaiveDateTime,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum CrawlStatus {
     Pending,

@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use docs_mcp::Result;
+use docs_mcp::commands::{add_site, delete_site, list_sites, update_site};
 use docs_mcp::config::{run_interactive_config, show_config};
 use tracing::info;
 
@@ -48,7 +49,8 @@ enum Commands {
     },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
@@ -64,23 +66,16 @@ fn main() -> Result<()> {
             }
         }
         Commands::Add { url, name } => {
-            info!(
-                "Add site command called with URL: {}, name: {:?}",
-                url, name
-            );
-            println!("Add site command not implemented yet");
+            add_site(url, name).await?;
         }
         Commands::List => {
-            info!("List sites command called");
-            println!("List sites command not implemented yet");
+            list_sites().await?;
         }
         Commands::Delete { site } => {
-            info!("Delete site command called for: {}", site);
-            println!("Delete site command not implemented yet");
+            delete_site(site).await?;
         }
         Commands::Update { site } => {
-            info!("Update site command called for: {}", site);
-            println!("Update site command not implemented yet");
+            update_site(site).await?;
         }
         Commands::Serve { port } => {
             info!("Serve command called on port: {}", port);
