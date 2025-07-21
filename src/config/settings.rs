@@ -45,7 +45,7 @@ impl Default for Config {
             ollama: OllamaConfig {
                 host: "localhost".to_string(),
                 port: 11434,
-                model: "nomic-embed-text".to_string(),
+                model: "nomic-embed-text:latest".to_string(),
                 batch_size: 64,
             },
         }
@@ -211,7 +211,7 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.ollama.host, "localhost");
         assert_eq!(config.ollama.port, 11434);
-        assert_eq!(config.ollama.model, "nomic-embed-text");
+        assert_eq!(config.ollama.model, "nomic-embed-text:latest");
         assert_eq!(config.ollama.batch_size, 64);
     }
 

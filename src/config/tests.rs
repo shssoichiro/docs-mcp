@@ -73,14 +73,14 @@ mod integration_tests {
             [ollama]
             host = "localhost"
             port = 11434
-            model = "nomic-embed-text"
+            model = "nomic-embed-text:latest"
             batch_size = 64
         "#;
 
         let config: Config = toml::from_str(valid_toml).expect("should parse toml successfully");
         assert_eq!(config.ollama.host, "localhost");
         assert_eq!(config.ollama.port, 11434);
-        assert_eq!(config.ollama.model, "nomic-embed-text");
+        assert_eq!(config.ollama.model, "nomic-embed-text:latest");
         assert_eq!(config.ollama.batch_size, 64);
     }
 

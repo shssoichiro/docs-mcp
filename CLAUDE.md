@@ -72,9 +72,16 @@ The project follows a modular architecture split across several main components:
 
 1. **Configuration**: TOML config in `~/.docs-mcp/config.toml`
 2. **Crawling**: Sequential crawling with rate limiting (250ms between requests)
-3. **Content Processing**: HTML extraction → heading hierarchy detection → semantic chunking (500-800 tokens) → embedding generation
+3. **Content Processing**: HTML extraction → heading hierarchy detection → semantic chunking (500-800 tokens) → Ollama embedding generation
 4. **Storage**: Metadata in SQLite, vectors in LanceDB at `~/.docs-mcp/`
 5. **Search**: MCP server provides semantic search via vector similarity
+
+### Embedding Pipeline
+
+- **Chunk Processing**: ContentChunk objects with preserved metadata (heading paths, token counts)
+- **Ollama Integration**: Batch processing with configurable sizes and retry logic
+- **Model Validation**: Ensures nomic-embed-text:latest model availability before processing
+- **Error Recovery**: Exponential backoff for transient failures, graceful degradation for individual chunk failures
 
 ### Key Architectural Patterns
 
@@ -156,6 +163,51 @@ The chunking system implements semantic content splitting for optimal embedding 
 ### URL Filtering
 
 Only crawls URLs that match or begin with the base URL (excluding trailing filenames), ensuring scope compliance.
+
+### Ollama API Client Implementation (`src/embeddings/ollama.rs`)
+
+The Ollama client provides a robust interface for generating embeddings with comprehensive error handling and performance optimization:
+
+#### Core Features
+
+- **HTTP Client**: Uses ureq 3.0 with Agent-based connection pooling and timeout configuration
+- **Model Management**: Validates model availability, lists available models, and performs health checks
+- **Batch Processing**: Processes multiple text chunks efficiently with configurable batch sizes
+- **Error Handling**: Distinguishes between retryable (5xx, transport) and non-retryable (4xx) errors
+- **Retry Logic**: Exponential backoff for transient failures with configurable retry attempts
+- **Connection Health**: Ping functionality and comprehensive health monitoring
+
+#### API Client Architecture
+
+- `OllamaClient` struct with configuration-based initialization
+- Builder pattern for timeout and retry configuration
+- Integration with existing `Config` system for host, port, model, and batch size settings
+- Proper resource management with connection reuse and cleanup
+
+#### Embedding Generation
+
+- **Single Embeddings**: Generate embeddings for individual text strings
+- **Batch Processing**: Process multiple texts in configurable batch sizes (default: 64)
+- **ContentChunk Integration**: Seamless integration with chunking system, preserving metadata
+- **Model Validation**: Ensures requested model (nomic-embed-text:latest) is available
+
+#### Error Recovery Patterns
+
+- Server errors (5xx) and transport errors trigger exponential backoff retry
+- Client errors (4xx) fail immediately without retry
+- Connection failures handled gracefully with detailed error reporting
+- Service unavailability detected and reported with actionable information
+
+#### Testing Coverage
+
+- **Unit Tests**: 3 tests covering client configuration and data structures
+- **Integration Tests**: 8 comprehensive tests with real Ollama instance including:
+  - Health check and model validation
+  - Single and batch embedding generation
+  - ContentChunk processing and metadata preservation
+  - Large batch processing with similarity validation
+  - Error recovery with invalid models
+  - Empty input handling
 
 ### MCP Interface
 
@@ -294,10 +346,18 @@ The project uses `just precommit` which runs:
   - ✅ "docs-mcp add" command implementation
   - ✅ Comprehensive error handling and recovery
   - ✅ Integration tests with mock HTTP servers
+- ✅ **Ollama API Client and Embedding Generation** (`src/embeddings/ollama.rs`)
+  - ✅ Complete HTTP client using ureq 3.0 with proper timeout configuration
+  - ✅ Full embedding generation for single texts and batch processing
+  - ✅ Model availability checking and validation with health checks
+  - ✅ Comprehensive error handling for HTTP status codes and transport errors
+  - ✅ Retry logic with exponential backoff for transient failures
+  - ✅ Rate limiting compliance with configurable batch sizes
+  - ✅ Integration with ContentChunk system preserving metadata
+  - ✅ 8 comprehensive integration tests with real Ollama instance
 
 ### In Progress / Planned Components
 
-- 🚧 Ollama integration and embedding generation
 - 🚧 Background indexing process coordination
 - 🚧 MCP server implementation
 - 🚧 Vector database (LanceDB) integration

@@ -90,7 +90,7 @@ src/
 [ollama]
 host = "localhost"
 port = 11434
-model = "nomic-embed-text"
+model = "nomic-embed-text:latest"
 batch_size = 64
 ```
 
@@ -180,9 +180,9 @@ docs-mcp config
 
 Interactive configuration setup:
 
-1. Prompt for Ollama host (default: localhost)
-2. Prompt for Ollama port (default: 11434)
-3. Prompt for embedding model (default: nomic-embed-text)
+1. Prompt for Ollama host (default: `localhost`)
+2. Prompt for Ollama port (default: `11434`)
+3. Prompt for embedding model (default: `nomic-embed-text:latest`)
 4. Test connection to Ollama
 5. Check if model exists, offer to pull if missing
 6. Save configuration
@@ -501,7 +501,7 @@ The print() function outputs text to the console...
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
 tokio = { version = "1.0", features = ["full"] }
-reqwest = { version = "0.11", features = ["json"] }
+ureq = { version = "3.0", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
