@@ -176,61 +176,61 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 2.1: URL Validation and Basic HTTP Client
 
-- [ ] Add web crawling dependencies
-  - [ ] Add reqwest with json features
-  - [ ] Add url crate for URL parsing
-  - [ ] Add regex crate for pattern matching
-  - [ ] Add scraper crate for HTML parsing
-- [ ] Create crawler module structure
-  - [ ] Create src/crawler/mod.rs with public exports
-  - [ ] Create src/crawler/robots.rs for robots.txt handling
-  - [ ] Create placeholder for extractor.rs and browser.rs
-- [ ] Implement URL validation and normalization
-  - [ ] Add URL parsing and validation functions
-  - [ ] Implement URL normalization (remove fragments, etc.)
-  - [ ] Add relative URL resolution
-  - [ ] Create URL filtering logic based on base URL rules
-  - [ ] Handle URL encoding and decoding properly
-- [ ] Create HTTP client setup
-  - [ ] Configure reqwest client with appropriate headers
-  - [ ] Set proper User-Agent string
-  - [ ] Add timeout configuration (30 seconds)
-  - [ ] Add redirect handling
-  - [ ] Configure connection pooling
-- [ ] Implement robots.txt handling
-  - [ ] Add robots.txt fetching function
-  - [ ] Implement robots.txt parsing
-  - [ ] Add URL permission checking against robots.txt
-  - [ ] Handle missing or malformed robots.txt files
-  - [ ] Cache robots.txt data appropriately
-- [ ] Add rate limiting mechanism
-  - [ ] Implement 250ms delay between requests
-  - [ ] Use tokio time utilities for delays
-  - [ ] Add configurable rate limiting
-  - [ ] Test rate limiting accuracy
-- [ ] Implement retry logic
-  - [ ] Add exponential backoff for network failures
-  - [ ] Distinguish between retryable and non-retryable errors
-  - [ ] Implement maximum retry limits (3 attempts)
-  - [ ] Add logging for retry attempts
-- [ ] Create comprehensive unit tests
-  - [ ] Test URL validation with various formats
-  - [ ] Test URL normalization edge cases
-  - [ ] Test URL filtering rules with complex base URLs
-  - [ ] Test robots.txt parsing with different formats
-  - [ ] Test HTTP client configuration and behavior
-  - [ ] Test rate limiting accuracy and performance
-  - [ ] Test retry logic with simulated failures
-- [ ] Add integration tests with mock servers
-  - [ ] Set up mock HTTP server for testing
-  - [ ] Test complete HTTP request/response cycle
-  - [ ] Test robots.txt integration
-  - [ ] Test timeout and error handling
-- [ ] Error handling implementation
-  - [ ] Define custom error types for network operations
-  - [ ] Add proper error propagation
-  - [ ] Create user-friendly error messages
-  - [ ] Test error handling scenarios
+- [x] Add web crawling dependencies
+  - [x] Add reqwest with json features
+  - [x] Add url crate for URL parsing
+  - [x] Add regex crate for pattern matching
+  - [x] Add scraper crate for HTML parsing
+- [x] Create crawler module structure
+  - [x] Create src/crawler/mod.rs with public exports
+  - [x] Create src/crawler/robots.rs for robots.txt handling
+  - [x] Create placeholder for extractor.rs and browser.rs
+- [x] Implement URL validation and normalization
+  - [x] Add URL parsing and validation functions
+  - [x] Implement URL normalization (remove fragments, etc.)
+  - [x] Add relative URL resolution
+  - [x] Create URL filtering logic based on base URL rules
+  - [x] Handle URL encoding and decoding properly
+- [x] Create HTTP client setup
+  - [x] Configure reqwest client with appropriate headers
+  - [x] Set proper User-Agent string
+  - [x] Add timeout configuration (30 seconds)
+  - [x] Add redirect handling
+  - [x] Configure connection pooling
+- [x] Implement robots.txt handling
+  - [x] Add robots.txt fetching function
+  - [x] Implement robots.txt parsing
+  - [x] Add URL permission checking against robots.txt
+  - [x] Handle missing or malformed robots.txt files
+  - [x] Cache robots.txt data appropriately
+- [x] Add rate limiting mechanism
+  - [x] Implement 250ms delay between requests
+  - [x] Use tokio time utilities for delays
+  - [x] Add configurable rate limiting
+  - [x] Test rate limiting accuracy
+- [x] Implement retry logic
+  - [x] Add exponential backoff for network failures
+  - [x] Distinguish between retryable and non-retryable errors
+  - [x] Implement maximum retry limits (3 attempts)
+  - [x] Add logging for retry attempts
+- [x] Create comprehensive unit tests
+  - [x] Test URL validation with various formats
+  - [x] Test URL normalization edge cases
+  - [x] Test URL filtering rules with complex base URLs
+  - [x] Test robots.txt parsing with different formats
+  - [x] Test HTTP client configuration and behavior
+  - [x] Test rate limiting accuracy and performance
+  - [x] Test retry logic with simulated failures
+- [x] Add integration tests with mock servers
+  - [x] Set up mock HTTP server for testing
+  - [x] Test complete HTTP request/response cycle
+  - [x] Test robots.txt integration
+  - [x] Test timeout and error handling
+- [x] Error handling implementation
+  - [x] Define custom error types for network operations
+  - [x] Add proper error propagation
+  - [x] Create user-friendly error messages
+  - [x] Test error handling scenarios
 
 ### Step 2.2: HTML Content Extraction and Basic Chunking
 

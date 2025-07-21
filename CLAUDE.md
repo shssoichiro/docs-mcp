@@ -60,11 +60,13 @@ The project follows a modular architecture split across several main components:
 ### Technology Stack
 
 - **Language**: Rust (edition 2024)
-- **CLI Framework**: Clap
-- **Metadata Database**: SQLite (stores sites, crawl queue, indexed chunks)
+- **CLI Framework**: Clap (with derive features for command parsing)
+- **Metadata Database**: SQLite with sqlx (stores sites, crawl queue, indexed chunks)
 - **Vector Database**: LanceDB (stores embeddings for semantic search)
 - **Embedding Provider**: Ollama (local, using nomic-embed-text model)
-- **Web Crawling**: Headless Chrome for JavaScript rendering
+- **Web Crawling**: scraper crate for HTML extraction (headless Chrome not yet implemented)
+- **HTTP Client**: ureq for web requests
+- **Configuration**: TOML with serde for serialization
 
 ### Data Flow
 
@@ -114,9 +116,14 @@ Provides two main tools:
 
 ### CLI Commands Structure
 
-- `docs-mcp config`: Interactive setup of Ollama connection
-- `docs-mcp add/list/delete/update`: Site management
-- `docs-mcp serve`: Start MCP server and background indexer
+- `docs-mcp config [--show]`: Interactive setup of Ollama connection or show current config
+- `docs-mcp add <url> [--name <name>]`: Add new documentation site
+- `docs-mcp list`: List all indexed documentation sites
+- `docs-mcp delete <site>`: Delete a documentation site
+- `docs-mcp update <site>`: Update/re-index a documentation site
+- `docs-mcp serve [--port <port>]`: Start MCP server and background indexer (default port: 3000)
+
+**Note**: Most CLI commands beyond `config` are currently placeholders and not yet implemented.
 
 ## Configuration System
 
@@ -200,8 +207,9 @@ Extensive clippy rules are configured in `Cargo.toml` covering:
 
 - Use an in-memory database as much as possible for integration tests
 - Use query macros for additional type safety. There is a database at `.sqlx/test.db` which sqlx will check against for its query verification.
-  - To run migrations against this test DB, use `cargo sqlx migrate run  --source ./src/database/sqlite/migrations`
+  - To run migrations against this test DB, use `cargo sqlx migrate run --source ./src/database/sqlite/migrations`
 - Assume all datetimes in the SQLite database are UTC. sqlx's sqlite adapter does not provide support for `DateTime<Utc>`, so we are using `NaiveDateTime` instead and storing all datetimes in the database as UTC.
+- The initial schema is defined in `src/database/sqlite/migrations/001_initial_schema.sql` with comprehensive constraints and indexes
 
 ## Quality Assurance
 
@@ -214,3 +222,24 @@ The project uses `just precommit` which runs:
 3. `cargo test` - Full test suite
 
 **Always run `just precommit` before committing changes** to ensure code quality standards.
+
+## Implementation Status
+
+### Completed Components
+
+- ✅ CLI framework with clap command parsing and comprehensive tests
+- ✅ Configuration system with TOML support, interactive setup, and validation
+- ✅ SQLite database schema with migrations and constraints
+- ✅ Error handling architecture with centralized `DocsError` enum
+- ✅ Project structure and module organization
+
+### In Progress / Planned Components
+
+- 🚧 Database operations (SQLite models and queries)
+- 🚧 Web crawler and content extraction
+- 🚧 Ollama integration and embedding generation
+- 🚧 Background indexing process coordination
+- 🚧 MCP server implementation
+- 🚧 Vector database (LanceDB) integration
+
+Most CLI commands beyond `config` currently show placeholder messages and need implementation.
