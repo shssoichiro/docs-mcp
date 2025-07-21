@@ -64,7 +64,7 @@ The project follows a modular architecture split across several main components:
 - **Metadata Database**: SQLite with sqlx (stores sites, crawl queue, indexed chunks)
 - **Vector Database**: LanceDB (stores embeddings for semantic search)
 - **Embedding Provider**: Ollama (local, using nomic-embed-text model)
-- **Web Crawling**: scraper crate for HTML extraction (headless Chrome not yet implemented)
+- **Web Crawling**: scraper crate for HTML extraction with semantic content processing
 - **HTTP Client**: ureq for web requests
 - **Configuration**: TOML with serde for serialization
 
@@ -72,7 +72,7 @@ The project follows a modular architecture split across several main components:
 
 1. **Configuration**: TOML config in `~/.docs-mcp/config.toml`
 2. **Crawling**: Sequential crawling with rate limiting (250ms between requests)
-3. **Content Processing**: HTML extraction → semantic chunking (500-800 tokens) → embedding generation
+3. **Content Processing**: HTML extraction → heading hierarchy detection → semantic chunking (500-800 tokens) → embedding generation
 4. **Storage**: Metadata in SQLite, vectors in LanceDB at `~/.docs-mcp/`
 5. **Search**: MCP server provides semantic search via vector similarity
 
@@ -99,9 +99,37 @@ The project follows a modular architecture split across several main components:
 
 ## Key Implementation Notes
 
-### Content Chunking
+### Content Extraction and Processing
 
-Uses semantic chunking strategy preserving heading hierarchy with context breadcrumbs like "Page Title > Section > Subsection" included in each chunk.
+#### HTML Content Extraction (`src/crawler/extractor.rs`)
+
+The content extraction system provides sophisticated HTML parsing and content structuring:
+
+- **Smart Content Detection**: Automatically identifies main content areas using semantic selectors (`main`, `[role="main"]`, `.content`, etc.)
+- **Heading Hierarchy Preservation**: Builds breadcrumb paths like "Page Title > Section > Subsection" from H1-H6 structure
+- **Code Block Identification**: Detects and preserves code blocks, syntax highlighting, and preformatted content
+- **Text Normalization**: Handles whitespace cleanup, Unicode normalization, and malformed HTML gracefully
+- **Metadata Extraction**: Extracts page titles, meta tags, and structured document information
+- **Configurable Filtering**: Optional inclusion/exclusion of navigation, footer, and auxiliary content
+
+#### Content Chunking (`src/embeddings/chunking.rs`)
+
+The chunking system implements semantic content splitting for optimal embedding generation:
+
+- **Token-Aware Chunking**: Targets 650 tokens per chunk (configurable: 500-800 target, 1000 max, 100 min)
+- **Semantic Boundaries**: Splits on heading boundaries, paragraph breaks, and sentence boundaries when possible
+- **Code Block Preservation**: Never splits within code blocks, handling them as atomic units
+- **Contextual Chunks**: Each chunk includes page title and heading path for context
+- **Overlap Support**: Configurable overlap between adjacent chunks (default: 50 tokens)
+- **Multiple Splitting Strategies**: Paragraph-based → sentence-based → word-based as fallbacks
+- **Smart Merging**: Automatically merges small chunks and handles oversized content
+
+#### Key Features
+
+- **Malformed HTML Handling**: Gracefully processes broken or incomplete HTML structures
+- **Performance Optimized**: Efficient parsing and chunking for large documentation sites
+- **Test Coverage**: Comprehensive test suite with 72 passing tests covering various document structures
+- **Memory Efficient**: Processes content without excessive memory allocation
 
 ### URL Filtering
 
@@ -232,11 +260,15 @@ The project uses `just precommit` which runs:
 - ✅ SQLite database schema with migrations and constraints
 - ✅ Error handling architecture with centralized `DocsError` enum
 - ✅ Project structure and module organization
+- ✅ Database operations (SQLite models and queries)
+- ✅ Web crawler HTTP client with rate limiting and retry logic
+- ✅ HTML content extraction with heading hierarchy preservation
+- ✅ Semantic content chunking with code block preservation
+- ✅ robots.txt handling and URL filtering
 
 ### In Progress / Planned Components
 
-- 🚧 Database operations (SQLite models and queries)
-- 🚧 Web crawler and content extraction
+- 🚧 Site crawling integration and orchestration
 - 🚧 Ollama integration and embedding generation
 - 🚧 Background indexing process coordination
 - 🚧 MCP server implementation

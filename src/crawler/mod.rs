@@ -1,3 +1,4 @@
+pub mod extractor;
 pub mod robots;
 
 #[cfg(test)]

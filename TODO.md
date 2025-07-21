@@ -234,63 +234,63 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 2.2: HTML Content Extraction and Basic Chunking
 
-- [ ] Add content processing dependencies
-  - [ ] Ensure scraper crate is available for HTML parsing
-  - [ ] Add any additional text processing dependencies
-  - [ ] Add tokenization library for chunk sizing
-- [ ] Create content extraction module
-  - [ ] Create src/crawler/extractor.rs
-  - [ ] Define content extraction structures
-  - [ ] Add HTML parsing functions
-- [ ] Create chunking module
-  - [ ] Create src/embeddings/chunking.rs
-  - [ ] Define chunking algorithm interfaces
-  - [ ] Add token counting utilities
-- [ ] Implement HTML content extraction
-  - [ ] Extract main content from HTML documents
-  - [ ] Preserve heading hierarchy (h1, h2, h3, etc.)
-  - [ ] Extract page titles from HTML
-  - [ ] Handle meta information extraction
-  - [ ] Remove navigation and footer content
-  - [ ] Preserve code blocks and preformatted text
-- [ ] Implement heading hierarchy detection
-  - [ ] Build heading tree structure from HTML
-  - [ ] Create breadcrumb paths for content sections
-  - [ ] Handle nested heading structures
-  - [ ] Deal with malformed heading hierarchies
-- [ ] Create text cleaning and normalization
-  - [ ] Remove excessive whitespace
-  - [ ] Normalize Unicode characters
-  - [ ] Handle special characters and encoding
-  - [ ] Preserve important formatting markers
-- [ ] Implement basic chunking algorithm
-  - [ ] Target 500-800 tokens per chunk
-  - [ ] Split content by heading boundaries
-  - [ ] Preserve code blocks during splitting
-  - [ ] Handle oversized sections (>1000 tokens)
-  - [ ] Add context preservation with heading paths
-- [ ] Add chunk formatting
-  - [ ] Include page title in each chunk
-  - [ ] Add heading breadcrumb path
-  - [ ] Format chunks according to SPEC.md example
-  - [ ] Ensure consistent chunk structure
-- [ ] Create comprehensive unit tests
-  - [ ] Test HTML parsing with various document structures
-  - [ ] Test heading hierarchy extraction accuracy
-  - [ ] Test content cleaning and normalization
-  - [ ] Test chunking with different content sizes
-  - [ ] Test code block preservation
-  - [ ] Test heading path generation
-  - [ ] Test token counting accuracy
-- [ ] Add test data and fixtures
-  - [ ] Create sample HTML documents for testing
-  - [ ] Include various documentation site structures
-  - [ ] Add edge cases like malformed HTML
-  - [ ] Test with real documentation examples
-- [ ] Performance testing
-  - [ ] Test extraction speed with large documents
-  - [ ] Test memory usage with complex HTML
-  - [ ] Optimize slow extraction operations
+- [x] Add content processing dependencies
+  - [x] Ensure scraper crate is available for HTML parsing
+  - [x] Add any additional text processing dependencies
+  - [x] Add tokenization library for chunk sizing
+- [x] Create content extraction module
+  - [x] Create src/crawler/extractor.rs
+  - [x] Define content extraction structures
+  - [x] Add HTML parsing functions
+- [x] Create chunking module
+  - [x] Create src/embeddings/chunking.rs
+  - [x] Define chunking algorithm interfaces
+  - [x] Add token counting utilities
+- [x] Implement HTML content extraction
+  - [x] Extract main content from HTML documents
+  - [x] Preserve heading hierarchy (h1, h2, h3, etc.)
+  - [x] Extract page titles from HTML
+  - [x] Handle meta information extraction
+  - [x] Remove navigation and footer content
+  - [x] Preserve code blocks and preformatted text
+- [x] Implement heading hierarchy detection
+  - [x] Build heading tree structure from HTML
+  - [x] Create breadcrumb paths for content sections
+  - [x] Handle nested heading structures
+  - [x] Deal with malformed heading hierarchies
+- [x] Create text cleaning and normalization
+  - [x] Remove excessive whitespace
+  - [x] Normalize Unicode characters
+  - [x] Handle special characters and encoding
+  - [x] Preserve important formatting markers
+- [x] Implement basic chunking algorithm
+  - [x] Target 500-800 tokens per chunk
+  - [x] Split content by heading boundaries
+  - [x] Preserve code blocks during splitting
+  - [x] Handle oversized sections (>1000 tokens)
+  - [x] Add context preservation with heading paths
+- [x] Add chunk formatting
+  - [x] Include page title in each chunk
+  - [x] Add heading breadcrumb path
+  - [x] Format chunks according to SPEC.md example
+  - [x] Ensure consistent chunk structure
+- [x] Create comprehensive unit tests
+  - [x] Test HTML parsing with various document structures
+  - [x] Test heading hierarchy extraction accuracy
+  - [x] Test content cleaning and normalization
+  - [x] Test chunking with different content sizes
+  - [x] Test code block preservation
+  - [x] Test heading path generation
+  - [x] Test token counting accuracy
+- [x] Add test data and fixtures
+  - [x] Create sample HTML documents for testing
+  - [x] Include various documentation site structures
+  - [x] Add edge cases like malformed HTML
+  - [x] Test with real documentation examples
+- [x] Performance testing
+  - [x] Test extraction speed with large documents
+  - [x] Test memory usage with complex HTML
+  - [x] Optimize slow extraction operations
 
 ### Step 2.3: Basic Site Crawling Without JavaScript
 

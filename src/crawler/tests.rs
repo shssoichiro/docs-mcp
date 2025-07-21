@@ -1,22 +1,22 @@
-use std::time::Instant;
-
-use anyhow::anyhow;
-use url::Url;
-
-use crate::crawler::{CrawlerConfig, HttpClient};
+use super::extract_links as extract_links_impl;
+use super::is_retryable_error as is_retryable_error_impl;
+use super::normalize_path_for_filtering as normalize_path_for_filtering_impl;
+use super::should_crawl_url as should_crawl_url_impl;
+use super::validate_url as validate_url_impl;
+use super::*;
 
 #[test]
 fn validate_url() {
     // Valid URLs
-    assert!(super::validate_url("https://example.com").is_ok());
-    assert!(super::validate_url("http://docs.rs/regex/1.0/").is_ok());
-    assert!(super::validate_url("https://docs.python.org/3/library/").is_ok());
+    assert!(validate_url_impl("https://example.com").is_ok());
+    assert!(validate_url_impl("http://docs.rs/regex/1.0/").is_ok());
+    assert!(validate_url_impl("https://docs.python.org/3/library/").is_ok());
 
     // Invalid URLs
-    assert!(super::validate_url("ftp://example.com").is_err());
-    assert!(super::validate_url("not-a-url").is_err());
-    assert!(super::validate_url("").is_err());
-    assert!(super::validate_url("https://").is_err());
+    assert!(validate_url_impl("ftp://example.com").is_err());
+    assert!(validate_url_impl("not-a-url").is_err());
+    assert!(validate_url_impl("").is_err());
+    assert!(validate_url_impl("https://").is_err());
 }
 
 #[test]
@@ -24,29 +24,29 @@ fn should_crawl_url() {
     let base = Url::parse("https://docs.rs/regex/1.10.6/regex/").expect("url should parse");
 
     // Should crawl - same path prefix
-    assert!(super::should_crawl_url(
+    assert!(should_crawl_url_impl(
         &Url::parse("https://docs.rs/regex/1.10.6/regex/struct.Regex.html")
             .expect("url should parse"),
         &base
     ));
 
     // Should crawl - exact match
-    assert!(super::should_crawl_url(&base, &base));
+    assert!(should_crawl_url_impl(&base, &base));
 
     // Should not crawl - different host
-    assert!(!super::should_crawl_url(
+    assert!(!should_crawl_url_impl(
         &Url::parse("https://doc.rust-lang.org/std/").expect("url should parse"),
         &base
     ));
 
     // Should not crawl - different path prefix
-    assert!(!super::should_crawl_url(
+    assert!(!should_crawl_url_impl(
         &Url::parse("https://docs.rs/other-crate/1.0/").expect("url should parse"),
         &base
     ));
 
     // Should not crawl - different scheme
-    assert!(!super::should_crawl_url(
+    assert!(!should_crawl_url_impl(
         &Url::parse("http://docs.rs/regex/1.10.6/regex/").expect("url should parse"),
         &base
     ));
@@ -55,54 +55,54 @@ fn should_crawl_url() {
 #[test]
 fn normalize_path_for_filtering() {
     // Already ends with slash
-    assert_eq!(super::normalize_path_for_filtering("/docs/"), "/docs/");
+    assert_eq!(normalize_path_for_filtering_impl("/docs/"), "/docs/");
 
     // Directory without trailing slash
-    assert_eq!(super::normalize_path_for_filtering("/docs"), "/docs/");
+    assert_eq!(normalize_path_for_filtering_impl("/docs"), "/docs/");
 
     // Filename with extension
     assert_eq!(
-        super::normalize_path_for_filtering("/docs/index.html"),
+        normalize_path_for_filtering_impl("/docs/index.html"),
         "/docs/"
     );
 
     // Complex path with filename
     assert_eq!(
-        super::normalize_path_for_filtering("/regex/1.10.6/regex/struct.Regex.html"),
+        normalize_path_for_filtering_impl("/regex/1.10.6/regex/struct.Regex.html"),
         "/regex/1.10.6/regex/"
     );
 
     // Root path
-    assert_eq!(super::normalize_path_for_filtering("/"), "/");
+    assert_eq!(normalize_path_for_filtering_impl("/"), "/");
 
     // No leading slash
-    assert_eq!(super::normalize_path_for_filtering("docs"), "docs/");
+    assert_eq!(normalize_path_for_filtering_impl("docs"), "docs/");
 }
 
 #[test]
 fn is_retryable_error() {
     // Retryable errors
-    assert!(super::is_retryable_error(&anyhow!("Connection timeout")));
-    assert!(super::is_retryable_error(&anyhow!(
+    assert!(is_retryable_error_impl(&anyhow!("Connection timeout")));
+    assert!(is_retryable_error_impl(&anyhow!(
         "HTTP error 500: Internal Server Error"
     )));
-    assert!(super::is_retryable_error(&anyhow!(
+    assert!(is_retryable_error_impl(&anyhow!(
         "HTTP error 503: Service Unavailable"
     )));
-    assert!(super::is_retryable_error(&anyhow!(
+    assert!(is_retryable_error_impl(&anyhow!(
         "HTTP error 429: Too Many Requests"
     )));
-    assert!(super::is_retryable_error(&anyhow!("Network unreachable")));
+    assert!(is_retryable_error_impl(&anyhow!("Network unreachable")));
 
     // Non-retryable errors
-    assert!(!super::is_retryable_error(&anyhow!(
+    assert!(!is_retryable_error_impl(&anyhow!(
         "HTTP error 404: Not Found"
     )));
-    assert!(!super::is_retryable_error(&anyhow!(
+    assert!(!is_retryable_error_impl(&anyhow!(
         "HTTP error 401: Unauthorized"
     )));
-    assert!(!super::is_retryable_error(&anyhow!("Invalid URL format")));
-    assert!(!super::is_retryable_error(&anyhow!("Parse error")));
+    assert!(!is_retryable_error_impl(&anyhow!("Invalid URL format")));
+    assert!(!is_retryable_error_impl(&anyhow!("Parse error")));
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn extract_links() {
         </html>
     "#;
 
-    let links = super::extract_links(html, &base_url).expect("extract_links should succeed");
+    let links = extract_links_impl(html, &base_url).expect("extract_links should succeed");
 
     // Should only include links that match the base URL path
     assert_eq!(links.len(), 2);
@@ -179,7 +179,7 @@ fn malformed_html_parsing() {
 
     let base_url = Url::parse("https://example.com/").expect("url should parse");
     let links =
-        super::extract_links(malformed_html, &base_url).expect("extract_links should succeed");
+        extract_links_impl(malformed_html, &base_url).expect("extract_links should succeed");
 
     // Should still extract valid links despite malformed HTML
     assert_eq!(links.len(), 3);
@@ -205,23 +205,23 @@ fn edge_case_url_validation() {
     // Test various edge cases for URL validation
 
     // URLs with different ports
-    assert!(super::validate_url("https://example.com:8080/docs").is_ok());
-    assert!(super::validate_url("http://localhost:3000").is_ok());
+    assert!(validate_url_impl("https://example.com:8080/docs").is_ok());
+    assert!(validate_url_impl("http://localhost:3000").is_ok());
 
     // URLs with authentication (should be valid but we might not want to crawl them)
-    assert!(super::validate_url("https://user:pass@example.com").is_ok());
+    assert!(validate_url_impl("https://user:pass@example.com").is_ok());
 
     // URLs with complex paths
-    assert!(super::validate_url("https://docs.rs/regex/1.10.6/regex/struct.Regex.html").is_ok());
+    assert!(validate_url_impl("https://docs.rs/regex/1.10.6/regex/struct.Regex.html").is_ok());
 
     // Invalid schemes
-    assert!(super::validate_url("ftp://example.com").is_err());
-    assert!(super::validate_url("file:///local/file.html").is_err());
+    assert!(validate_url_impl("ftp://example.com").is_err());
+    assert!(validate_url_impl("file:///local/file.html").is_err());
 
     // Malformed URLs
-    assert!(super::validate_url("https://").is_err());
-    assert!(super::validate_url("not-a-url").is_err());
-    assert!(super::validate_url("").is_err());
+    assert!(validate_url_impl("https://").is_err());
+    assert!(validate_url_impl("not-a-url").is_err());
+    assert!(validate_url_impl("").is_err());
 }
 
 #[test]
@@ -233,27 +233,27 @@ fn complex_url_filtering_scenarios() {
         Url::parse("https://docs.rs/regex/1.10.6/regex/index.html").expect("url should parse");
 
     // Should crawl pages in the same directory
-    assert!(super::should_crawl_url(
+    assert!(should_crawl_url_impl(
         &Url::parse("https://docs.rs/regex/1.10.6/regex/struct.Regex.html")
             .expect("url should parse"),
         &base
     ));
 
     // Should crawl subdirectories
-    assert!(super::should_crawl_url(
+    assert!(should_crawl_url_impl(
         &Url::parse("https://docs.rs/regex/1.10.6/regex/enum/Error.html")
             .expect("url should parse"),
         &base
     ));
 
     // Should not crawl parent directories
-    assert!(!super::should_crawl_url(
+    assert!(!should_crawl_url_impl(
         &Url::parse("https://docs.rs/regex/1.10.6/").expect("url should parse"),
         &base
     ));
 
     // Should not crawl different crates
-    assert!(!super::should_crawl_url(
+    assert!(!should_crawl_url_impl(
         &Url::parse("https://docs.rs/serde/1.0/serde/").expect("url should parse"),
         &base
     ));
@@ -262,20 +262,20 @@ fn complex_url_filtering_scenarios() {
     let base2 = Url::parse("https://docs.python.org/3/library/").expect("url should parse");
 
     // Should crawl subdirectories
-    assert!(super::should_crawl_url(
+    assert!(should_crawl_url_impl(
         &Url::parse("https://docs.python.org/3/library/os.html").expect("url should parse"),
         &base2
     ));
 
     // Should crawl nested subdirectories
-    assert!(super::should_crawl_url(
+    assert!(should_crawl_url_impl(
         &Url::parse("https://docs.python.org/3/library/concurrent/futures.html")
             .expect("url should parse"),
         &base2
     ));
 
     // Should not crawl different versions
-    assert!(!super::should_crawl_url(
+    assert!(!should_crawl_url_impl(
         &Url::parse("https://docs.python.org/2/library/os.html").expect("url should parse"),
         &base2
     ));
@@ -470,8 +470,7 @@ mod integration_tests {
             .get(&test_url)
             .await
             .expect("get call should succeed");
-        let links =
-            super::super::extract_links(&html, &base_url).expect("extract_links should succeed");
+        let links = extract_links_impl(&html, &base_url).expect("extract_links should succeed");
 
         // Should extract only valid internal links
         assert_eq!(links.len(), 2);
@@ -528,8 +527,7 @@ mod integration_tests {
             .get(base_url.as_str())
             .await
             .expect("get call should succeed");
-        let links =
-            super::super::extract_links(&html, &base_url).expect("extract_links should succeed");
+        let links = extract_links_impl(&html, &base_url).expect("extract_links should succeed");
 
         // 3. Filter links based on robots.txt
         let allowed_links: Vec<_> = links
