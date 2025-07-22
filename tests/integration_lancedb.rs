@@ -355,10 +355,6 @@ async fn metadata_preservation_and_filtering() {
 }
 
 #[tokio::test]
-#[expect(
-    clippy::unnecessary_to_owned,
-    reason = "https://github.com/rust-lang/rust-clippy/issues/8929"
-)]
 async fn site_deletion_integrity() {
     let (config, _temp_dir) = create_test_config();
     let mut store = VectorStore::new(&config)
@@ -397,14 +393,14 @@ async fn site_deletion_integrity() {
     // Should still have python_docs and javascript_docs
     let remaining_sites: std::collections::HashSet<_> = remaining_results
         .iter()
-        .map(|r| &r.chunk_metadata.site_id)
+        .map(|r| r.chunk_metadata.site_id.as_str())
         .collect();
     assert!(
-        remaining_sites.contains(&"python_docs".to_string()),
+        remaining_sites.contains("python_docs"),
         "Should still have python_docs"
     );
     assert!(
-        remaining_sites.contains(&"javascript_docs".to_string()),
+        remaining_sites.contains("javascript_docs"),
         "Should still have javascript_docs"
     );
 }
