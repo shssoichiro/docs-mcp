@@ -441,6 +441,7 @@ mod tests {
                 model: "test-model".to_string(),
                 batch_size: 128,
             },
+            base_dir: None,
         };
 
         let client = OllamaClient::new(&config).expect("Failed to create client");

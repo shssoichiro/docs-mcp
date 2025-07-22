@@ -209,6 +209,75 @@ The Ollama client provides a robust interface for generating embeddings with com
   - Error recovery with invalid models
   - Empty input handling
 
+### LanceDB Vector Storage Implementation (`src/database/lancedb/`)
+
+The LanceDB integration provides a complete vector storage and search system with production-ready features:
+
+#### Core Architecture
+
+- **VectorStore struct**: Main interface for vector database operations with dynamic dimension support
+- **EmbeddingRecord/ChunkMetadata**: Complete data structures matching SPEC.md requirements
+- **Arrow Integration**: Proper FixedSizeListArray usage for efficient vector storage
+- **Async Design**: Full async/await support with tokio compatibility
+
+#### Dynamic Vector Dimensions
+
+- **Auto-Detection**: Automatically detects vector dimensions from first batch of embeddings
+- **Schema Recreation**: Dynamically recreates database schema when dimensions change
+- **Test/Production Support**: Seamlessly handles 5-dimensional test vectors and 768-dimensional production vectors
+- **Dimension Persistence**: Remembers vector dimensions across database sessions
+
+#### Vector Storage and Retrieval
+
+- **Batch Processing**: Efficient storage of multiple embeddings with metadata preservation
+- **Metadata Integration**: Complete ChunkMetadata storage including heading paths, content, tokens
+- **UUID Management**: Automatic ID generation and management for vector records
+- **Schema Validation**: Ensures data consistency with Arrow schema validation
+
+#### Similarity Search Features
+
+- **Cosine Similarity**: Fast vector similarity search using LanceDB's optimized algorithms
+- **Relevance Scoring**: Converts distance metrics to intuitive similarity scores (1.0 - distance)
+- **Site Filtering**: Filter search results by site_id using SQL-like predicates
+- **Result Limiting**: Configurable result limits with performance optimization
+- **Metadata Queries**: Search and filter by any metadata field
+
+#### Database Maintenance and Optimization
+
+- **Vector Indexing**: Creates performance-optimized vector indexes (requires 256+ records for PQ training)
+- **Database Optimization**: Compaction and reorganization for optimal performance
+- **Corruption Recovery**: Automatic detection and recovery from database corruption
+- **Site Deletion**: Clean removal of all vectors and metadata for specific sites
+- **Health Checking**: Comprehensive database integrity validation
+
+#### Error Handling and Recovery
+
+- **Corruption Detection**: Automatic detection of database corruption with backup/restore
+- **Schema Validation**: Ensures Arrow schema consistency across operations
+- **Connection Recovery**: Robust connection management with retry logic
+- **Transaction Safety**: Atomic operations with proper error rollback
+
+#### Testing Coverage
+
+- **Unit Tests**: 8 comprehensive unit tests covering all vector operations
+- **Integration Tests**: 9 integration tests with realistic 768-dimensional data:
+  - Complete documentation dataset storage and search
+  - Search relevance ranking and accuracy validation
+  - Large batch processing (300+ records) with performance testing
+  - Metadata preservation and filtering validation
+  - Site deletion integrity and cleanup verification
+  - Vector index creation and performance optimization
+  - Database optimization and maintenance operations
+  - Corruption recovery and persistence testing
+  - Concurrent access simulation and safety validation
+
+#### Performance Characteristics
+
+- **Large Dataset Support**: Tested with 300+ records and 768-dimensional vectors
+- **Memory Efficiency**: Optimized memory usage during batch operations
+- **Search Performance**: Sub-second search response times with proper indexing
+- **Scalability**: Designed for production workloads with thousands of documents
+
 ### MCP Interface
 
 Provides two main tools:
@@ -276,7 +345,7 @@ The system uses a centralized `DocsError` enum in `lib.rs` that categorizes erro
 ### Test Organization
 
 - **Unit Tests**: In each module (`#[cfg(test)] mod tests`)
-- **Integration Tests**: Cross-module functionality (`config/tests.rs`)
+- **Integration Tests**: Cross-module functionality or functionality which tests against a real server (`tests` directory)
 - **Cross-Platform Tests**: Platform-specific behavior validation
 - **Edge Case Testing**: Boundary conditions, invalid inputs, error scenarios
 
@@ -355,12 +424,23 @@ The project uses `just precommit` which runs:
   - ✅ Rate limiting compliance with configurable batch sizes
   - ✅ Integration with ContentChunk system preserving metadata
   - ✅ 8 comprehensive integration tests with real Ollama instance
+- ✅ **LanceDB Vector Storage System** (`src/database/lancedb/`)
+  - ✅ Complete vector database integration with Arrow/LanceDB 0.21
+  - ✅ Dynamic vector dimension support (auto-detects 5-dim for tests, 768-dim for production)
+  - ✅ Comprehensive vector storage with metadata preservation (EmbeddingRecord/ChunkMetadata)
+  - ✅ Vector similarity search with cosine similarity and relevance scoring
+  - ✅ Site-based filtering and flexible metadata queries
+  - ✅ Batch processing for efficient embedding storage
+  - ✅ Database maintenance: optimization, indexing, corruption recovery
+  - ✅ Vector index creation for improved search performance (requires 256+ records)
+  - ✅ 8 unit tests and 9 integration tests covering all functionality
+  - ✅ Production-ready with 768-dimensional nomic-embed-text compatibility
 
 ### In Progress / Planned Components
 
 - 🚧 Background indexing process coordination
 - 🚧 MCP server implementation
-- 🚧 Vector database (LanceDB) integration
+- 🚧 End-to-end embedding pipeline integration
 
 ### CLI Commands Implementation Status
 

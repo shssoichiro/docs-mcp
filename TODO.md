@@ -413,61 +413,65 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 3.2: LanceDB Integration
 
-- [ ] Add LanceDB dependencies
-  - [ ] Add lancedb crate to Cargo.toml
-  - [ ] Add any additional vector processing dependencies
-  - [ ] Ensure async compatibility
-- [ ] Create LanceDB module structure
-  - [ ] Create src/database/lancedb/mod.rs
-  - [ ] Create src/database/lancedb/vector_store.rs
-  - [ ] Update src/database/mod.rs to export LanceDB functions
-- [ ] Define vector data structures
-  - [ ] Create EmbeddingRecord struct matching SPEC.md
-  - [ ] Create ChunkMetadata struct with proper fields
-  - [ ] Add serde derives for serialization
-  - [ ] Implement type conversions and validations
-- [ ] Implement vector database initialization
-  - [ ] Create database in ~/.docs-mcp/embeddings/
-  - [ ] Set up proper database schema
-  - [ ] Handle database creation and migration
-  - [ ] Add database health checking
-- [ ] Add embedding storage functions
-  - [ ] Implement single embedding insertion
-  - [ ] Add batch insertion for multiple embeddings
-  - [ ] Store metadata alongside vectors
-  - [ ] Handle UUID generation for vector IDs
-- [ ] Implement vector similarity search
-  - [ ] Add semantic search functionality
-  - [ ] Implement relevance scoring
-  - [ ] Add result limiting and filtering
-  - [ ] Handle query embedding generation
-- [ ] Add metadata filtering capabilities
-  - [ ] Filter by site_id
-  - [ ] Filter by URL patterns
-  - [ ] Filter by content types
-  - [ ] Add regex-based filtering for site names
-- [ ] Implement database maintenance functions
-  - [ ] Add database cleanup operations
-  - [ ] Implement index optimization
-  - [ ] Add database size monitoring
-  - [ ] Handle database corruption recovery
-- [ ] Create comprehensive unit tests
-  - [ ] Test database initialization and setup
-  - [ ] Test embedding insertion and retrieval
-  - [ ] Test batch operations performance
-  - [ ] Test similarity search accuracy
-  - [ ] Test metadata filtering functionality
-  - [ ] Test database maintenance operations
-- [ ] Add integration tests
-  - [ ] Test with real embedding data
-  - [ ] Test search performance with large datasets
-  - [ ] Test concurrent access patterns
-  - [ ] Test database persistence and recovery
-- [ ] Performance optimization and testing
-  - [ ] Optimize insertion and search performance
-  - [ ] Test memory usage with large vector datasets
-  - [ ] Monitor database size growth
-  - [ ] Add performance metrics and monitoring
+- [x] Add LanceDB dependencies
+  - [x] Add lancedb crate to Cargo.toml
+  - [x] Add arrow and futures dependencies for vector processing
+  - [x] Ensure async compatibility with tokio runtime
+- [x] Create LanceDB module structure
+  - [x] Create src/database/lancedb/mod.rs
+  - [x] Create src/database/lancedb/vector_store.rs
+  - [x] Update src/database/mod.rs to export LanceDB functions
+- [x] Define vector data structures
+  - [x] Create EmbeddingRecord struct matching SPEC.md
+  - [x] Create ChunkMetadata struct with proper fields
+  - [x] Add serde derives for serialization
+  - [x] Implement type conversions and validations
+- [x] Implement vector database initialization
+  - [x] Create database in ~/.docs-mcp/vectors/
+  - [x] Set up proper database schema with FixedSizeList for vectors
+  - [x] Handle database creation and migration
+  - [x] Add database health checking and corruption recovery
+- [x] Add embedding storage functions
+  - [x] Implement single embedding insertion
+  - [x] Add batch insertion for multiple embeddings
+  - [x] Store metadata alongside vectors
+  - [x] Handle UUID generation for vector IDs
+- [x] Implement vector similarity search
+  - [x] Add semantic search functionality with cosine similarity
+  - [x] Implement relevance scoring (1.0 - distance)
+  - [x] Add result limiting and filtering by site_id
+  - [x] Handle query embedding generation integration
+- [x] Add metadata filtering capabilities
+  - [x] Filter by site_id using SQL-like predicates
+  - [x] Filter by URL patterns through metadata
+  - [x] Filter by content types or metadata fields
+  - [x] Add flexible filtering through LanceDB predicates
+- [x] Implement database maintenance functions
+  - [x] Add database cleanup operations (site deletion)
+  - [x] Implement index optimization and vector indexing
+  - [x] Add database size monitoring (count_embeddings)
+  - [x] Handle database corruption recovery with backup/restore
+- [x] Create comprehensive unit tests
+  - [x] Test database initialization and setup (8 unit tests passing)
+  - [x] Test embedding insertion and retrieval
+  - [x] Test batch operations performance
+  - [x] Test similarity search accuracy with site filtering
+  - [x] Test metadata filtering functionality
+  - [x] Test database maintenance operations
+- [x] Add integration tests
+  - [x] Test with real embedding data (768-dimensional vectors)
+  - [x] Test search performance with large datasets (300+ records)
+  - [x] Test concurrent access patterns and simulation
+  - [x] Test database persistence and recovery scenarios
+- [x] Performance optimization and testing
+  - [x] Optimize insertion and search performance with vector indexing
+  - [x] Test memory usage with large vector datasets
+  - [x] Monitor database size growth and optimization
+  - [x] Add performance metrics and comprehensive monitoring
+- [x] Dynamic vector dimension support
+  - [x] Auto-detect vector dimensions from first batch (5-dim for tests, 768-dim for production)
+  - [x] Recreate database schema when dimensions change
+  - [x] Support seamless transition between test and production vector sizes
 
 ### Step 3.3: End-to-End Embedding Pipeline
 

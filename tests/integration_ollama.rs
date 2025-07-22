@@ -32,6 +32,7 @@ fn create_integration_test_client() -> OllamaClient {
             model,
             batch_size: 5, // Smaller batch size for testing
         },
+        base_dir: None,
     };
 
     OllamaClient::new(&config)
@@ -411,6 +412,7 @@ fn real_ollama_error_recovery() {
             model: "non-existent-model-12345".to_string(),
             batch_size: 5,
         },
+        base_dir: None,
     };
 
     let client = OllamaClient::new(&config)

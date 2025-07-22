@@ -8,6 +8,8 @@ use url::Url;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Config {
     pub ollama: OllamaConfig,
+    #[serde(skip)]
+    pub base_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -48,6 +50,7 @@ impl Default for Config {
                 model: "nomic-embed-text:latest".to_string(),
                 batch_size: 64,
             },
+            base_dir: None,
         }
     }
 }
@@ -68,6 +71,14 @@ impl Config {
                 }
             })
             .ok_or(ConfigError::DirectoryError)
+    }
+
+    /// Get the base directory for the application, using override if set
+    #[inline]
+    pub fn get_base_dir(&self) -> Result<PathBuf, ConfigError> {
+        self.base_dir
+            .as_ref()
+            .map_or_else(Self::config_dir, |base_dir| Ok(base_dir.clone()))
     }
 
     #[inline]

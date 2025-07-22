@@ -178,7 +178,7 @@ fn extract_sections(document: &Html, config: &ExtractionConfig) -> Result<Vec<Co
 }
 
 /// Find the main content area of the document
-fn find_main_content(document: &Html) -> ElementRef {
+fn find_main_content(document: &Html) -> ElementRef<'_> {
     // Try common main content selectors
     let main_selectors = [
         "main",
