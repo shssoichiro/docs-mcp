@@ -1,6 +1,9 @@
 // Database consistency validation module
 // Ensures data integrity between SQLite and LanceDB
 
+#[cfg(test)]
+mod tests;
+
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, info, warn};
@@ -319,57 +322,5 @@ impl ConsistencyReport {
     #[inline]
     pub fn total_issues(&self) -> usize {
         self.missing_in_lancedb.len() + self.orphaned_in_lancedb.len()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn consistency_report_creation() {
-        let report = ConsistencyReport {
-            sqlite_chunks: 100,
-            lancedb_embeddings: 95,
-            missing_in_lancedb: vec!["vec1".to_string(), "vec2".to_string()],
-            orphaned_in_lancedb: vec![],
-            inconsistent_sites: vec![],
-            is_consistent: false,
-        };
-
-        assert_eq!(report.total_issues(), 2);
-        assert!(!report.is_consistent);
-        assert!(report.summary().contains("inconsistencies found"));
-    }
-
-    #[test]
-    fn consistent_report() {
-        let report = ConsistencyReport {
-            sqlite_chunks: 100,
-            lancedb_embeddings: 100,
-            missing_in_lancedb: vec![],
-            orphaned_in_lancedb: vec![],
-            inconsistent_sites: vec![],
-            is_consistent: true,
-        };
-
-        assert_eq!(report.total_issues(), 0);
-        assert!(report.is_consistent);
-        assert!(report.summary().contains("Database is consistent"));
-    }
-
-    #[test]
-    fn site_consistency_issue() {
-        let issue = SiteConsistencyIssue {
-            site_id: 1,
-            site_name: "Test Site".to_string(),
-            sqlite_chunks: 50,
-            lancedb_embeddings: 48,
-            missing_in_lancedb: vec!["vec1".to_string(), "vec2".to_string()],
-            orphaned_in_lancedb: vec![],
-        };
-
-        assert_eq!(issue.missing_in_lancedb.len(), 2);
-        assert_eq!(issue.orphaned_in_lancedb.len(), 0);
     }
 }

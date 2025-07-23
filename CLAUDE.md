@@ -259,8 +259,8 @@ The LanceDB integration provides a complete vector storage and search system wit
 
 #### Testing Coverage
 
-- **Unit Tests**: 8 comprehensive unit tests covering all vector operations
-- **Integration Tests**: 9 integration tests with realistic 768-dimensional data:
+- **Unit Tests**: Comprehensive unit tests covering all vector operations
+- **Integration Tests**: Integration tests with realistic 768-dimensional data:
   - Complete documentation dataset storage and search
   - Search relevance ranking and accuracy validation
   - Large batch processing (300+ records) with performance testing
@@ -345,6 +345,7 @@ The system uses a centralized `DocsError` enum in `lib.rs` that categorizes erro
 ### Test Organization
 
 - **Unit Tests**: In each module (`#[cfg(test)] mod tests`)
+  - Placed in a separate `tests.rs` file for each module to improve organization and reduce lines per file.
 - **Integration Tests**: Cross-module functionality or functionality which tests against a real server (`tests` directory)
 - **Cross-Platform Tests**: Platform-specific behavior validation
 - **Edge Case Testing**: Boundary conditions, invalid inputs, error scenarios
