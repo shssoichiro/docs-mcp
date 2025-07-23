@@ -116,10 +116,6 @@ fn extract_sections(document: &Html, config: &ExtractionConfig) -> Result<Vec<Co
     let mut sections = Vec::new();
     let mut heading_stack: Vec<(u8, String)> = Vec::new();
 
-    // Create selector for headings and content elements
-    let _heading_selector = Selector::parse("h1, h2, h3, h4, h5, h6")
-        .map_err(|e| anyhow!("Failed to create heading selector: {:?}", e))?;
-
     // Find the main content area
     let content_root = find_main_content(document);
 

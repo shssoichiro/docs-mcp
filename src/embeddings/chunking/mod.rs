@@ -456,7 +456,6 @@ pub fn create_contextual_chunk(
     heading_path: &str,
     chunk_index: usize,
 ) -> ContentChunk {
-    let _token_count = estimate_token_count(content);
     let has_code_blocks = contains_code_block(content);
 
     // Create contextual content with page title and heading path

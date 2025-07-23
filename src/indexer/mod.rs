@@ -111,7 +111,7 @@ impl BackgroundIndexer {
 
         // Stop heartbeat and cleanup
         heartbeat_handle.abort();
-        let _ = self.cleanup_lock_file().await;
+        self.cleanup_lock_file().await?;
 
         result
     }
@@ -284,7 +284,7 @@ impl BackgroundIndexer {
                         indexed_pages: Some(site.indexed_pages + pages_processed),
                         ..Default::default()
                     };
-                    let _ = self.database.update_site(site.id, &progress_update).await;
+                    self.database.update_site(site.id, &progress_update).await?;
                 }
                 Err(e) => {
                     error!("Failed to process page {}: {}", crawl_item.url, e);

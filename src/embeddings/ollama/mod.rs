@@ -146,14 +146,13 @@ impl OllamaClient {
 
         debug!("Pinging Ollama server at {}", url);
 
-        let _response = self
-            .make_request_with_retry(|| {
-                self.agent
-                    .get(url.as_str())
-                    .call()
-                    .and_then(|mut resp| resp.body_mut().read_to_string())
-            })
-            .context("Failed to ping Ollama server")?;
+        self.make_request_with_retry(|| {
+            self.agent
+                .get(url.as_str())
+                .call()
+                .and_then(|mut resp| resp.body_mut().read_to_string())
+        })
+        .context("Failed to ping Ollama server")?;
 
         debug!("Server ping successful");
         Ok(())
