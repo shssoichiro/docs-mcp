@@ -20,15 +20,16 @@ async fn integration_schema_migration() -> Result<()> {
     .fetch_all(database.pool())
     .await?;
 
-    let expected_tables: HashSet<String> = [
-        "sites".to_string(),
-        "crawl_queue".to_string(),
-        "indexed_chunks".to_string(),
+    let expected_tables: HashSet<&'static str> = [
+        "sites",
+        "crawl_queue",
+        "indexed_chunks",
+        "indexer_heartbeat",
     ]
     .into_iter()
     .collect();
 
-    let actual_tables: HashSet<String> = tables.into_iter().collect();
+    let actual_tables: HashSet<&str> = tables.iter().map(|t| t.as_str()).collect();
     assert_eq!(actual_tables, expected_tables);
 
     Ok(())

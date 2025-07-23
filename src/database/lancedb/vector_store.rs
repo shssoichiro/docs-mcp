@@ -771,6 +771,37 @@ impl VectorStore {
         info!("Database repair completed successfully");
         Ok(())
     }
+
+    /// Delete a single embedding by vector ID (placeholder implementation)
+    #[inline]
+    #[expect(clippy::unused_async, reason = "not yet implemented")]
+    pub async fn delete_embedding(&mut self, vector_id: &str) -> Result<bool, DocsError> {
+        debug!("Deleting embedding with vector_id: {}", vector_id);
+
+        // TODO: Implement single embedding deletion by vector_id
+        // This would require querying by the ID field and deleting the matching record
+        warn!(
+            "delete_embedding not yet implemented for vector_id: {}",
+            vector_id
+        );
+
+        // For now, return false indicating the embedding was not found/deleted
+        Ok(false)
+    }
+
+    /// List all vector IDs in the database (placeholder implementation)
+    #[inline]
+    #[expect(clippy::unused_async, reason = "not yet implemented")]
+    pub async fn list_all_vector_ids(&mut self) -> Result<Vec<String>, DocsError> {
+        debug!("Listing all vector IDs");
+
+        // TODO: Implement listing all vector IDs
+        // This would require querying the table and extracting all ID fields
+        warn!("list_all_vector_ids not yet implemented");
+
+        // For now, return empty vector
+        Ok(vec![])
+    }
 }
 
 #[cfg(test)]

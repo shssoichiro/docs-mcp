@@ -435,18 +435,36 @@ The project uses `just precommit` which runs:
   - ✅ Vector index creation for improved search performance (requires 256+ records)
   - ✅ 8 unit tests and 9 integration tests covering all functionality
   - ✅ Production-ready with 768-dimensional nomic-embed-text compatibility
+- ✅ **Complete Background Indexing System** (`src/indexer/mod.rs`)
+  - ✅ File locking mechanism with `~/.docs-mcp/.indexer.lock` for process coordination
+  - ✅ Heartbeat system with SQLite timestamp updates every 30 seconds
+  - ✅ Complete indexing pipeline from crawled content to embeddings
+  - ✅ Cross-database consistency validation between SQLite and LanceDB
+  - ✅ Auto-start/termination logic with queue management
+  - ✅ Resource management and error recovery throughout pipeline
+  - ✅ 3 comprehensive unit tests covering indexer creation, lock files, and status
+- ✅ **Cross-Database Consistency Validation** (`src/indexer/consistency.rs`)
+  - ✅ ConsistencyValidator with comprehensive validation between SQLite and LanceDB
+  - ✅ Orphaned embedding cleanup and missing embedding regeneration
+  - ✅ Site-level consistency checking with detailed reporting
+  - ✅ 3 unit tests covering consistency reports and validation logic
+- ✅ **Enhanced CLI Commands** (`src/commands.rs`)
+  - ✅ Comprehensive `docs-mcp list` with site statistics, progress, and heartbeat monitoring
+  - ✅ Complete `docs-mcp status` with pipeline health checking and actionable next steps
+  - ✅ Database connectivity checking, Ollama health monitoring, and consistency validation
+  - ✅ Real-time progress tracking and error reporting
 
 ### In Progress / Planned Components
 
-- 🚧 Background indexing process coordination
 - 🚧 MCP server implementation
-- 🚧 End-to-end embedding pipeline integration
+- 🚧 Cleanup procedures for failed indexing operations
 
 ### CLI Commands Implementation Status
 
 - ✅ `docs-mcp config [--show]`: Interactive setup of Ollama connection or show current config
 - ✅ `docs-mcp add <url> [--name <name>]`: Add new documentation site (fully implemented)
-- ✅ `docs-mcp list`: List all indexed documentation sites (basic implementation)
-- 🚧 `docs-mcp delete <site>`: Delete a documentation site (placeholder)
-- 🚧 `docs-mcp update <site>`: Update/re-index a documentation site (placeholder)
+- ✅ `docs-mcp list`: List all indexed documentation sites (comprehensive implementation with statistics and monitoring)
+- ✅ `docs-mcp status`: Show detailed pipeline status with health checks and consistency validation
+- 🚧 `docs-mcp delete <site>`: Delete a documentation site (placeholder implementation)
+- 🚧 `docs-mcp update <site>`: Update/re-index a documentation site (placeholder implementation)
 - 🚧 `docs-mcp serve [--port <port>]`: Start MCP server and background indexer (placeholder)

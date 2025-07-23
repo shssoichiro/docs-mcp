@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use tracing::{error, info};
 
-use crate::config::get_config_dir;
+use crate::config::{Config, get_config_dir};
 use crate::crawler::{CrawlerConfig, SiteCrawler, validate_url};
 use crate::database::sqlite::{Database, NewSite, SiteQueries};
+use crate::indexer::BackgroundIndexer;
 
 /// Add a new documentation site for indexing
 #[inline]
@@ -86,7 +87,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     Ok(())
 }
 
-/// List all indexed documentation sites  
+/// List all indexed documentation sites with comprehensive information
 #[inline]
 pub async fn list_sites() -> Result<()> {
     let config_dir = get_config_dir()?;
@@ -108,31 +109,82 @@ pub async fn list_sites() -> Result<()> {
     println!("Documentation Sites ({} total):", sites.len());
     println!();
 
-    for site in sites {
+    for site in &sites {
         println!("📚 {} (ID: {})", site.name, site.id);
         println!("   URL: {}", site.base_url);
         println!("   Status: {}", site.status);
 
+        // Show crawl progress
         if site.total_pages > 0 {
             println!(
-                "   Progress: {}/{} pages ({}%)",
+                "   Crawl Progress: {}/{} pages ({}%)",
                 site.indexed_pages, site.total_pages, site.progress_percent
             );
         }
 
+        // Get comprehensive statistics
+        match SiteQueries::get_statistics(database.pool(), site.id).await {
+            Ok(Some(stats)) => {
+                println!("   Content Chunks: {}", stats.total_chunks);
+
+                if stats.pending_crawl_items > 0 {
+                    println!("   Pending Pages: {}", stats.pending_crawl_items);
+                }
+
+                if stats.failed_crawl_items > 0 {
+                    println!("   Failed Pages: {}", stats.failed_crawl_items);
+                }
+            }
+            Ok(None) => println!("   Statistics: Not available"),
+            Err(e) => println!("   Statistics: Error - {}", e),
+        }
+
+        // Show indexing dates
         if let Some(indexed_date) = site.indexed_date {
             println!(
-                "   Last indexed: {}",
+                "   Last Indexed: {}",
                 indexed_date.format("%Y-%m-%d %H:%M:%S")
             );
         }
 
-        if let Some(error) = site.error_message {
-            println!("   Error: {}", error);
+        if let Some(heartbeat) = site.last_heartbeat {
+            let elapsed = chrono::Utc::now()
+                .naive_utc()
+                .signed_duration_since(heartbeat)
+                .num_seconds();
+
+            if elapsed < 120 {
+                println!("   Indexer: Active ({}s ago)", elapsed);
+            } else {
+                println!("   Indexer: Inactive ({}s ago)", elapsed);
+            }
         }
+
+        // Show errors
+        if let Some(error) = &site.error_message {
+            println!("   ⚠️  Error: {}", error);
+        }
+
+        // Show creation date
+        println!(
+            "   Created: {}",
+            site.created_date.format("%Y-%m-%d %H:%M:%S")
+        );
 
         println!();
     }
+
+    // Show summary statistics
+    let total_sites = sites.len();
+    let completed_sites = sites.iter().filter(|s| s.is_completed()).count();
+    let indexing_sites = sites.iter().filter(|s| s.is_indexing()).count();
+    let failed_sites = sites.iter().filter(|s| s.is_failed()).count();
+
+    println!("Summary:");
+    println!("  Total Sites: {}", total_sites);
+    println!("  Completed: {}", completed_sites);
+    println!("  Currently Indexing: {}", indexing_sites);
+    println!("  Failed: {}", failed_sites);
 
     Ok(())
 }
@@ -224,6 +276,174 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
             println!("Update failed: {}", e);
         }
     }
+
+    Ok(())
+}
+
+/// Show detailed status of the indexing pipeline
+#[inline]
+pub async fn show_status() -> Result<()> {
+    let config = Config::load().unwrap_or_default();
+
+    println!("📊 Docs-MCP Status Report");
+    println!("{}", "=".repeat(50));
+    println!();
+
+    // Database connectivity
+    println!("🗄️  Database Status:");
+    let database = match Database::new(&config.database_path()).await {
+        Ok(db) => {
+            println!("   ✅ SQLite: Connected");
+            Some(db)
+        }
+        Err(e) => {
+            println!("   ❌ SQLite: Failed to connect - {}", e);
+            None
+        }
+    };
+
+    // Ollama connectivity
+    println!("🤖 Ollama Status:");
+    match crate::embeddings::ollama::OllamaClient::new(&config) {
+        Ok(client) => match client.health_check() {
+            Ok(()) => {
+                println!(
+                    "   ✅ Ollama: Connected ({}:{})",
+                    config.ollama.host, config.ollama.port
+                );
+                println!("   📋 Model: {}", config.ollama.model);
+                println!("   🔢 Batch Size: {}", config.ollama.batch_size);
+            }
+            Err(e) => {
+                println!("   ⚠️  Ollama: Connected but unhealthy - {}", e);
+            }
+        },
+        Err(e) => {
+            println!("   ❌ Ollama: Failed to connect - {}", e);
+        }
+    }
+
+    // Vector database status
+    println!("🔍 Vector Database Status:");
+    match crate::database::lancedb::VectorStore::new(&config).await {
+        Ok(_store) => {
+            println!("   ✅ LanceDB: Connected");
+        }
+        Err(e) => {
+            println!("   ❌ LanceDB: Failed to connect - {}", e);
+        }
+    }
+
+    if let Some(database) = database {
+        println!();
+        println!("🔄 Indexer Status:");
+
+        // Check if indexer is running
+        let mut indexer = BackgroundIndexer::new(config.clone()).await?;
+        match indexer.get_indexing_status().await {
+            Ok(status) => match status {
+                crate::indexer::IndexingStatus::Idle => {
+                    println!("   💤 Status: Idle");
+                }
+                crate::indexer::IndexingStatus::ProcessingSite { site_id, site_name } => {
+                    println!(
+                        "   🔄 Status: Processing site {} (ID: {})",
+                        site_name, site_id
+                    );
+                }
+                crate::indexer::IndexingStatus::GeneratingEmbeddings { remaining_chunks } => {
+                    println!(
+                        "   🧮 Status: Generating embeddings ({} chunks remaining)",
+                        remaining_chunks
+                    );
+                }
+                crate::indexer::IndexingStatus::Failed { error } => {
+                    println!("   ❌ Status: Failed - {}", error);
+                }
+            },
+            Err(e) => {
+                println!("   ⚠️  Status: Unknown - {}", e);
+            }
+        }
+
+        // Check database consistency
+        println!();
+        println!("🔍 Database Consistency:");
+        match indexer.validate_consistency().await {
+            Ok(report) => {
+                if report.is_consistent {
+                    println!("   ✅ Databases are consistent");
+                    println!("   📊 SQLite chunks: {}", report.sqlite_chunks);
+                    println!("   📊 LanceDB embeddings: {}", report.lancedb_embeddings);
+                } else {
+                    println!("   ⚠️  Consistency issues found:");
+                    println!("   📊 SQLite chunks: {}", report.sqlite_chunks);
+                    println!("   📊 LanceDB embeddings: {}", report.lancedb_embeddings);
+                    if !report.missing_in_lancedb.is_empty() {
+                        println!(
+                            "   🚫 Missing in LanceDB: {}",
+                            report.missing_in_lancedb.len()
+                        );
+                    }
+                    if !report.orphaned_in_lancedb.is_empty() {
+                        println!(
+                            "   👻 Orphaned in LanceDB: {}",
+                            report.orphaned_in_lancedb.len()
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                println!("   ❌ Failed to check consistency: {}", e);
+            }
+        }
+
+        // Show site statistics
+        println!();
+        println!("📚 Site Overview:");
+        match SiteQueries::list_all(database.pool()).await {
+            Ok(sites) => {
+                if sites.is_empty() {
+                    println!("   📭 No sites indexed yet");
+                } else {
+                    let total_sites = sites.len();
+                    let completed_sites = sites.iter().filter(|s| s.is_completed()).count();
+                    let indexing_sites = sites.iter().filter(|s| s.is_indexing()).count();
+                    let failed_sites = sites.iter().filter(|s| s.is_failed()).count();
+                    let pending_sites = sites
+                        .iter()
+                        .filter(|s| s.status == crate::database::sqlite::SiteStatus::Pending)
+                        .count();
+
+                    println!("   📊 Total Sites: {}", total_sites);
+                    println!("   ✅ Completed: {}", completed_sites);
+                    println!("   🔄 Currently Indexing: {}", indexing_sites);
+                    println!("   ⏳ Pending: {}", pending_sites);
+                    println!("   ❌ Failed: {}", failed_sites);
+
+                    // Show total chunks across all sites
+                    let mut total_chunks = 0;
+                    for site in &sites {
+                        if let Ok(Some(stats)) =
+                            SiteQueries::get_statistics(database.pool(), site.id).await
+                        {
+                            total_chunks += stats.total_chunks;
+                        }
+                    }
+                    println!("   📄 Total Chunks Indexed: {}", total_chunks);
+                }
+            }
+            Err(e) => {
+                println!("   ❌ Failed to load site statistics: {}", e);
+            }
+        }
+    }
+
+    println!();
+    println!("💡 Next Steps:");
+    println!("   • Use 'docs-mcp add <url>' to index a new documentation site");
+    println!("   • Use 'docs-mcp list' to see detailed site information");
+    println!("   • Use 'docs-mcp serve' to start the MCP server for AI assistants");
 
     Ok(())
 }

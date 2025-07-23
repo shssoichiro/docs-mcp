@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::{NaiveDateTime, Utc};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Sqlite};
 use std::path::Path;
@@ -79,5 +80,94 @@ impl Database {
             .begin()
             .await
             .context("Failed to begin database transaction")
+    }
+
+    // Heartbeat methods for indexer coordination
+    #[inline]
+    pub async fn update_indexer_heartbeat(&self) -> Result<()> {
+        let now = Utc::now().naive_utc();
+        sqlx::query!(
+            "UPDATE indexer_heartbeat SET last_heartbeat = ?, status = 'indexing' WHERE id = 1",
+            now
+        )
+        .execute(&self.pool)
+        .await
+        .context("Failed to update indexer heartbeat")?;
+
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn get_indexer_heartbeat(&self) -> Result<Option<NaiveDateTime>> {
+        let result =
+            sqlx::query_scalar!("SELECT last_heartbeat FROM indexer_heartbeat WHERE id = 1")
+                .fetch_optional(&self.pool)
+                .await
+                .context("Failed to get indexer heartbeat")?;
+
+        Ok(result)
+    }
+
+    #[inline]
+    pub async fn set_indexer_idle(&self) -> Result<()> {
+        let now = Utc::now().naive_utc();
+        sqlx::query!(
+            "UPDATE indexer_heartbeat SET last_heartbeat = ?, status = 'idle' WHERE id = 1",
+            now
+        )
+        .execute(&self.pool)
+        .await
+        .context("Failed to set indexer idle")?;
+
+        Ok(())
+    }
+
+    // Site operations
+    #[inline]
+    pub async fn get_sites_by_status(&self, status: SiteStatus) -> Result<Vec<Site>> {
+        SiteQueries::get_sites_by_status(&self.pool, status).await
+    }
+
+    #[inline]
+    pub async fn get_sites_needing_indexing(&self) -> Result<Vec<Site>> {
+        SiteQueries::get_sites_needing_indexing(&self.pool).await
+    }
+
+    #[inline]
+    pub async fn update_site(&self, id: i64, update: &SiteUpdate) -> Result<Option<Site>> {
+        SiteQueries::update(&self.pool, id, update.clone()).await
+    }
+
+    // Crawl queue operations
+    #[inline]
+    pub async fn get_pending_crawl_items_for_site(
+        &self,
+        site_id: i64,
+    ) -> Result<Vec<CrawlQueueItem>> {
+        CrawlQueueQueries::get_pending_for_site(&self.pool, site_id).await
+    }
+
+    #[inline]
+    pub async fn get_completed_crawl_items_for_site(
+        &self,
+        site_id: i64,
+    ) -> Result<Vec<CrawlQueueItem>> {
+        CrawlQueueQueries::get_completed_for_site(&self.pool, site_id).await
+    }
+
+    // Indexed chunk operations
+    #[inline]
+    pub async fn get_chunks_for_site(&self, site_id: i64) -> Result<Vec<IndexedChunk>> {
+        IndexedChunkQueries::list_by_site(&self.pool, site_id).await
+    }
+
+    #[inline]
+    pub async fn insert_indexed_chunk(&self, chunk: &NewIndexedChunk) -> Result<IndexedChunk> {
+        IndexedChunkQueries::create(&self.pool, chunk.clone()).await
+    }
+
+    #[inline]
+    pub async fn get_chunk_by_vector_id(&self, vector_id: &str) -> Result<Option<IndexedChunk>> {
+        IndexedChunkQueries::get_by_vector_id(&self.pool, vector_id).await
     }
 }

@@ -141,6 +141,26 @@ impl Config {
         let url_str = format!("http://{}:{}", self.ollama.host, self.ollama.port);
         Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))
     }
+
+    /// Get the path for the SQLite database
+    #[inline]
+    pub fn database_path(&self) -> String {
+        let base_dir = self.get_base_dir().unwrap_or_else(|_| PathBuf::from("."));
+        base_dir.join("metadata.db").to_string_lossy().to_string()
+    }
+
+    /// Get the path for the vector database directory
+    #[inline]
+    pub fn vector_database_path(&self) -> String {
+        let base_dir = self.get_base_dir().unwrap_or_else(|_| PathBuf::from("."));
+        base_dir.join("vectors").to_string_lossy().to_string()
+    }
+
+    /// Get the config directory as an instance method
+    #[inline]
+    pub fn config_dir_path(&self) -> PathBuf {
+        self.get_base_dir().unwrap_or_else(|_| PathBuf::from("."))
+    }
 }
 
 impl OllamaConfig {

@@ -280,6 +280,70 @@ impl SiteQueries {
             failed_crawl_items: failed_crawl,
         }))
     }
+
+    #[inline]
+    pub async fn get_sites_by_status(pool: &SqlitePool, status: SiteStatus) -> Result<Vec<Site>> {
+        let status_str = match status {
+            SiteStatus::Pending => "pending",
+            SiteStatus::Indexing => "indexing",
+            SiteStatus::Completed => "completed",
+            SiteStatus::Failed => "failed",
+        };
+
+        let sites = sqlx::query_as!(
+            Site,
+            r#"
+            SELECT id,
+                   base_url, 
+                   name, 
+                   version, 
+                   indexed_date,
+                   status as "status: SiteStatus",
+                   progress_percent,
+                   total_pages,
+                   indexed_pages,
+                   error_message,
+                   created_date,
+                   last_heartbeat
+            FROM sites WHERE status = ? ORDER BY created_date ASC
+            "#,
+            status_str
+        )
+        .fetch_all(pool)
+        .await
+        .context("Failed to get sites by status")?;
+
+        Ok(sites)
+    }
+
+    #[inline]
+    pub async fn get_sites_needing_indexing(pool: &SqlitePool) -> Result<Vec<Site>> {
+        let sites = sqlx::query_as!(
+            Site,
+            r#"
+            SELECT id,
+                   base_url, 
+                   name, 
+                   version, 
+                   indexed_date,
+                   status as "status: SiteStatus",
+                   progress_percent,
+                   total_pages,
+                   indexed_pages,
+                   error_message,
+                   created_date,
+                   last_heartbeat
+            FROM sites 
+            WHERE status IN ('pending', 'indexing')
+            ORDER BY created_date ASC
+            "#
+        )
+        .fetch_all(pool)
+        .await
+        .context("Failed to get sites needing indexing")?;
+
+        Ok(sites)
+    }
 }
 
 #[derive(Debug)]
@@ -544,6 +608,62 @@ impl CrawlQueueQueries {
             completed: stats.completed,
             failed: stats.failed,
         })
+    }
+
+    #[inline]
+    pub async fn get_pending_for_site(
+        pool: &SqlitePool,
+        site_id: i64,
+    ) -> Result<Vec<CrawlQueueItem>> {
+        let items = sqlx::query_as!(
+            CrawlQueueItem,
+            r#"
+            SELECT id,
+                   site_id,
+                   url, 
+                   status as "status: CrawlStatus",
+                   retry_count,
+                   error_message, 
+                   created_date
+            FROM crawl_queue 
+            WHERE site_id = ? AND status = 'pending'
+            ORDER BY created_date ASC
+            "#,
+            site_id
+        )
+        .fetch_all(pool)
+        .await
+        .context("Failed to get pending crawl items for site")?;
+
+        Ok(items)
+    }
+
+    #[inline]
+    pub async fn get_completed_for_site(
+        pool: &SqlitePool,
+        site_id: i64,
+    ) -> Result<Vec<CrawlQueueItem>> {
+        let items = sqlx::query_as!(
+            CrawlQueueItem,
+            r#"
+            SELECT id,
+                   site_id,
+                   url, 
+                   status as "status: CrawlStatus",
+                   retry_count,
+                   error_message, 
+                   created_date
+            FROM crawl_queue 
+            WHERE site_id = ? AND status = 'completed'
+            ORDER BY created_date ASC
+            "#,
+            site_id
+        )
+        .fetch_all(pool)
+        .await
+        .context("Failed to get completed crawl items for site")?;
+
+        Ok(items)
     }
 }
 

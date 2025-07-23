@@ -475,44 +475,44 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 3.3: End-to-End Embedding Pipeline
 
-- [ ] Integrate content extraction with embedding generation
-  - [ ] Connect chunking output to Ollama client input
-  - [ ] Handle text preprocessing for embeddings
-  - [ ] Add proper error handling throughout pipeline
-- [ ] Integrate embedding storage with vector database
-  - [ ] Connect Ollama output to LanceDB input
-  - [ ] Store embeddings with proper metadata
-  - [ ] Handle batch processing coordination
-- [ ] Implement complete indexing workflow
-  - [ ] Process chunks from crawling to vector storage
-  - [ ] Coordinate between SQLite metadata and LanceDB vectors
-  - [ ] Add transaction-like behavior for consistency
-  - [ ] Handle partial failures and recovery
-- [ ] Add data consistency validation
-  - [ ] Verify SQLite and LanceDB data alignment
-  - [ ] Check for orphaned vectors or metadata
-  - [ ] Implement consistency repair functions
-  - [ ] Add data integrity checks
-- [ ] Implement "docs-mcp list" command
-  - [ ] Query sites from SQLite database
-  - [ ] Format output as table with proper columns
-  - [ ] Show site status, progress, and statistics
-  - [ ] Handle empty database gracefully
-- [ ] Implement "docs-mcp status" command
-  - [ ] Show detailed status for specific sites
-  - [ ] Display progress, error messages, and statistics
-  - [ ] Show embedding and vector storage status
-  - [ ] Provide actionable information for issues
-- [ ] Add comprehensive error handling
-  - [ ] Handle embedding generation failures
-  - [ ] Manage vector storage errors
-  - [ ] Implement cleanup for partial operations
-  - [ ] Provide detailed error reporting
-- [ ] Implement proper resource management
-  - [ ] Monitor memory usage during processing
-  - [ ] Clean up temporary data structures
-  - [ ] Handle large site processing efficiently
-  - [ ] Add memory pressure handling
+- [x] Integrate content extraction with embedding generation
+  - [x] Connect chunking output to Ollama client input
+  - [x] Handle text preprocessing for embeddings
+  - [x] Add proper error handling throughout pipeline
+- [x] Integrate embedding storage with vector database
+  - [x] Connect Ollama output to LanceDB input
+  - [x] Store embeddings with proper metadata
+  - [x] Handle batch processing coordination
+- [x] Implement complete indexing workflow
+  - [x] Process chunks from crawling to vector storage
+  - [x] Coordinate between SQLite metadata and LanceDB vectors
+  - [x] Add transaction-like behavior for consistency
+  - [x] Handle partial failures and recovery
+- [x] Add data consistency validation
+  - [x] Verify SQLite and LanceDB data alignment
+  - [x] Check for orphaned vectors or metadata
+  - [x] Implement consistency repair functions
+  - [x] Add data integrity checks
+- [x] Implement "docs-mcp list" command
+  - [x] Query sites from SQLite database
+  - [x] Format output as table with proper columns
+  - [x] Show site status, progress, and statistics
+  - [x] Handle empty database gracefully
+- [x] Implement "docs-mcp status" command
+  - [x] Show detailed status for specific sites
+  - [x] Display progress, error messages, and statistics
+  - [x] Show embedding and vector storage status
+  - [x] Provide actionable information for issues
+- [x] Add comprehensive error handling
+  - [x] Handle embedding generation failures
+  - [x] Manage vector storage errors
+  - [x] Implement cleanup for partial operations
+  - [x] Provide detailed error reporting
+- [x] Implement proper resource management
+  - [x] Monitor memory usage during processing
+  - [x] Clean up temporary data structures
+  - [x] Handle large site processing efficiently
+  - [x] Add memory pressure handling
 - [ ] Create comprehensive unit tests
   - [ ] Test complete pipeline with mock data
   - [ ] Test error handling and recovery scenarios
@@ -534,44 +534,44 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 4.1: Process Coordination and File Locking
 
-- [ ] Add process coordination dependencies
-  - [ ] Add file locking utilities (fs2 or similar)
-  - [ ] Add signal handling dependencies
-  - [ ] Add process management utilities
-- [ ] Create indexer module structure
-  - [ ] Create src/indexer/mod.rs with public exports
-  - [ ] Create src/indexer/process.rs for coordination
-  - [ ] Create placeholders for queue.rs and progress.rs
-- [ ] Implement file locking mechanism
-  - [ ] Create lock file at ~/.docs-mcp/.indexer.lock
-  - [ ] Implement exclusive file locking
-  - [ ] Add lock file creation and removal
-  - [ ] Handle lock file permissions and errors
-- [ ] Add heartbeat system
-  - [ ] Update SQLite with timestamps every 30 seconds
-  - [ ] Add heartbeat column to sites table if needed
-  - [ ] Implement heartbeat monitoring
-  - [ ] Handle heartbeat failures and recovery
-- [ ] Implement stale process detection
-  - [ ] Check for lock files without recent heartbeats
-  - [ ] Detect processes that have crashed or hung
-  - [ ] Remove stale lock files safely
-  - [ ] Start new indexer when stale process detected
-- [ ] Add background process management
-  - [ ] Spawn background indexer processes
-  - [ ] Monitor background process health
-  - [ ] Handle process termination and cleanup
-  - [ ] Implement process restart capability
-- [ ] Implement signal handling
-  - [ ] Handle SIGTERM and SIGINT gracefully
-  - [ ] Clean up lock files on shutdown
-  - [ ] Complete current operations before exit
-  - [ ] Save progress before termination
-- [ ] Add process status monitoring
-  - [ ] Check if background indexer is running
-  - [ ] Report process status to users
-  - [ ] Monitor process resource usage
-  - [ ] Add process health checks
+- [x] Add process coordination dependencies
+  - [x] Add file locking utilities (fs2 or similar)
+  - [x] Add signal handling dependencies
+  - [x] Add process management utilities
+- [x] Create indexer module structure
+  - [x] Create src/indexer/mod.rs with public exports
+  - [x] Create src/indexer/consistency.rs for cross-database validation
+  - [x] Create comprehensive background indexer implementation
+- [x] Implement file locking mechanism
+  - [x] Create lock file at ~/.docs-mcp/.indexer.lock
+  - [x] Implement exclusive file locking
+  - [x] Add lock file creation and removal
+  - [x] Handle lock file permissions and errors
+- [x] Add heartbeat system
+  - [x] Update SQLite with timestamps every 30 seconds
+  - [x] Add indexer_heartbeat table to database schema
+  - [x] Implement heartbeat monitoring
+  - [x] Handle heartbeat failures and recovery
+- [x] Implement stale process detection
+  - [x] Check for lock files without recent heartbeats
+  - [x] Detect processes that have crashed or hung
+  - [x] Remove stale lock files safely
+  - [x] Start new indexer when stale process detected
+- [x] Add background process management
+  - [x] Spawn background indexer processes
+  - [x] Monitor background process health
+  - [x] Handle process termination and cleanup
+  - [x] Implement process restart capability
+- [x] Implement signal handling
+  - [x] Handle SIGTERM and SIGINT gracefully
+  - [x] Clean up lock files on shutdown
+  - [x] Complete current operations before exit
+  - [x] Save progress before termination
+- [x] Add process status monitoring
+  - [x] Check if background indexer is running
+  - [x] Report process status to users
+  - [x] Monitor process resource usage
+  - [x] Add process health checks
 - [ ] Create comprehensive unit tests
   - [ ] Test file locking with concurrent processes
   - [ ] Test heartbeat mechanism and monitoring
@@ -592,40 +592,40 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 4.2: Indexing Queue Management
 
-- [ ] Create queue management module
-  - [ ] Create src/indexer/queue.rs
-  - [ ] Define queue management interfaces
-  - [ ] Add queue status monitoring functions
-- [ ] Implement queue processing logic
-  - [ ] Process items from crawl_queue table
-  - [ ] Implement priority-based ordering
-  - [ ] Add queue item status transitions
-  - [ ] Handle concurrent queue access
-- [ ] Add resume capability
-  - [ ] Detect interrupted indexing operations
-  - [ ] Resume from last saved state
-  - [ ] Handle partial completions gracefully
-  - [ ] Validate resume state consistency
-- [ ] Implement retry logic
-  - [ ] Add exponential backoff for failures
-  - [ ] Distinguish between retry types
-  - [ ] Track retry counts and limits
-  - [ ] Handle permanent failures appropriately
-- [ ] Add queue monitoring and reporting
-  - [ ] Track queue size and progress
-  - [ ] Monitor processing rates
-  - [ ] Report queue statistics
-  - [ ] Add queue health monitoring
-- [ ] Implement queue maintenance
-  - [ ] Clean up completed queue items
-  - [ ] Remove expired or failed items
-  - [ ] Optimize queue performance
-  - [ ] Add queue integrity checks
-- [ ] Add queue configuration
-  - [ ] Configure retry limits and delays
-  - [ ] Set queue processing priorities
-  - [ ] Configure queue cleanup policies
-  - [ ] Add queue size limits
+- [x] Create queue management module
+  - [x] Integrate queue management within src/indexer/mod.rs
+  - [x] Define queue management interfaces
+  - [x] Add queue status monitoring functions
+- [x] Implement queue processing logic
+  - [x] Process items from crawl_queue table
+  - [x] Implement priority-based ordering
+  - [x] Add queue item status transitions
+  - [x] Handle concurrent queue access
+- [x] Add resume capability
+  - [x] Detect interrupted indexing operations
+  - [x] Resume from last saved state
+  - [x] Handle partial completions gracefully
+  - [x] Validate resume state consistency
+- [x] Implement retry logic
+  - [x] Add exponential backoff for failures
+  - [x] Distinguish between retry types
+  - [x] Track retry counts and limits
+  - [x] Handle permanent failures appropriately
+- [x] Add queue monitoring and reporting
+  - [x] Track queue size and progress
+  - [x] Monitor processing rates
+  - [x] Report queue statistics
+  - [x] Add queue health monitoring
+- [x] Implement queue maintenance
+  - [x] Clean up completed queue items
+  - [x] Remove expired or failed items
+  - [x] Optimize queue performance
+  - [x] Add queue integrity checks
+- [x] Add queue configuration
+  - [x] Configure retry limits and delays
+  - [x] Set queue processing priorities
+  - [x] Configure queue cleanup policies
+  - [x] Add queue size limits
 - [ ] Create comprehensive unit tests
   - [ ] Test queue processing with various scenarios
   - [ ] Test resume capability after interruption
@@ -646,45 +646,45 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 4.3: Complete Background Indexer
 
-- [ ] Integrate process coordination with queue management
-  - [ ] Combine file locking with queue processing
-  - [ ] Coordinate heartbeats with queue operations
-  - [ ] Handle process management with active queues
-- [ ] Implement auto-start logic
-  - [ ] Start background indexer when needed
-  - [ ] Detect when indexer should be running
-  - [ ] Handle multiple simultaneous start requests
-  - [ ] Prevent duplicate background processes
-- [ ] Add auto-termination logic
-  - [ ] Detect when queue is empty
-  - [ ] Terminate background process gracefully
-  - [ ] Clean up resources on termination
-  - [ ] Handle termination edge cases
-- [ ] Implement comprehensive progress tracking
-  - [ ] Track progress across all operations
-  - [ ] Update progress in real-time
-  - [ ] Provide progress estimates
-  - [ ] Handle progress reporting errors
-- [ ] Add status monitoring and health checks
-  - [ ] Monitor background indexer health
-  - [ ] Report detailed status information
-  - [ ] Add performance monitoring
-  - [ ] Implement health check endpoints
-- [ ] Integrate with CLI commands
-  - [ ] Start background indexer from CLI commands
-  - [ ] Report background status in CLI
-  - [ ] Handle CLI interaction with background processes
-  - [ ] Add CLI commands for background control
-- [ ] Add comprehensive error handling
-  - [ ] Handle all types of background failures
-  - [ ] Implement error recovery strategies
-  - [ ] Report errors appropriately
-  - [ ] Add error logging and monitoring
-- [ ] Implement resource management
-  - [ ] Monitor memory and CPU usage
-  - [ ] Implement resource limits
-  - [ ] Handle resource pressure gracefully
-  - [ ] Add resource usage reporting
+- [x] Integrate process coordination with queue management
+  - [x] Combine file locking with queue processing
+  - [x] Coordinate heartbeats with queue operations
+  - [x] Handle process management with active queues
+- [x] Implement auto-start logic
+  - [x] Start background indexer when needed
+  - [x] Detect when indexer should be running
+  - [x] Handle multiple simultaneous start requests
+  - [x] Prevent duplicate background processes
+- [x] Add auto-termination logic
+  - [x] Detect when queue is empty
+  - [x] Terminate background process gracefully
+  - [x] Clean up resources on termination
+  - [x] Handle termination edge cases
+- [x] Implement comprehensive progress tracking
+  - [x] Track progress across all operations
+  - [x] Update progress in real-time
+  - [x] Provide progress estimates
+  - [x] Handle progress reporting errors
+- [x] Add status monitoring and health checks
+  - [x] Monitor background indexer health
+  - [x] Report detailed status information
+  - [x] Add performance monitoring
+  - [x] Implement health check endpoints
+- [x] Integrate with CLI commands
+  - [x] Start background indexer from CLI commands
+  - [x] Report background status in CLI
+  - [x] Handle CLI interaction with background processes
+  - [x] Add CLI commands for background control (list, status)
+- [x] Add comprehensive error handling
+  - [x] Handle all types of background failures
+  - [x] Implement error recovery strategies
+  - [x] Report errors appropriately
+  - [x] Add error logging and monitoring
+- [x] Implement resource management
+  - [x] Monitor memory and CPU usage
+  - [x] Implement resource limits
+  - [x] Handle resource pressure gracefully
+  - [x] Add resource usage reporting
 - [ ] Create comprehensive unit tests
   - [ ] Test complete background system integration
   - [ ] Test auto-start and termination logic

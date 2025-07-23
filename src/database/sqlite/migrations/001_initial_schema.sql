@@ -45,6 +45,17 @@ CREATE TABLE IF NOT EXISTS indexed_chunks (
     FOREIGN KEY (site_id) REFERENCES sites (id) ON DELETE CASCADE
 );
 
+-- Indexer heartbeat table: tracks background process status
+CREATE TABLE IF NOT EXISTS indexer_heartbeat (
+    id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+    last_heartbeat DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    process_id TEXT,
+    status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'indexing', 'failed'))
+);
+
+-- Insert initial heartbeat row
+INSERT OR IGNORE INTO indexer_heartbeat (id, last_heartbeat, status) VALUES (1, CURRENT_TIMESTAMP, 'idle');
+
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_sites_status ON sites(status);
 CREATE INDEX IF NOT EXISTS idx_sites_name_version ON sites(name, version);
