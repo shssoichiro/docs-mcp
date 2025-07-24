@@ -12,6 +12,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use chrono::Utc;
 use tokio::fs;
+use tokio::select;
+use tokio::signal;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
@@ -90,7 +92,7 @@ impl BackgroundIndexer {
         })
     }
 
-    /// Start the background indexing process
+    /// Start the background indexing process with signal handling
     #[inline]
     pub async fn start(&mut self) -> Result<()> {
         // Check if another indexer is already running
@@ -109,8 +111,8 @@ impl BackgroundIndexer {
         // Start heartbeat task
         let heartbeat_handle = self.start_heartbeat_task();
 
-        // Main indexing loop
-        let result = self.run_indexing_loop().await;
+        // Main indexing loop with signal handling
+        let result = self.run_indexing_loop_with_signals().await;
 
         // Stop heartbeat and cleanup
         heartbeat_handle.abort();
@@ -119,27 +121,89 @@ impl BackgroundIndexer {
         result
     }
 
-    /// Check if an indexer is currently running
+    /// Check if an indexer is currently running with enhanced stale detection
     #[inline]
     pub async fn is_indexer_running(&self) -> Result<bool> {
+        // First check if lock file exists
         if !self.lock_file_path.exists() {
+            debug!("No lock file found, indexer not running");
+            return Ok(false);
+        }
+
+        // Read lock file timestamp for additional validation
+        let lock_file_valid = match fs::read_to_string(&self.lock_file_path).await {
+            Ok(content) => {
+                content.trim().parse::<u64>().map_or_else(
+                    |_| {
+                        warn!("Lock file contains invalid timestamp, considering invalid");
+                        false
+                    },
+                    |timestamp| {
+                        let lock_time = SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp);
+                        let now = SystemTime::now();
+
+                        now.duration_since(lock_time).map_or_else(
+                            |_| {
+                                warn!("Lock file timestamp is in the future, considering invalid");
+                                false
+                            },
+                            |elapsed| {
+                                // Lock file should be recent (within 10 minutes)
+                                let stale = elapsed > Duration::from_secs(600);
+                                if stale {
+                                    warn!(
+                                        "Lock file is stale ({}s old), considering process dead",
+                                        elapsed.as_secs()
+                                    );
+                                }
+                                !stale
+                            },
+                        )
+                    },
+                )
+            }
+            Err(e) => {
+                error!("Failed to read lock file: {}", e);
+                false
+            }
+        };
+
+        if !lock_file_valid {
+            info!("Removing stale lock file");
+            let _ = fs::remove_file(&self.lock_file_path).await;
             return Ok(false);
         }
 
         // Check if the process is still alive by examining heartbeat
         match self.database.get_indexer_heartbeat().await {
-            Ok(Some(heartbeat)) => {
+            Ok(heartbeat) => {
                 let now = Utc::now().naive_utc();
                 let elapsed = now
                     .signed_duration_since(heartbeat)
                     .num_seconds()
                     .unsigned_abs();
 
-                // Consider stale if no heartbeat for 2 minutes
-                Ok(elapsed < 120)
+                // Consider stale if no heartbeat for 2 minutes (60 seconds as mentioned in requirements)
+                let is_alive = elapsed < 60;
+
+                if !is_alive {
+                    warn!(
+                        "Process heartbeat is stale ({}s since last update), cleaning up",
+                        elapsed
+                    );
+                    // Clean up stale lock file
+                    let _ = fs::remove_file(&self.lock_file_path).await;
+                    // Reset heartbeat in database
+                    let _ = self.database.clear_indexer_heartbeat().await;
+                }
+
+                Ok(is_alive)
             }
-            Ok(None) => Ok(false),
-            Err(_) => Ok(false),
+            Err(e) => {
+                error!("Failed to check heartbeat: {}", e);
+                // On database error, assume process might be running to avoid conflicts
+                Ok(true)
+            }
         }
     }
 
@@ -191,21 +255,42 @@ impl BackgroundIndexer {
         Ok(IndexingStatus::Idle)
     }
 
-    /// Main indexing loop
-    async fn run_indexing_loop(&mut self) -> Result<()> {
+    /// Main indexing loop with signal handling for graceful shutdown
+    async fn run_indexing_loop_with_signals(&mut self) -> Result<()> {
+        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
+            .context("Failed to register SIGTERM handler")?;
+        let mut sigint = signal::unix::signal(signal::unix::SignalKind::interrupt())
+            .context("Failed to register SIGINT handler")?;
+
         loop {
-            match self.process_next_site().await {
-                Ok(true) => {
-                    // Successfully processed a site or made progress
-                    sleep(Duration::from_millis(100)).await;
-                }
-                Ok(false) => {
-                    // No work to do, exit
+            select! {
+                // Handle SIGTERM (graceful shutdown request)
+                _ = sigterm.recv() => {
+                    info!("Received SIGTERM, initiating graceful shutdown");
                     return Ok(());
                 }
-                Err(e) => {
-                    error!("Error in indexing loop: {}", e);
-                    sleep(Duration::from_secs(10)).await;
+                // Handle SIGINT (Ctrl+C)
+                _ = sigint.recv() => {
+                    info!("Received SIGINT, initiating graceful shutdown");
+                    return Ok(());
+                }
+                // Normal indexing operations
+                result = self.process_next_site() => {
+                    match result {
+                        Ok(true) => {
+                            // Successfully processed a site or made progress
+                            sleep(Duration::from_millis(100)).await;
+                        }
+                        Ok(false) => {
+                            // No work to do, exit gracefully
+                            info!("No more work to process, shutting down indexer");
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            error!("Error in indexing loop: {}", e);
+                            sleep(Duration::from_secs(10)).await;
+                        }
+                    }
                 }
             }
         }

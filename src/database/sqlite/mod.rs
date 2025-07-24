@@ -98,10 +98,11 @@ impl Database {
     }
 
     #[inline]
-    pub async fn get_indexer_heartbeat(&self) -> Result<Option<NaiveDateTime>> {
+    pub async fn get_indexer_heartbeat(&self) -> Result<NaiveDateTime> {
+        // This record should always exist in the database
         let result =
             sqlx::query_scalar!("SELECT last_heartbeat FROM indexer_heartbeat WHERE id = 1")
-                .fetch_optional(&self.pool)
+                .fetch_one(&self.pool)
                 .await
                 .context("Failed to get indexer heartbeat")?;
 
@@ -119,6 +120,29 @@ impl Database {
         .await
         .context("Failed to set indexer idle")?;
 
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn set_indexer_heartbeat(&self, heartbeat: NaiveDateTime) -> Result<()> {
+        sqlx::query!(
+            "UPDATE indexer_heartbeat SET last_heartbeat = ?, status = 'indexing' WHERE id = 1",
+            heartbeat
+        )
+        .execute(&self.pool)
+        .await
+        .context("Failed to set indexer heartbeat")?;
+        Ok(())
+    }
+
+    #[inline]
+    pub async fn clear_indexer_heartbeat(&self) -> Result<()> {
+        sqlx::query!(
+            "UPDATE indexer_heartbeat SET last_heartbeat = 0, status = 'idle' WHERE id = 1"
+        )
+        .execute(&self.pool)
+        .await
+        .context("Failed to clear indexer heartbeat")?;
         Ok(())
     }
 

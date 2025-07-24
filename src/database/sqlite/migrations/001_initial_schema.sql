@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS indexer_heartbeat (
 );
 
 -- Insert initial heartbeat row
-INSERT OR IGNORE INTO indexer_heartbeat (id, last_heartbeat, status) VALUES (1, CURRENT_TIMESTAMP, 'idle');
+INSERT OR IGNORE INTO indexer_heartbeat (id, last_heartbeat, status) VALUES (1, 0, 'idle');
 
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_sites_status ON sites(status);
