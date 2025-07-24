@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::config::{Config, get_config_dir};
 use crate::crawler::{CrawlerConfig, SiteCrawler, validate_url};
@@ -367,6 +367,21 @@ pub async fn show_status() -> Result<()> {
         }
 
         // Check database consistency
+        // Show queue resource usage
+        println!();
+        println!("🚦 Queue Resource Usage:");
+        let queue_usage = indexer.get_queue_resource_usage();
+        println!(
+            "   📊 Processing Items Tracked: {}",
+            queue_usage.processing_items_tracked
+        );
+        println!(
+            "   💾 Estimated Memory Usage: {:.2} MB",
+            queue_usage.estimated_memory_usage_mb
+        );
+        println!("   📦 Active Batch Size: {}", queue_usage.active_batch_size);
+        println!("   ⏱️  Timeout: {}s", queue_usage.timeout_seconds);
+
         println!();
         println!("🔍 Database Consistency:");
         match indexer.validate_consistency().await {
@@ -444,6 +459,120 @@ pub async fn show_status() -> Result<()> {
     println!("   • Use 'docs-mcp add <url>' to index a new documentation site");
     println!("   • Use 'docs-mcp list' to see detailed site information");
     println!("   • Use 'docs-mcp serve' to start the MCP server for AI assistants");
+
+    Ok(())
+}
+
+/// Start MCP server and background indexer with auto-start/termination logic
+#[inline]
+pub async fn serve_mcp(port: u16) -> Result<()> {
+    info!(
+        "Starting MCP server on port {} with background indexer",
+        port
+    );
+
+    // Load configuration
+    let config = Config::load().context("Failed to load configuration")?;
+
+    // Verify Ollama connectivity before starting
+    match crate::embeddings::ollama::OllamaClient::new(&config) {
+        Ok(client) => match client.health_check() {
+            Ok(()) => {
+                info!(
+                    "✅ Ollama connected at {}:{} with model {}",
+                    config.ollama.host, config.ollama.port, config.ollama.model
+                );
+            }
+            Err(e) => {
+                warn!("⚠️  Ollama is reachable but unhealthy: {}", e);
+                println!("Warning: Ollama may not be ready. Background indexing may fail.");
+            }
+        },
+        Err(e) => {
+            error!("❌ Failed to connect to Ollama: {}", e);
+            println!(
+                "Error: Cannot connect to Ollama at {}:{}",
+                config.ollama.host, config.ollama.port
+            );
+            println!("Please ensure Ollama is running and accessible.");
+            println!("Use 'docs-mcp config' to update connection settings.");
+            return Err(e);
+        }
+    }
+
+    // Initialize background indexer
+    let indexer = BackgroundIndexer::new(config.clone())
+        .await
+        .context("Failed to create background indexer")?;
+
+    // Check if another indexer is already running
+    let indexer_handle = if indexer.is_indexer_running().await? {
+        println!("⚠️  Background indexer is already running");
+        println!("Use 'docs-mcp status' to check the current status");
+        println!("Starting MCP server only...");
+        None
+    } else {
+        println!("🚀 Starting background indexer...");
+
+        // Start background indexer in a separate task
+        let indexer_handle = {
+            let mut indexer_clone = BackgroundIndexer::new(config.clone()).await?;
+            tokio::spawn(async move {
+                match indexer_clone.start().await {
+                    Ok(()) => {
+                        info!("Background indexer completed successfully");
+                    }
+                    Err(e) => {
+                        error!("Background indexer failed: {}", e);
+                    }
+                }
+            })
+        };
+
+        // Give indexer a moment to start
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Verify indexer started successfully
+        if indexer.is_indexer_running().await? {
+            println!("✅ Background indexer started successfully");
+        } else {
+            warn!("⚠️  Background indexer may have failed to start");
+        }
+
+        // Store handle for later cleanup
+        Some(indexer_handle)
+    };
+
+    println!("🌐 Starting MCP server on port {}...", port);
+    println!("📊 Use 'docs-mcp status' to monitor indexing progress");
+    println!("📚 Use 'docs-mcp list' to see indexed sites");
+    println!();
+    println!("Press Ctrl+C to stop the server and background indexer");
+
+    // TODO: Implement actual MCP server here
+    // For now, simulate server running
+    println!("🚧 MCP server implementation coming soon...");
+    println!("Background indexer will continue processing in the background");
+
+    // Wait for interrupt signal
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            println!("\n📴 Received interrupt signal, shutting down...");
+
+            // Check if we need to stop the background indexer
+            if indexer.is_indexer_running().await? {
+                if let Some(handle) = indexer_handle {
+                    println!("🛑 Stopping background indexer...");
+                    if let Err(e) =  handle.await {
+                        // Print the error but continue shutting down
+                        warn!("⚠️  Encountered error shutting down background indexer: {e}");
+                    }
+                }
+            }
+
+            println!("✅ Shutdown complete");
+        }
+    }
 
     Ok(())
 }

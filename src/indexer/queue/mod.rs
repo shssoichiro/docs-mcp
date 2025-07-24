@@ -48,7 +48,7 @@ impl Default for QueueConfig {
             max_retries: 3,
             initial_retry_delay_ms: 1000, // 1 second
             max_retry_delay_ms: 60000,    // 1 minute
-            batch_size: 10,
+            batch_size: 64,
             processing_timeout_seconds: 300, // 5 minutes
             cleanup_age_seconds: 86400,      // 24 hours
         }
@@ -554,4 +554,39 @@ impl QueueManager {
         info!("Queue optimization completed: {}", optimization_summary);
         Ok(optimization_summary)
     }
+
+    /// Clean up queue resources to free memory
+    #[inline]
+    pub fn cleanup_resources(&mut self) {
+        // Clear processing start times for items that are no longer processing
+        self.processing_start_times.retain(|_, start_time| {
+            start_time.elapsed().unwrap_or(Duration::ZERO)
+                < Duration::from_secs(self.config.processing_timeout_seconds)
+        });
+
+        info!("Queue resource cleanup completed");
+    }
+
+    /// Get resource usage statistics for the queue manager
+    #[inline]
+    pub fn get_resource_usage(&self) -> QueueResourceUsage {
+        let processing_items_count = self.processing_start_times.len();
+        let estimated_memory_mb = (processing_items_count as f64 * 32.0) / 1024.0 / 1024.0;
+
+        QueueResourceUsage {
+            processing_items_tracked: processing_items_count,
+            estimated_memory_usage_mb: estimated_memory_mb,
+            active_batch_size: self.config.batch_size,
+            timeout_seconds: self.config.processing_timeout_seconds,
+        }
+    }
+}
+
+/// Resource usage statistics for queue management
+#[derive(Debug, Clone, PartialEq)]
+pub struct QueueResourceUsage {
+    pub processing_items_tracked: usize,
+    pub estimated_memory_usage_mb: f64,
+    pub active_batch_size: usize,
+    pub timeout_seconds: u64,
 }

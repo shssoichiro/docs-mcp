@@ -194,4 +194,25 @@ impl Database {
     pub async fn get_chunk_by_vector_id(&self, vector_id: &str) -> Result<Option<IndexedChunk>> {
         IndexedChunkQueries::get_by_vector_id(&self.pool, vector_id).await
     }
+
+    /// Optimize database performance by running VACUUM and ANALYZE
+    #[inline]
+    pub async fn optimize(&self) -> Result<()> {
+        info!("Optimizing database performance");
+
+        // Run VACUUM to reclaim space and defragment
+        sqlx::query("VACUUM")
+            .execute(&self.pool)
+            .await
+            .context("Failed to vacuum database")?;
+
+        // Run ANALYZE to update table statistics for better query planning
+        sqlx::query("ANALYZE")
+            .execute(&self.pool)
+            .await
+            .context("Failed to analyze database")?;
+
+        debug!("Database optimization completed");
+        Ok(())
+    }
 }

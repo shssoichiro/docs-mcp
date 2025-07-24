@@ -71,7 +71,8 @@ unnecessary_join = "warn"
 unused_async = "warn"
 verbose_file_reads = "warn"
 # Readability/Code Intention
-allow_attributes = "warn"
+# Disabled due to https://github.com/rust-lang/rust-clippy/issues/13394
+# allow_attributes = "warn"
 checked_conversions = "warn"
 clone_on_ref_ptr = "warn"
 cloned_instead_of_copied = "warn"

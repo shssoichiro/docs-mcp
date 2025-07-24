@@ -1,8 +1,7 @@
 use clap::{Parser, Subcommand};
 use docs_mcp::Result;
-use docs_mcp::commands::{add_site, delete_site, list_sites, update_site};
+use docs_mcp::commands::{add_site, delete_site, list_sites, serve_mcp, show_status, update_site};
 use docs_mcp::config::{run_interactive_config, show_config};
-use tracing::info;
 
 #[derive(Parser)]
 #[command(name = "docs-mcp")]
@@ -47,6 +46,8 @@ enum Commands {
         #[arg(long, default_value = "3000")]
         port: u16,
     },
+    /// Show detailed status of the indexing pipeline
+    Status,
 }
 
 #[tokio::main]
@@ -78,8 +79,10 @@ async fn main() -> Result<()> {
             update_site(site).await?;
         }
         Commands::Serve { port } => {
-            info!("Serve command called on port: {}", port);
-            println!("MCP server not implemented yet");
+            serve_mcp(port).await?;
+        }
+        Commands::Status => {
+            show_status().await?;
         }
     }
 
