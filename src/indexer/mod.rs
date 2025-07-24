@@ -2,6 +2,7 @@
 // This module handles background process coordination and queue management
 
 pub mod consistency;
+pub mod queue;
 
 #[cfg(test)]
 mod tests;
@@ -30,6 +31,7 @@ use crate::embeddings::chunking::{ChunkingConfig, ContentChunk, chunk_content};
 use crate::embeddings::ollama::OllamaClient;
 
 pub use consistency::{ConsistencyReport, ConsistencyValidator, SiteConsistencyIssue};
+pub use queue::{QueueConfig, QueueManager, QueueMetrics, QueuePriority, QueueStats};
 
 /// Background indexer that processes crawled content into searchable embeddings
 pub struct BackgroundIndexer {
