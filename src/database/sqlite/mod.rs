@@ -162,6 +162,19 @@ impl Database {
         SiteQueries::update(&self.pool, id, update.clone()).await
     }
 
+    #[inline]
+    pub async fn list_sites(&self) -> Result<Vec<Site>> {
+        SiteQueries::list_all(&self.pool).await
+    }
+
+    #[inline]
+    pub async fn get_site_by_name(&self, name: &str) -> Result<Option<Site>> {
+        // For simplicity, we'll get the first site with matching name
+        // In a real scenario, we might need version handling too
+        let sites = SiteQueries::list_all(&self.pool).await?;
+        Ok(sites.into_iter().find(|site| site.name == name))
+    }
+
     // Crawl queue operations
     #[inline]
     pub async fn get_pending_crawl_items_for_site(
