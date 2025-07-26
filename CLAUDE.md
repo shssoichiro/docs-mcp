@@ -283,6 +283,11 @@ The LanceDB integration provides a complete vector storage and search system wit
 Provides two main tools:
 
 - `search_docs`: Semantic search with site filtering and relevance scoring
+  - **Parameter Support**: Query string (required), site_id (integer), sites_filter (regex pattern), limit (integer)
+  - **Query Processing**: Generates embeddings using Ollama for semantic search
+  - **Response Format**: JSON structure matching SPEC.md with content, URL, page title, heading path, site name/version, and relevance score
+  - **Filtering**: Site-specific filtering by ID or regex pattern matching on site names/URLs
+  - **Error Handling**: Comprehensive error handling for embedding generation, vector search, and database connectivity issues
 - `list_sites`: Lists available indexed documentation sites
 
 ### CLI Commands Structure
@@ -457,7 +462,14 @@ The project uses `just precommit` which runs:
 
 ### In Progress / Planned Components
 
-- 🚧 MCP server implementation
+- ✅ MCP search_docs tool implementation (completed)
+  - ✅ Full parameter support for query, site_id, sites_filter, and limit
+  - ✅ Integration with LanceDB vector search and Ollama embedding generation
+  - ✅ Result ranking with relevance scoring and site filtering
+  - ✅ Response formatting matching SPEC.md requirements
+  - ✅ Comprehensive error handling and unit tests
+- ✅ MCP list_sites tool implementation (existing, tested)
+- 🚧 MCP server implementation (search tools complete, need server startup)
 - 🚧 Cleanup procedures for failed indexing operations
 
 ### CLI Commands Implementation Status

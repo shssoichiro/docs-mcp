@@ -175,6 +175,11 @@ impl Database {
         Ok(sites.into_iter().find(|site| site.name == name))
     }
 
+    #[inline]
+    pub async fn get_site_by_id(&self, id: i64) -> Result<Option<Site>> {
+        SiteQueries::get_by_id(&self.pool, id).await
+    }
+
     // Crawl queue operations
     #[inline]
     pub async fn get_pending_crawl_items_for_site(
