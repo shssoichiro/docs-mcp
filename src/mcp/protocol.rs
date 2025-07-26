@@ -116,6 +116,25 @@ pub struct Implementation {
     pub version: String,
 }
 
+/// Server health status for monitoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerHealthStatus {
+    pub connection_state: crate::mcp::server::ConnectionState,
+    pub tools_registered: usize,
+    pub resources_registered: usize,
+    pub uptime: std::time::Duration,
+}
+
+/// Detailed server statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerStatistics {
+    pub server_info: Implementation,
+    pub capabilities: ServerCapabilities,
+    pub connection_state: crate::mcp::server::ConnectionState,
+    pub registered_tools: Vec<String>,
+    pub registered_resources: Vec<String>,
+}
+
 /// Sampling capability
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SamplingCapability {}

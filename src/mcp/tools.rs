@@ -12,7 +12,6 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde_json::json;
 use std::collections::HashMap;
-use std::fmt::Write;
 use std::sync::Arc;
 use tracing::{debug, error};
 
@@ -246,10 +245,7 @@ impl ListSitesHandler {
     pub fn tool_definition() -> Tool {
         Tool {
             name: "list_sites".to_string(),
-            description: Some(
-                "List all available indexed documentation sites with their status and statistics."
-                    .to_string(),
-            ),
+            description: Some("List available documentation sites".to_string()),
             input_schema: json!({
                 "type": "object",
                 "properties": {},
@@ -267,64 +263,36 @@ impl ToolHandler for ListSitesHandler {
 
         match self.sqlite_db.list_sites().await {
             Ok(sites) => {
-                if sites.is_empty() {
-                    return Ok(CallToolResult {
-                        content: vec![ToolContent::Text {
-                            text: "No documentation sites have been indexed yet.".to_string(),
-                        }],
-                        is_error: Some(false),
+                // Filter to only show completed sites to MCP clients (as per SPEC.md)
+                let completed_sites: Vec<_> = sites
+                    .into_iter()
+                    .filter(|site| {
+                        matches!(site.status, crate::database::sqlite::SiteStatus::Completed)
+                    })
+                    .collect();
+
+                let mut site_list = Vec::new();
+
+                for site in completed_sites {
+                    let site_obj = json!({
+                        "id": site.id,
+                        "name": site.name,
+                        "version": site.version,
+                        "url": site.base_url,
+                        "status": "completed",
+                        "indexed_date": site.indexed_date.map(|d| d.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+                        "page_count": site.indexed_pages
                     });
+                    site_list.push(site_obj);
                 }
 
-                let mut response_text =
-                    format!("Found {} indexed documentation site(s):\n\n", sites.len());
-
-                for (i, site) in sites.iter().enumerate() {
-                    writeln!(&mut response_text, "{}. **{}**", i + 1, site.name)
-                        .expect("write to string should not fail");
-
-                    writeln!(&mut response_text, "   URL: {}", site.base_url)
-                        .expect("write to string should not fail");
-                    writeln!(&mut response_text, "   Status: {:?}", site.status)
-                        .expect("write to string should not fail");
-
-                    writeln!(
-                        &mut response_text,
-                        "   Pages Crawled: {}",
-                        site.indexed_pages
-                    )
-                    .expect("write to string should not fail");
-                    writeln!(&mut response_text, "   Total Pages: {}", site.total_pages)
-                        .expect("write to string should not fail");
-                    writeln!(
-                        &mut response_text,
-                        "   Progress: {:.1}%",
-                        site.progress_percent as f64
-                    )
-                    .expect("write to string should not fail");
-
-                    writeln!(
-                        &mut response_text,
-                        "   Added: {}",
-                        site.created_date.format("%Y-%m-%d %H:%M:%S UTC")
-                    )
-                    .expect("write to string should not fail");
-
-                    if let Some(last_heartbeat) = site.last_heartbeat {
-                        writeln!(
-                            &mut response_text,
-                            "   Last Activity: {}",
-                            last_heartbeat.format("%Y-%m-%d %H:%M:%S UTC")
-                        )
-                        .expect("write to string should not fail");
-                    }
-
-                    writeln!(&mut response_text).expect("write to string should not fail");
-                }
+                let response = json!({
+                    "sites": site_list
+                });
 
                 Ok(CallToolResult {
                     content: vec![ToolContent::Text {
-                        text: response_text,
+                        text: serde_json::to_string_pretty(&response)?,
                     }],
                     is_error: Some(false),
                 })

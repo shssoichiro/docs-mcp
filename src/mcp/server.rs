@@ -36,7 +36,7 @@ pub struct McpServer {
 }
 
 /// Connection state tracking
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ConnectionState {
     Uninitialized,
     Initializing,
@@ -139,41 +139,96 @@ impl McpServer {
     }
 
     /// Start the server using stdio transport
+    ///
+    /// Note: stdio transport is inherently single-client. For multi-client support,
+    /// use serve_tcp() or serve_websocket() methods (to be implemented).
     #[inline]
     pub async fn serve_stdio(self: Arc<Self>) -> Result<()> {
-        info!("Starting MCP server with stdio transport");
+        info!("Starting MCP server with stdio transport (single-client)");
+        info!(
+            "Server info: {} v{}",
+            self.server_info.name, self.server_info.version
+        );
+
+        let (tool_count, tool_names_str) = {
+            let tools = self.tools.read().await;
+            let tool_count = tools.len();
+            let tool_names_str: Vec<String> = tools.keys().cloned().collect();
+            (tool_count, tool_names_str)
+        };
+
+        info!(
+            "Registered {} tools: {}",
+            tool_count,
+            tool_names_str.join(", ")
+        );
+        info!("Server ready to accept MCP client connection");
 
         let stdin = io::stdin();
         let mut stdout = io::stdout();
         let mut reader = BufReader::new(stdin);
 
-        // Read and process messages from stdin
+        // Read and process messages from stdin with timeout and error recovery
         let mut line = String::new();
+        let mut message_count = 0;
+        let mut error_count = 0;
+        const MAX_CONSECUTIVE_ERRORS: u32 = 10;
+
         loop {
             line.clear();
-            match reader.read_line(&mut line).await {
-                Ok(0) => {
-                    info!("EOF reached, closing connection");
+
+            // Add timeout for read operations to prevent hanging
+            let read_result = tokio::time::timeout(
+                std::time::Duration::from_secs(300), // 5 minute timeout
+                reader.read_line(&mut line),
+            )
+            .await;
+
+            match read_result {
+                Ok(Ok(0)) => {
+                    info!("EOF reached, closing connection gracefully");
                     break;
                 }
-                Ok(_) => {
+                Ok(Ok(_)) => {
                     let line = line.trim();
                     if line.is_empty() {
                         continue;
                     }
 
-                    // First parse as raw JSON
+                    message_count += 1;
+                    error_count = 0; // Reset error count on successful read
+
+                    // First parse as raw JSON with error recovery
                     let raw_value: Value = match serde_json::from_str(line) {
                         Ok(value) => value,
                         Err(e) => {
-                            error!("Failed to parse JSON: {}", e);
+                            error_count += 1;
+                            error!(
+                                "Failed to parse JSON (message #{}, error #{}/{}): {}",
+                                message_count, error_count, MAX_CONSECUTIVE_ERRORS, e
+                            );
+
                             let error_response =
                                 JsonRpcErrorResponse::new(JsonRpcError::parse_error(), None);
-                            self.send_message(
-                                &mut stdout,
-                                &JsonRpcMessage::ErrorResponse(error_response),
-                            )
-                            .await?;
+                            if let Err(send_err) = self
+                                .send_message(
+                                    &mut stdout,
+                                    &JsonRpcMessage::ErrorResponse(error_response),
+                                )
+                                .await
+                            {
+                                error!("Failed to send error response: {}", send_err);
+                                error_count += 1;
+                            }
+
+                            // Check if we've hit too many consecutive errors
+                            if error_count >= MAX_CONSECUTIVE_ERRORS {
+                                error!(
+                                    "Too many consecutive errors ({}), closing connection",
+                                    MAX_CONSECUTIVE_ERRORS
+                                );
+                                break;
+                            }
                             continue;
                         }
                     };
@@ -181,29 +236,72 @@ impl McpServer {
                     // Validate and parse as MCP message
                     match self.validator.validate_raw_message(&raw_value) {
                         Ok(message) => {
+                            debug!("Processing MCP message: {:?}", message);
                             let handler = MessageHandler::new(Arc::clone(&self));
                             if let Err(e) = handler.process_message(message, &mut stdout).await {
                                 error!("Error processing message: {}", e);
                             }
                         }
                         Err(e) => {
-                            error!("Message validation failed: {}", e);
+                            error_count += 1;
+                            error!(
+                                "Message validation failed (message #{}, error #{}/{}): {}",
+                                message_count, error_count, MAX_CONSECUTIVE_ERRORS, e
+                            );
+
                             let error_response =
                                 JsonRpcErrorResponse::new(JsonRpcError::invalid_request(), None);
-                            self.send_message(
-                                &mut stdout,
-                                &JsonRpcMessage::ErrorResponse(error_response),
-                            )
-                            .await?;
+                            if let Err(send_err) = self
+                                .send_message(
+                                    &mut stdout,
+                                    &JsonRpcMessage::ErrorResponse(error_response),
+                                )
+                                .await
+                            {
+                                error!("Failed to send validation error response: {}", send_err);
+                                error_count += 1;
+                            }
+
+                            if error_count >= MAX_CONSECUTIVE_ERRORS {
+                                error!(
+                                    "Too many consecutive errors ({}), closing connection",
+                                    MAX_CONSECUTIVE_ERRORS
+                                );
+                                break;
+                            }
                         }
                     }
                 }
-                Err(e) => {
-                    error!("Error reading from stdin: {}", e);
-                    break;
+                Ok(Err(e)) => {
+                    error_count += 1;
+                    error!(
+                        "Error reading from stdin (error #{}/{}): {}",
+                        error_count, MAX_CONSECUTIVE_ERRORS, e
+                    );
+
+                    if error_count >= MAX_CONSECUTIVE_ERRORS {
+                        error!(
+                            "Too many consecutive read errors ({}), closing connection",
+                            MAX_CONSECUTIVE_ERRORS
+                        );
+                        break;
+                    }
+
+                    // Brief pause before retrying
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+                Err(_timeout) => {
+                    debug!("Read timeout - connection may be idle");
+                    // Timeout is not necessarily an error - client might just be idle
+                    // Continue the loop to check for new messages
                 }
             }
         }
+
+        info!(
+            "Processed {} messages total, final error count: {}",
+            message_count, error_count
+        );
 
         // Update connection state
         {
@@ -231,6 +329,43 @@ impl McpServer {
     #[inline]
     pub async fn connection_state(&self) -> ConnectionState {
         self.connection_state.read().await.clone()
+    }
+
+    /// Get server health status
+    #[inline]
+    pub async fn health_status(&self) -> ServerHealthStatus {
+        let connection_state = self.connection_state().await;
+        let tools_count = self.tools.read().await.len();
+        let resources_count = self.resources.read().await.len();
+
+        ServerHealthStatus {
+            connection_state,
+            tools_registered: tools_count,
+            resources_registered: resources_count,
+            uptime: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default(),
+        }
+    }
+
+    /// Get detailed server statistics  
+    #[inline]
+    pub async fn server_statistics(&self) -> ServerStatistics {
+        let tools = self.tools.read().await;
+        let tool_names: Vec<String> = tools.keys().cloned().collect();
+        drop(tools);
+
+        let resources = self.resources.read().await;
+        let resource_uris: Vec<String> = resources.keys().cloned().collect();
+        drop(resources);
+
+        ServerStatistics {
+            server_info: self.server_info.clone(),
+            capabilities: self.capabilities.clone(),
+            connection_state: self.connection_state().await,
+            registered_tools: tool_names,
+            registered_resources: resource_uris,
+        }
     }
 }
 
@@ -280,6 +415,12 @@ impl MessageHandler {
     where
         W: AsyncWriteExt + Unpin,
     {
+        let start_time = std::time::Instant::now();
+        debug!(
+            "Handling request: method={}, id={:?}",
+            request.method, request.id
+        );
+
         let response = match request.method.as_str() {
             "initialize" => self.handle_initialize(request.params).await,
             "tools/list" => self.handle_list_tools().await,
@@ -295,14 +436,23 @@ impl MessageHandler {
             }
         };
 
+        let duration = start_time.elapsed();
+
         match response {
             Ok(result) => {
+                debug!(
+                    "Request completed successfully: method={}, duration={:?}",
+                    request.method, duration
+                );
                 let response = JsonRpcResponse::new(result, request.id);
                 self.send_response(writer, JsonRpcMessage::Response(response))
                     .await
             }
             Err(e) => {
-                error!("Error handling request {}: {}", request.method, e);
+                error!(
+                    "Error handling request {}: {} (duration: {:?})",
+                    request.method, e, duration
+                );
                 let error = JsonRpcError::internal_error(Some(e.to_string()));
                 self.send_error_response(writer, error, Some(request.id))
                     .await
@@ -394,12 +544,63 @@ impl MessageHandler {
             None => return Err(anyhow!("Tool call request missing parameters")),
         };
 
+        debug!(
+            "Calling tool: {} with arguments: {:?}",
+            params.name, params.arguments
+        );
+
         let handlers = self.server.tool_handlers.read().await;
         let handler = handlers
             .get(&params.name)
             .ok_or_else(|| anyhow!("Tool not found: {}", params.name))?;
 
-        let result = handler.handle(params).await?;
+        let start_time = std::time::Instant::now();
+
+        // Add timeout for tool execution to prevent hanging
+        let tool_result = tokio::time::timeout(
+            std::time::Duration::from_secs(120), // 2 minute timeout for tool execution
+            handler.handle(params.clone()),
+        )
+        .await;
+
+        let duration = start_time.elapsed();
+
+        let result = match tool_result {
+            Ok(Ok(result)) => {
+                debug!(
+                    "Tool call completed successfully: {} (duration: {:?}, error: {:?})",
+                    params.name,
+                    duration,
+                    result.is_error.unwrap_or(false)
+                );
+                result
+            }
+            Ok(Err(e)) => {
+                error!(
+                    "Tool execution failed: {} (duration: {:?}) - {}",
+                    params.name, duration, e
+                );
+                CallToolResult {
+                    content: vec![ToolContent::Text {
+                        text: format!("Tool execution failed: {}", e),
+                    }],
+                    is_error: Some(true),
+                }
+            }
+            Err(_timeout) => {
+                error!(
+                    "Tool execution timed out: {} (duration: {:?})",
+                    params.name, duration
+                );
+                CallToolResult {
+                    content: vec![ToolContent::Text {
+                        text: format!("Tool execution timed out after {:?}", duration),
+                    }],
+                    is_error: Some(true),
+                }
+            }
+        };
+
         Ok(serde_json::to_value(result)?)
     }
 

@@ -659,10 +659,7 @@ mod list_sites_tool_tests {
         assert_eq!(tool.name, "list_sites");
         assert_eq!(
             tool.description,
-            Some(
-                "List all available indexed documentation sites with their status and statistics."
-                    .to_string()
-            )
+            Some("List available documentation sites".to_string())
         );
 
         // Should have no parameters

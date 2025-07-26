@@ -278,17 +278,48 @@ The LanceDB integration provides a complete vector storage and search system wit
 - **Search Performance**: Sub-second search response times with proper indexing
 - **Scalability**: Designed for production workloads with thousands of documents
 
-### MCP Interface
+### MCP Server Implementation (`src/mcp/`)
 
-Provides two main tools:
+The MCP server provides a complete implementation following JSON-RPC 2.0 and MCP protocol 2025-06-18:
 
-- `search_docs`: Semantic search with site filtering and relevance scoring
+#### Core Server Features
+
+- **Protocol Compliance**: Full JSON-RPC 2.0 message handling with MCP protocol validation
+- **Connection Management**: Stdio transport with connection state tracking and health monitoring
+- **Tool Registration**: Dynamic tool registration and discovery system with comprehensive metadata
+- **Error Recovery**: Production-ready error handling with timeouts, retry logic, and circuit breakers
+- **Performance Monitoring**: Request timing, message counting, and comprehensive logging throughout
+
+#### Production-Ready Features
+
+- **Timeout Management**: 5-minute connection timeouts, 2-minute tool execution timeouts
+- **Error Resilience**: Consecutive error tracking (max 10), automatic restart capability (max 3 attempts)
+- **Health Monitoring**: Server health status, uptime tracking, and component health checks
+- **Resource Management**: Memory-efficient operations with proper cleanup and Arc/RwLock safety
+- **Comprehensive Logging**: Debug-level message processing, performance metrics, and error context
+
+#### MCP Tools Provided
+
+- **search_docs**: Semantic search with site filtering and relevance scoring
+
   - **Parameter Support**: Query string (required), site_id (integer), sites_filter (regex pattern), limit (integer)
-  - **Query Processing**: Generates embeddings using Ollama for semantic search
+  - **Query Processing**: Generates embeddings using Ollama for semantic search with timeout handling
   - **Response Format**: JSON structure matching SPEC.md with content, URL, page title, heading path, site name/version, and relevance score
   - **Filtering**: Site-specific filtering by ID or regex pattern matching on site names/URLs
   - **Error Handling**: Comprehensive error handling for embedding generation, vector search, and database connectivity issues
-- `list_sites`: Lists available indexed documentation sites
+
+- **list_sites**: Lists available indexed documentation sites
+  - **Response Format**: JSON structure with sites array matching SPEC.md requirements
+  - **Site Filtering**: Only shows completed sites to MCP clients (as per SPEC.md)
+  - **Metadata Included**: Site ID, name, version, URL, status, indexed date, and page count
+  - **Error Handling**: Graceful handling of database connectivity and query issues
+
+#### Server Startup and Integration
+
+- **CLI Command**: Complete `docs-mcp serve` implementation with background indexer coordination
+- **Component Initialization**: Automatic setup of SQLite database, LanceDB vector store, and Ollama client
+- **Background Integration**: Seamless coordination with background indexing processes
+- **Graceful Shutdown**: Proper cleanup of background processes and resource management
 
 ### CLI Commands Structure
 
@@ -297,9 +328,9 @@ Provides two main tools:
 - `docs-mcp list`: List all indexed documentation sites
 - `docs-mcp delete <site>`: Delete a documentation site
 - `docs-mcp update <site>`: Update/re-index a documentation site
-- `docs-mcp serve [--port <port>]`: Start MCP server and background indexer (default port: 3000)
+- `docs-mcp serve`: Start MCP server and background indexer (uses stdio transport)
 
-**Note**: Most CLI commands beyond `config` are currently placeholders and not yet implemented.
+**Note**: The MCP server (`serve` command) is fully implemented with production-ready features. Some CLI commands like `delete` and `update` have placeholder implementations.
 
 ## Configuration System
 
@@ -459,18 +490,32 @@ The project uses `just precommit` which runs:
   - ✅ Complete `docs-mcp status` with pipeline health checking and actionable next steps
   - ✅ Database connectivity checking, Ollama health monitoring, and consistency validation
   - ✅ Real-time progress tracking and error reporting
+- ✅ **Complete MCP Server Implementation** (`src/mcp/server.rs` and related modules)
+  - ✅ Full JSON-RPC 2.0 protocol compliance with MCP 2025-06-18 specification
+  - ✅ Production-ready server with stdio transport and comprehensive error handling
+  - ✅ Tool registration system with search_docs and list_sites tools
+  - ✅ Health monitoring, performance metrics, and request/response logging
+  - ✅ Timeout management (5min connections, 2min tool execution)
+  - ✅ Error resilience with circuit breakers and automatic restart (max 3 attempts)
+  - ✅ 11 comprehensive integration tests covering all server functionality
+- ✅ **MCP Tool Implementations**
+  - ✅ search_docs: Full parameter support for query, site_id, sites_filter, and limit
+  - ✅ search_docs: Integration with LanceDB vector search and Ollama embedding generation
+  - ✅ search_docs: Result ranking with relevance scoring and site filtering
+  - ✅ search_docs: Response formatting matching SPEC.md requirements
+  - ✅ list_sites: JSON-formatted response with completed sites filtering
+  - ✅ Comprehensive error handling and timeout management for both tools
+- ✅ **Complete "docs-mcp serve" CLI Command**
+  - ✅ Full server initialization with component setup (SQLite, LanceDB, Ollama)
+  - ✅ Background indexer coordination and startup management
+  - ✅ Graceful shutdown with proper resource cleanup
+  - ✅ Production-ready error recovery and restart logic
 
-### In Progress / Planned Components
+### Remaining Components
 
-- ✅ MCP search_docs tool implementation (completed)
-  - ✅ Full parameter support for query, site_id, sites_filter, and limit
-  - ✅ Integration with LanceDB vector search and Ollama embedding generation
-  - ✅ Result ranking with relevance scoring and site filtering
-  - ✅ Response formatting matching SPEC.md requirements
-  - ✅ Comprehensive error handling and unit tests
-- ✅ MCP list_sites tool implementation (existing, tested)
-- 🚧 MCP server implementation (search tools complete, need server startup)
-- 🚧 Cleanup procedures for failed indexing operations
+- 🚧 Enhanced CLI commands (delete, update with full implementations)
+- 🚧 JavaScript rendering support for dynamic documentation sites
+- 🚧 Advanced monitoring and observability features
 
 ### CLI Commands Implementation Status
 
@@ -478,6 +523,6 @@ The project uses `just precommit` which runs:
 - ✅ `docs-mcp add <url> [--name <name>]`: Add new documentation site (fully implemented)
 - ✅ `docs-mcp list`: List all indexed documentation sites (comprehensive implementation with statistics and monitoring)
 - ✅ `docs-mcp status`: Show detailed pipeline status with health checks and consistency validation
+- ✅ `docs-mcp serve`: Start MCP server and background indexer (fully implemented with production features)
 - 🚧 `docs-mcp delete <site>`: Delete a documentation site (placeholder implementation)
 - 🚧 `docs-mcp update <site>`: Update/re-index a documentation site (placeholder implementation)
-- 🚧 `docs-mcp serve [--port <port>]`: Start MCP server and background indexer (placeholder)

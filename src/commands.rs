@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::config::{Config, get_config_dir};
@@ -543,36 +544,120 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
         Some(indexer_handle)
     };
 
-    println!("🌐 Starting MCP server on port {}...", port);
+    // Initialize MCP server components
+    println!("🌐 Initializing MCP server...");
+
+    let config_dir = crate::config::get_config_dir()?;
+    let sqlite_db = std::sync::Arc::new(
+        crate::database::sqlite::Database::initialize_from_config_dir(&config_dir)
+            .await
+            .context("Failed to initialize SQLite database")?,
+    );
+
+    let vector_store = std::sync::Arc::new(
+        crate::database::lancedb::VectorStore::new(&config)
+            .await
+            .context("Failed to initialize vector store")?,
+    );
+
+    let ollama_client = std::sync::Arc::new(
+        crate::embeddings::ollama::OllamaClient::new(&config)
+            .context("Failed to create Ollama client")?,
+    );
+
+    // Create MCP server
+    let server = std::sync::Arc::new(
+        crate::mcp::McpServer::new(
+            "docs-mcp".to_string(),
+            env!("CARGO_PKG_VERSION").to_string(),
+        )
+        .context("Failed to create MCP server")?,
+    );
+
+    // Register tools
+    let search_handler = crate::mcp::tools::SearchDocsHandler::new(
+        std::sync::Arc::clone(&sqlite_db),
+        std::sync::Arc::clone(&vector_store),
+        std::sync::Arc::clone(&ollama_client),
+    );
+    let list_handler = crate::mcp::tools::ListSitesHandler::new(std::sync::Arc::clone(&sqlite_db));
+
+    server
+        .register_tool(
+            crate::mcp::tools::SearchDocsHandler::tool_definition(),
+            search_handler,
+        )
+        .await
+        .context("Failed to register search_docs tool")?;
+
+    server
+        .register_tool(
+            crate::mcp::tools::ListSitesHandler::tool_definition(),
+            list_handler,
+        )
+        .await
+        .context("Failed to register list_sites tool")?;
+
+    println!("✅ MCP server initialized with tools: search_docs, list_sites");
+    println!("🌐 Starting MCP server on stdio transport...");
     println!("📊 Use 'docs-mcp status' to monitor indexing progress");
     println!("📚 Use 'docs-mcp list' to see indexed sites");
     println!();
+    println!("Note: This server uses stdio transport. Connect via MCP client.");
     println!("Press Ctrl+C to stop the server and background indexer");
 
-    // TODO: Implement actual MCP server here
-    // For now, simulate server running
-    println!("🚧 MCP server implementation coming soon...");
-    println!("Background indexer will continue processing in the background");
+    // Start MCP server and background indexer concurrently with retry logic
+    let mut restart_count = 0;
+    const MAX_RESTARTS: u32 = 3;
 
-    // Wait for interrupt signal
-    tokio::select! {
-        _ = tokio::signal::ctrl_c() => {
-            println!("\n📴 Received interrupt signal, shutting down...");
+    loop {
+        tokio::select! {
+            result = Arc::clone(&server).serve_stdio() => {
+                match result {
+                    Ok(()) => {
+                        info!("MCP server stopped normally");
+                        break;
+                    }
+                    Err(e) => {
+                        error!("MCP server error (attempt {}/{}): {}", restart_count + 1, MAX_RESTARTS + 1, e);
+                        restart_count += 1;
 
-            // Check if we need to stop the background indexer
-            if indexer.is_indexer_running().await? {
-                if let Some(handle) = indexer_handle {
-                    println!("🛑 Stopping background indexer...");
-                    if let Err(e) =  handle.await {
-                        // Print the error but continue shutting down
-                        warn!("⚠️  Encountered error shutting down background indexer: {e}");
+                        if restart_count > MAX_RESTARTS {
+                            error!("Maximum restart attempts reached, shutting down");
+                            break;
+                        }
+
+                        println!("⚠️  MCP server encountered an error, restarting in 5 seconds...");
+                        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                        println!("🔄 Restarting MCP server (attempt {}/{})...", restart_count + 1, MAX_RESTARTS + 1);
                     }
                 }
             }
-
-            println!("✅ Shutdown complete");
+            _ = tokio::signal::ctrl_c() => {
+                println!("\n📴 Received interrupt signal, shutting down...");
+                break;
+            }
         }
     }
+
+    // Cleanup background indexer if needed
+    if indexer.is_indexer_running().await? {
+        if let Some(handle) = indexer_handle {
+            println!("🛑 Stopping background indexer...");
+            handle.abort(); // Force stop the background task
+            match handle.await {
+                Ok(()) => {}
+                Err(e) if e.is_cancelled() => {
+                    println!("✅ Background indexer stopped");
+                }
+                Err(e) => {
+                    warn!("⚠️  Error stopping background indexer: {}", e);
+                }
+            }
+        }
+    }
+
+    println!("✅ Shutdown complete");
 
     Ok(())
 }
