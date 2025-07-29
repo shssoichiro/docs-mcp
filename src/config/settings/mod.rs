@@ -11,6 +11,8 @@ use url::Url;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Config {
     pub ollama: OllamaConfig,
+    #[serde(default)]
+    pub browser: BrowserConfig,
     #[serde(skip)]
     pub base_dir: Option<PathBuf>,
 }
@@ -21,6 +23,24 @@ pub struct OllamaConfig {
     pub port: u16,
     pub model: String,
     pub batch_size: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BrowserConfig {
+    /// Whether to enable JavaScript rendering
+    pub enable_js_rendering: bool,
+    /// Maximum number of browser instances
+    pub max_browsers: usize,
+    /// Maximum tabs per browser
+    pub max_tabs_per_browser: usize,
+    /// Navigation timeout in seconds
+    pub navigation_timeout_seconds: u64,
+    /// Whether to run browsers headlessly
+    pub headless: bool,
+    /// Browser window width
+    pub window_width: u32,
+    /// Browser window height
+    pub window_height: u32,
 }
 
 #[derive(Debug, Error)]
@@ -35,6 +55,12 @@ pub enum ConfigError {
     InvalidBatchSize(u32),
     #[error("Invalid model name: {0} (cannot be empty)")]
     InvalidModel(String),
+    #[error("Invalid browser timeout: {0} (must be between 1 and 300 seconds)")]
+    InvalidBrowserTimeout(u64),
+    #[error("Invalid browser pool size: {0} (must be between 1 and 10)")]
+    InvalidBrowserPoolSize(usize),
+    #[error("Invalid window dimensions: {0}x{1} (must be between 100 and 4000)")]
+    InvalidWindowDimensions(u32, u32),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("TOML parsing error: {0}")]
@@ -53,7 +79,23 @@ impl Default for Config {
                 model: "nomic-embed-text:latest".to_string(),
                 batch_size: 64,
             },
+            browser: BrowserConfig::default(),
             base_dir: None,
+        }
+    }
+}
+
+impl Default for BrowserConfig {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            enable_js_rendering: true,
+            max_browsers: 2,
+            max_tabs_per_browser: 4,
+            navigation_timeout_seconds: 30,
+            headless: true,
+            window_width: 1280,
+            window_height: 720,
         }
     }
 }
@@ -136,7 +178,9 @@ impl Config {
 
     #[inline]
     pub fn validate(&self) -> Result<(), ConfigError> {
-        self.ollama.validate()
+        self.ollama.validate()?;
+        self.browser.validate()?;
+        Ok(())
     }
 
     #[inline]
@@ -222,6 +266,73 @@ impl OllamaConfig {
             return Err(ConfigError::InvalidBatchSize(batch_size));
         }
         self.batch_size = batch_size;
+        Ok(())
+    }
+}
+
+impl BrowserConfig {
+    #[inline]
+    pub fn validate(&self) -> Result<(), ConfigError> {
+        if self.navigation_timeout_seconds == 0 || self.navigation_timeout_seconds > 300 {
+            return Err(ConfigError::InvalidBrowserTimeout(
+                self.navigation_timeout_seconds,
+            ));
+        }
+
+        if self.max_browsers == 0 || self.max_browsers > 10 {
+            return Err(ConfigError::InvalidBrowserPoolSize(self.max_browsers));
+        }
+
+        if self.max_tabs_per_browser == 0 || self.max_tabs_per_browser > 10 {
+            return Err(ConfigError::InvalidBrowserPoolSize(
+                self.max_tabs_per_browser,
+            ));
+        }
+
+        if self.window_width < 100
+            || self.window_width > 4000
+            || self.window_height < 100
+            || self.window_height > 4000
+        {
+            return Err(ConfigError::InvalidWindowDimensions(
+                self.window_width,
+                self.window_height,
+            ));
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    pub fn set_enable_js_rendering(&mut self, enable: bool) {
+        self.enable_js_rendering = enable;
+    }
+
+    #[inline]
+    pub fn set_max_browsers(&mut self, max_browsers: usize) -> Result<(), ConfigError> {
+        if max_browsers == 0 || max_browsers > 10 {
+            return Err(ConfigError::InvalidBrowserPoolSize(max_browsers));
+        }
+        self.max_browsers = max_browsers;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn set_navigation_timeout(&mut self, timeout_seconds: u64) -> Result<(), ConfigError> {
+        if timeout_seconds == 0 || timeout_seconds > 300 {
+            return Err(ConfigError::InvalidBrowserTimeout(timeout_seconds));
+        }
+        self.navigation_timeout_seconds = timeout_seconds;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn set_window_size(&mut self, width: u32, height: u32) -> Result<(), ConfigError> {
+        if !(100..=4000).contains(&width) || !(100..=4000).contains(&height) {
+            return Err(ConfigError::InvalidWindowDimensions(width, height));
+        }
+        self.window_width = width;
+        self.window_height = height;
         Ok(())
     }
 }

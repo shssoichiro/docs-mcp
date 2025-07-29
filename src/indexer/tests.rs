@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::OllamaConfig;
+use crate::config::{BrowserConfig, OllamaConfig};
 use chrono::DateTime;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tempfile::TempDir;
@@ -16,6 +16,7 @@ async fn create_test_indexer() -> Result<(BackgroundIndexer, TempDir)> {
             batch_size: 32,
         },
         base_dir: Some(temp_dir.path().to_path_buf()),
+        browser: BrowserConfig::default(),
     };
 
     let indexer = BackgroundIndexer::new(config).await?;
@@ -143,6 +144,7 @@ async fn concurrent_lock_file_access() {
             batch_size: 32,
         },
         base_dir: Some(_temp_dir.path().to_path_buf()),
+        browser: BrowserConfig::default(),
     };
     let indexer2 = BackgroundIndexer::new(config)
         .await

@@ -6,7 +6,7 @@
 // Integration tests that require a local Ollama instance
 // Run with: cargo test --test integration_ollama
 
-use docs_mcp::config::{Config, OllamaConfig};
+use docs_mcp::config::{BrowserConfig, Config, OllamaConfig};
 use docs_mcp::embeddings::chunking::{ContentChunk, estimate_token_count};
 use docs_mcp::embeddings::ollama::OllamaClient;
 use std::env;
@@ -33,6 +33,7 @@ fn create_integration_test_client() -> OllamaClient {
             batch_size: 5, // Smaller batch size for testing
         },
         base_dir: None,
+        browser: BrowserConfig::default(),
     };
 
     OllamaClient::new(&config)
@@ -413,6 +414,7 @@ fn real_ollama_error_recovery() {
             batch_size: 5,
         },
         base_dir: None,
+        browser: BrowserConfig::default(),
     };
 
     let client = OllamaClient::new(&config)

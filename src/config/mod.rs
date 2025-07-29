@@ -8,7 +8,7 @@ pub mod settings;
 mod tests;
 
 pub use interactive::{run_interactive_config, show_config};
-pub use settings::{Config, ConfigError, OllamaConfig};
+pub use settings::{BrowserConfig, Config, ConfigError, OllamaConfig};
 
 /// Get the configuration directory path
 #[inline]

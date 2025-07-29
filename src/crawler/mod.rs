@@ -1,3 +1,4 @@
+pub mod browser;
 pub mod extractor;
 pub mod robots;
 
@@ -13,6 +14,7 @@ use tracing::{debug, error, info, warn};
 use ureq::Agent;
 use url::Url;
 
+use self::browser::{BrowserClient, BrowserConfig};
 use self::extractor::{ExtractionConfig, extract_content};
 use self::robots::{RobotsTxt, fetch_robots_txt};
 use crate::database::sqlite::{
@@ -33,6 +35,10 @@ pub struct CrawlerConfig {
     pub max_retries: u32,
     /// Delay between retry attempts in seconds
     pub retry_delay_seconds: u64,
+    /// Whether to enable JavaScript rendering for dynamic content
+    pub enable_js_rendering: bool,
+    /// Configuration for browser-based rendering
+    pub browser_config: BrowserConfig,
 }
 
 impl Default for CrawlerConfig {
@@ -44,6 +50,8 @@ impl Default for CrawlerConfig {
             rate_limit_ms: 250,
             max_retries: 3,
             retry_delay_seconds: 30,
+            enable_js_rendering: true,
+            browser_config: BrowserConfig::default(),
         }
     }
 }
@@ -282,6 +290,7 @@ pub fn extract_links(html: &str, base_url: &Url) -> Result<Vec<Url>> {
 /// Main crawler that coordinates the crawling process
 pub struct SiteCrawler {
     http_client: HttpClient,
+    browser_client: Option<BrowserClient>,
     db_pool: DbPool,
     config: CrawlerConfig,
     extraction_config: ExtractionConfig,
@@ -303,7 +312,7 @@ pub struct CrawlResult {
 }
 
 /// Statistics about a crawl session
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CrawlStats {
     /// Total URLs discovered
     pub total_urls: usize,
@@ -324,8 +333,18 @@ impl SiteCrawler {
         let http_client = HttpClient::new(config.clone());
         let extraction_config = ExtractionConfig::default();
 
+        // Initialize browser client if JavaScript rendering is enabled
+        let browser_client = if config.enable_js_rendering {
+            info!("JavaScript rendering enabled with browser client");
+            Some(BrowserClient::new(config.browser_config.clone()))
+        } else {
+            debug!("JavaScript rendering disabled");
+            None
+        };
+
         Self {
             http_client,
+            browser_client,
             db_pool,
             config,
             extraction_config,
@@ -528,21 +547,35 @@ impl SiteCrawler {
     async fn crawl_page(&mut self, url: &Url, base_url: &Url) -> Result<CrawlResult> {
         debug!("Crawling page: {}", url);
 
-        // Fetch HTML content
-        let html = match self.http_client.get(url.as_str()).await {
-            Ok(html) => html,
+        // Try JavaScript rendering first if available, fallback to HTTP client
+        let html = match self.try_browser_rendering(url).await {
+            Ok(html) => {
+                debug!("Successfully rendered page with JavaScript: {}", url);
+                html
+            }
             Err(e) => {
-                return Ok(CrawlResult {
-                    url: url.clone(),
-                    content: extractor::ExtractedContent {
-                        title: String::new(),
-                        sections: Vec::new(),
-                        raw_text: String::new(),
-                    },
-                    links: Vec::new(),
-                    success: false,
-                    error_message: Some(e.to_string()),
-                });
+                debug!(
+                    "Browser rendering failed for {}, falling back to HTTP: {}",
+                    url, e
+                );
+
+                // Fallback to HTTP client
+                match self.http_client.get(url.as_str()).await {
+                    Ok(html) => html,
+                    Err(e) => {
+                        return Ok(CrawlResult {
+                            url: url.clone(),
+                            content: extractor::ExtractedContent {
+                                title: String::new(),
+                                sections: Vec::new(),
+                                raw_text: String::new(),
+                            },
+                            links: Vec::new(),
+                            success: false,
+                            error_message: Some(e.to_string()),
+                        });
+                    }
+                }
             }
         };
 
@@ -680,5 +713,34 @@ impl SiteCrawler {
 
         SiteQueries::update(&self.db_pool, site_id, update).await?;
         Ok(())
+    }
+
+    /// Try to render a page using browser JavaScript rendering
+    async fn try_browser_rendering(&self, url: &Url) -> Result<String> {
+        if let Some(ref browser_client) = self.browser_client {
+            browser_client.get_rendered_html(url).await
+        } else {
+            Err(anyhow!("Browser client not available"))
+        }
+    }
+
+    /// Cleanup idle browsers to free resources
+    #[inline]
+    pub fn cleanup_idle_browsers(&self) {
+        if let Some(ref browser_client) = self.browser_client {
+            let idle_time = Duration::from_secs(300); // 5 minutes
+            let cleaned = browser_client.cleanup_idle_browsers(idle_time);
+            if cleaned > 0 {
+                info!("Cleaned up {} idle browser instances", cleaned);
+            }
+        }
+    }
+
+    /// Get browser pool statistics for monitoring
+    #[inline]
+    pub fn get_browser_stats(&self) -> Option<browser::BrowserPoolStats> {
+        self.browser_client
+            .as_ref()
+            .map(|client| client.get_pool_stats())
     }
 }

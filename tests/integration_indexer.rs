@@ -21,7 +21,7 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tokio::time::sleep;
 
-use docs_mcp::config::{Config, OllamaConfig};
+use docs_mcp::config::{BrowserConfig, Config, OllamaConfig};
 use docs_mcp::database::lancedb::VectorStore;
 use docs_mcp::database::sqlite::{
     CrawlQueueQueries, CrawlStatus, Database, NewCrawlQueueItem, NewIndexedChunk, NewSite,
@@ -52,6 +52,7 @@ fn create_test_config() -> (Config, TempDir) {
             model,
             batch_size: 5, // Smaller batch size for testing
         },
+        browser: BrowserConfig::default(),
     };
 
     (config, temp_dir)

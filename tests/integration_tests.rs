@@ -8,7 +8,7 @@
 
 use tempfile::TempDir;
 
-use docs_mcp::config::{Config, OllamaConfig};
+use docs_mcp::config::{BrowserConfig, Config, OllamaConfig};
 use docs_mcp::database::sqlite::{Database, NewSite, SiteQueries, SiteStatus};
 use docs_mcp::indexer::{BackgroundIndexer, IndexingStatus, QueueConfig, QueueManager};
 
@@ -23,6 +23,7 @@ async fn create_test_setup() -> anyhow::Result<(Config, Database, TempDir)> {
             batch_size: 32,
         },
         base_dir: Some(temp_dir.path().to_path_buf()),
+        browser: BrowserConfig::default(),
     };
 
     let database = Database::new(&config.database_path()).await?;

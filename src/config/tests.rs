@@ -19,6 +19,7 @@ mod integration_tests {
                 batch_size: 32,
             },
             base_dir: None,
+            browser: BrowserConfig::default(),
         };
 
         let toml_content = toml::to_string_pretty(&original_config)
@@ -95,6 +96,7 @@ mod integration_tests {
                 batch_size: 1,
             },
             base_dir: None,
+            browser: BrowserConfig::default(),
         };
 
         let result = config.validate();
@@ -147,6 +149,7 @@ mod integration_tests {
                     batch_size: 32,
                 },
                 base_dir: None,
+                browser: BrowserConfig::default(),
             };
 
             let url = config.ollama_url().expect("ollama_url is ok");

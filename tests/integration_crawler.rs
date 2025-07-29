@@ -32,7 +32,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
     // Mock the base page
     Mock::given(method("GET"))
         .and(path("/docs/"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
             r#"
             <!DOCTYPE html>
             <html>
@@ -61,6 +61,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
             </body>
             </html>
             "#,
+            "text/html",
         ))
         .mount(server)
         .await;
@@ -68,7 +69,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
     // Mock getting started page
     Mock::given(method("GET"))
         .and(path("/docs/getting-started/"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
             r#"
             <!DOCTYPE html>
             <html>
@@ -87,6 +88,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
             </body>
             </html>
             "#,
+            "text/html",
         ))
         .mount(server)
         .await;
@@ -94,7 +96,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
     // Mock detailed installation page
     Mock::given(method("GET"))
         .and(path("/docs/getting-started/installation/"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
             r#"
             <!DOCTYPE html>
             <html>
@@ -119,6 +121,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
             </body>
             </html>
             "#,
+            "text/html",
         ))
         .mount(server)
         .await;
@@ -126,7 +129,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
     // Mock API page
     Mock::given(method("GET"))
         .and(path("/docs/api/"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
             r#"
             <!DOCTYPE html>
             <html>
@@ -153,6 +156,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
             </body>
             </html>
             "#,
+            "text/html",
         ))
         .mount(server)
         .await;
@@ -160,7 +164,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
     // Mock examples page
     Mock::given(method("GET"))
         .and(path("/docs/examples/"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
             r#"
             <!DOCTYPE html>
             <html>
@@ -196,6 +200,7 @@ async fn setup_mock_docs_site(server: &MockServer) {
             </body>
             </html>
             "#,
+            "text/html",
         ))
         .mount(server)
         .await;
@@ -235,7 +240,7 @@ async fn setup_restricted_mock_site(server: &MockServer) {
     // Mock a page that should be blocked
     Mock::given(method("GET"))
         .and(path("/docs/"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
             r#"
             <!DOCTYPE html>
             <html>
@@ -243,6 +248,7 @@ async fn setup_restricted_mock_site(server: &MockServer) {
             <body><h1>This should be blocked by robots.txt</h1></body>
             </html>
             "#,
+            "text/html",
         ))
         .mount(server)
         .await;
@@ -308,6 +314,7 @@ async fn basic_site_crawling() -> Result<()> {
     let config = CrawlerConfig {
         rate_limit_ms: 10, // Faster for tests
         max_retries: 1,    // Less retries for tests
+        enable_js_rendering: false,
         ..CrawlerConfig::default()
     };
 
@@ -469,7 +476,7 @@ async fn content_extraction() -> Result<()> {
 
     Mock::given(method("GET"))
         .and(path("/docs/"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
             r#"
             <!DOCTYPE html>
             <html>
@@ -500,6 +507,7 @@ async fn content_extraction() -> Result<()> {
             </body>
             </html>
             "#,
+            "text/html",
         ))
         .mount(&server)
         .await;
@@ -711,7 +719,7 @@ async fn extract_links_integration() {
 
     Mock::given(method("GET"))
         .and(path("/test-page"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(html_content))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(html_content, "text/html"))
         .mount(&mock_server)
         .await;
 
@@ -763,7 +771,7 @@ async fn crawl_workflow_with_robots_txt() {
 
     Mock::given(method("GET"))
         .and(path("/"))
-        .respond_with(ResponseTemplate::new(200).set_body_string(html_content))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(html_content, "text/html"))
         .mount(&mock_server)
         .await;
 

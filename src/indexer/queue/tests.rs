@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::{Config, OllamaConfig};
+use crate::config::{BrowserConfig, Config, OllamaConfig};
 use crate::database::sqlite::models::NewSite;
 use crate::database::sqlite::queries::SiteQueries;
 use tempfile::TempDir;
@@ -13,6 +13,7 @@ async fn create_test_setup() -> Result<(QueueManager, Database, i64, TempDir)> {
             model: "nomic-embed-text:latest".to_string(),
             batch_size: 32,
         },
+        browser: BrowserConfig::default(),
         base_dir: Some(temp_dir.path().to_path_buf()),
     };
 
@@ -84,6 +85,7 @@ async fn queue_stats_empty_queue() {
             model: "nomic-embed-text:latest".to_string(),
             batch_size: 32,
         },
+        browser: BrowserConfig::default(),
         base_dir: Some(temp_dir.path().to_path_buf()),
     };
     let database = Database::new(&config.database_path())

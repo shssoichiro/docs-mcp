@@ -64,14 +64,14 @@ The project follows a modular architecture split across several main components:
 - **Metadata Database**: SQLite with sqlx (stores sites, crawl queue, indexed chunks)
 - **Vector Database**: LanceDB (stores embeddings for semantic search)
 - **Embedding Provider**: Ollama (local, using nomic-embed-text model)
-- **Web Crawling**: scraper crate for HTML extraction with semantic content processing
+- **Web Crawling**: scraper crate for HTML extraction with semantic content processing and headless_chrome for JavaScript rendering
 - **HTTP Client**: ureq for web requests
 - **Configuration**: TOML with serde for serialization
 
 ### Data Flow
 
 1. **Configuration**: TOML config in `~/.docs-mcp/config.toml`
-2. **Crawling**: Sequential crawling with rate limiting (250ms between requests)
+2. **Crawling**: Sequential crawling with rate limiting (250ms between requests) and JavaScript rendering for dynamic content
 3. **Content Processing**: HTML extraction → heading hierarchy detection → semantic chunking (500-800 tokens) → Ollama embedding generation
 4. **Storage**: Metadata in SQLite, vectors in LanceDB at `~/.docs-mcp/`
 5. **Search**: MCP server provides semantic search via vector similarity
@@ -163,6 +163,116 @@ The chunking system implements semantic content splitting for optimal embedding 
 ### URL Filtering
 
 Only crawls URLs that match or begin with the base URL (excluding trailing filenames), ensuring scope compliance.
+
+### JavaScript Rendering System (`src/crawler/browser/`)
+
+The JavaScript rendering system provides comprehensive support for dynamic documentation sites that require JavaScript execution for content generation:
+
+#### Core Architecture (`src/crawler/browser/mod.rs`)
+
+- **Browser Pool Management**: Efficient resource management with `BrowserPool` and `ManagedBrowser` structs
+- **Resource Limiting**: Semaphore-based concurrency control with configurable browser and tab limits
+- **Automatic Cleanup**: Smart lifecycle management with idle browser cleanup and resource deallocation
+- **Index-Stable Storage**: Uses `Vec<Option<ManagedBrowser>>` pattern for stable browser indexing during concurrent operations
+
+#### Browser Configuration (`BrowserConfig`)
+
+- **Performance Optimization**: Chrome arguments tuned for content extraction (`--disable-images`, `--disable-gpu`, etc.)
+- **Configurable Resources**: Adjustable browser pool size (1-10), tabs per browser (1-10), and timeout settings (1-300s)
+- **Window Management**: Configurable viewport dimensions (100-4000px) with validation
+- **User Agent**: Custom user agent identification for documentation crawling
+
+#### Tab Management with Critical Resource Safety
+
+- **BrowserTab Structure**: Manages individual browser tabs with automatic cleanup via Drop trait
+- **Critical Index Tracking**: Each `BrowserTab` tracks its `browser_index` to ensure proper resource cleanup
+- **Semaphore Integration**: Uses `tokio::sync::OwnedSemaphorePermit` for automatic resource limiting
+- **Thread-Safe Operations**: Arc<Mutex<>> for safe concurrent access to browser pool
+
+##### Critical Drop Implementation Fix
+
+The `BrowserTab` Drop implementation includes a critical fix for proper resource management:
+
+```rust
+impl Drop for BrowserTab {
+    fn drop(&mut self) {
+        if let Ok(mut browsers) = self.browsers.lock() {
+            if let Some(Some(browser)) = browsers.get_mut(self.browser_index) {
+                browser.release_tab(); // Release from CORRECT browser
+            }
+        }
+    }
+}
+```
+
+This fixes a critical design flaw where tabs could be released from the wrong browser instance, preventing resource leaks and ensuring proper cleanup.
+
+#### JavaScript Content Detection and Rendering
+
+- **Dynamic Content Detection**: Sophisticated JavaScript checks for React, Vue.js, Angular, and general SPA indicators
+- **Smart Rendering Strategy**: Detects minimal initial content that gets populated by JavaScript
+- **Wait Strategies**: Network idle detection, body element waiting, and configurable JavaScript execution timeouts
+- **Content Extraction**: Full HTML extraction after JavaScript rendering completion
+
+#### Browser Client Integration (`BrowserClient`)
+
+- **Fallback Architecture**: Primary JavaScript rendering with HTTP client fallback for reliability
+- **Performance Monitoring**: Render time tracking and dynamic content detection reporting
+- **Pool Statistics**: Comprehensive monitoring of browser instances, active tabs, and resource utilization
+- **Maintenance Operations**: Automated idle browser cleanup and resource optimization
+
+#### Integration with Existing Crawler
+
+The browser system integrates seamlessly with the existing crawler through the `try_browser_rendering` method:
+
+```rust
+// Try JavaScript rendering first if available, fallback to HTTP client
+let html = match self.try_browser_rendering(url).await {
+    Ok(html) => {
+        debug!("Successfully rendered page with JavaScript: {}", url);
+        html
+    }
+    Err(e) => {
+        debug!("Browser rendering failed for {}, falling back to HTTP: {}", url, e);
+        // Fallback to HTTP client
+        self.http_client.get(url.as_str()).await?
+    }
+};
+```
+
+#### Configuration Integration
+
+Browser settings are fully integrated into the main configuration system:
+
+- **Config Structure**: `BrowserConfig` embedded in main `Config` with TOML serialization
+- **Validation**: Comprehensive validation for all browser parameters with meaningful error messages
+- **Default Values**: Production-ready defaults optimized for documentation crawling
+- **Setter Methods**: Validated setter methods preventing invalid configurations
+
+#### Testing Coverage
+
+Comprehensive test suite covering all aspects of the JavaScript rendering system:
+
+- **12 Test Functions**: Complete coverage of browser lifecycle, configuration validation, and resource management
+- **Mock HTML Testing**: JavaScript detection tests with realistic HTML scenarios
+- **Concurrent Operations**: Resource pool stress testing and concurrent tab management
+- **Configuration Validation**: Boundary testing for all configurable parameters
+- **Integration Testing**: End-to-end browser rendering with content extraction validation
+
+#### Key Features
+
+- **Headless Operation**: Configurable headless mode for server environments
+- **Screenshot Support**: Debug capability with PNG screenshot generation
+- **Custom Chrome Arguments**: Extensible Chrome configuration for specific use cases
+- **Production Ready**: Robust error handling, timeout management, and resource cleanup
+- **Memory Efficient**: Optimized for long-running documentation indexing operations
+
+#### Performance Characteristics
+
+- **Resource Management**: Efficient browser pooling prevents excessive resource consumption
+- **Concurrent Safety**: Thread-safe operations with proper synchronization primitives
+- **Memory Optimization**: Smart cleanup prevents memory leaks during long crawling sessions  
+- **Scalable Architecture**: Supports high-volume documentation site crawling with stable performance
 
 ### Ollama API Client Implementation (`src/embeddings/ollama.rs`)
 
@@ -549,10 +659,20 @@ The project uses `just precommit` which runs:
   - ✅ Background indexer coordination and startup management
   - ✅ Graceful shutdown with proper resource cleanup
   - ✅ Production-ready error recovery and restart logic
+- ✅ **JavaScript Rendering System** (`src/crawler/browser/`)
+  - ✅ Complete headless Chrome integration using headless_chrome crate
+  - ✅ Browser pool management with resource limiting and automatic cleanup
+  - ✅ Critical BrowserTab Drop implementation fix for proper resource management
+  - ✅ Index-stable storage pattern with Vec<Option<ManagedBrowser>> for concurrent safety
+  - ✅ Dynamic content detection for React, Vue.js, Angular, and general SPA applications
+  - ✅ Intelligent fallback system: JavaScript rendering with HTTP client backup
+  - ✅ Complete configuration integration with validation and TOML serialization
+  - ✅ Comprehensive testing with 12 test functions covering all browser operations
+  - ✅ Performance optimization with configurable timeouts, resource limits, and cleanup strategies
+  - ✅ Production-ready error handling, thread safety, and memory management
 
 ### Remaining Components
 
-- 🚧 JavaScript rendering support for dynamic documentation sites
 - 🚧 Advanced monitoring and observability features
 
 ### CLI Commands Implementation Status
