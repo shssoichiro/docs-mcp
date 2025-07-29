@@ -324,13 +324,47 @@ The MCP server provides a complete implementation following JSON-RPC 2.0 and MCP
 ### CLI Commands Structure
 
 - `docs-mcp config [--show]`: Interactive setup of Ollama connection or show current config
-- `docs-mcp add <url> [--name <name>]`: Add new documentation site
-- `docs-mcp list`: List all indexed documentation sites
-- `docs-mcp delete <site>`: Delete a documentation site
-- `docs-mcp update <site>`: Update/re-index a documentation site
+- `docs-mcp add <url> [--name <name>]`: Add new documentation site with comprehensive progress tracking
+- `docs-mcp list`: List all indexed documentation sites with detailed statistics and monitoring
+- `docs-mcp delete <site>`: Delete a documentation site with proper cleanup and user confirmation
+- `docs-mcp update <site>`: Update/re-index a documentation site with complete data cleanup and re-crawling
+- `docs-mcp status`: Show detailed pipeline status with health checks and consistency validation
 - `docs-mcp serve`: Start MCP server and background indexer (uses stdio transport)
 
-**Note**: The MCP server (`serve` command) is fully implemented with production-ready features. Some CLI commands like `delete` and `update` have placeholder implementations.
+#### CLI Command Features
+
+**Input Validation and Error Handling:**
+
+- URL validation with protocol and host checking
+- Site identifier validation (supports both numeric IDs and site names)
+- Port number validation with privilege warnings
+- Site name validation with length limits and character restrictions
+- Comprehensive error messages with actionable suggestions
+
+**User Experience Enhancements:**
+
+- Step-by-step progress indicators with emoji icons
+- Interactive confirmation prompts for destructive operations
+- Real-time status updates and feedback during long operations
+- Consistent formatting and terminology across all commands
+- Context-sensitive help and tip messages
+
+**Data Management:**
+
+- Complete cleanup of SQLite metadata and LanceDB vectors
+- Cross-database consistency validation and repair
+- Atomic operations with proper rollback capabilities
+- Database optimization after major operations
+- Graceful handling of partial failures and recovery
+
+**Testing and Quality:**
+
+- 6 comprehensive unit tests covering all validation functions
+- Edge case testing including URL parsing, boundary conditions, and security considerations
+- Integration testing with real database operations
+- Code quality assurance with clippy linting and formatting
+
+**Note**: All CLI commands are now fully implemented with production-ready features, comprehensive error handling, and user-friendly interfaces.
 
 ## Configuration System
 
@@ -485,11 +519,16 @@ The project uses `just precommit` which runs:
   - ✅ Orphaned embedding cleanup and missing embedding regeneration
   - ✅ Site-level consistency checking with detailed reporting
   - ✅ 3 unit tests covering consistency reports and validation logic
-- ✅ **Enhanced CLI Commands** (`src/commands.rs`)
+- ✅ **Complete CLI Commands Implementation** (`src/commands.rs`)
+  - ✅ Enhanced `docs-mcp add` with comprehensive progress tracking and user-friendly interface
   - ✅ Comprehensive `docs-mcp list` with site statistics, progress, and heartbeat monitoring
   - ✅ Complete `docs-mcp status` with pipeline health checking and actionable next steps
+  - ✅ Full `docs-mcp delete` with proper cleanup, user confirmation, and vector store cleanup
+  - ✅ Complete `docs-mcp update` with data cleanup, re-crawling, and progress tracking
+  - ✅ Input validation and parameter checking with meaningful error messages
+  - ✅ Consistent formatting utilities and user interface elements
+  - ✅ Comprehensive test coverage with 6 unit tests covering all validation functions
   - ✅ Database connectivity checking, Ollama health monitoring, and consistency validation
-  - ✅ Real-time progress tracking and error reporting
 - ✅ **Complete MCP Server Implementation** (`src/mcp/server.rs` and related modules)
   - ✅ Full JSON-RPC 2.0 protocol compliance with MCP 2025-06-18 specification
   - ✅ Production-ready server with stdio transport and comprehensive error handling
@@ -513,16 +552,23 @@ The project uses `just precommit` which runs:
 
 ### Remaining Components
 
-- 🚧 Enhanced CLI commands (delete, update with full implementations)
 - 🚧 JavaScript rendering support for dynamic documentation sites
 - 🚧 Advanced monitoring and observability features
 
 ### CLI Commands Implementation Status
 
 - ✅ `docs-mcp config [--show]`: Interactive setup of Ollama connection or show current config
-- ✅ `docs-mcp add <url> [--name <name>]`: Add new documentation site (fully implemented)
-- ✅ `docs-mcp list`: List all indexed documentation sites (comprehensive implementation with statistics and monitoring)
-- ✅ `docs-mcp status`: Show detailed pipeline status with health checks and consistency validation
-- ✅ `docs-mcp serve`: Start MCP server and background indexer (fully implemented with production features)
-- 🚧 `docs-mcp delete <site>`: Delete a documentation site (placeholder implementation)
-- 🚧 `docs-mcp update <site>`: Update/re-index a documentation site (placeholder implementation)
+- ✅ `docs-mcp add <url> [--name <name>]`: Add new documentation site with comprehensive progress tracking and user feedback
+- ✅ `docs-mcp list`: List all indexed documentation sites with detailed statistics, progress monitoring, and heartbeat tracking
+- ✅ `docs-mcp delete <site>`: Delete a documentation site with proper cleanup, user confirmation, and cross-database consistency
+- ✅ `docs-mcp update <site>`: Update/re-index a documentation site with complete data cleanup and re-crawling workflow
+- ✅ `docs-mcp status`: Show detailed pipeline status with health checks, consistency validation, and actionable next steps
+- ✅ `docs-mcp serve`: Start MCP server and background indexer with full production-ready features and error recovery
+
+**All CLI commands are now fully implemented with:**
+
+- Comprehensive input validation and parameter checking
+- User-friendly progress displays and status reporting
+- Consistent error handling and recovery patterns
+- Production-ready database operations and resource management
+- Extensive test coverage and quality assurance

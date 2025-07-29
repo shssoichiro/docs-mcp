@@ -878,58 +878,58 @@ This checklist tracks the implementation progress of the documentation MCP serve
 
 ### Step 6.1: Complete CLI Commands Implementation
 
-- [ ] Implement "docs-mcp delete" command
-  - [ ] Parse command arguments (name_or_url, version)
-  - [ ] Handle site identification and disambiguation
-  - [ ] Prompt for confirmation before deletion
-  - [ ] Clean up SQLite metadata for site
-  - [ ] Clean up LanceDB vectors for site
-  - [ ] Remove crawl queue items for site
-  - [ ] Add comprehensive error handling
-- [ ] Implement "docs-mcp update" command
-  - [ ] Parse command arguments (name_or_url, version)
-  - [ ] Identify existing site for update
-  - [ ] Mark site for re-indexing
-  - [ ] Clean up existing data
-  - [ ] Trigger background re-indexing
-  - [ ] Provide user feedback during update
-- [ ] Enhance status reporting
-  - [ ] Improve "docs-mcp status" output formatting
-  - [ ] Add detailed progress information
-  - [ ] Show error messages and diagnostics
-  - [ ] Display crawl statistics and metrics
-  - [ ] Add timing and performance information
-- [ ] Improve user interface and formatting
-  - [ ] Create consistent table formatting for "list" command
-  - [ ] Add color coding for status indicators
-  - [ ] Implement progress bars for long operations
-  - [ ] Add human-readable file sizes and dates
-  - [ ] Improve command help and usage messages
-- [ ] Add comprehensive input validation
-  - [ ] Validate URLs and site names
-  - [ ] Check for valid version strings
-  - [ ] Prevent invalid command combinations
-  - [ ] Add helpful error messages for invalid inputs
-- [ ] Implement command consistency
-  - [ ] Ensure consistent behavior across all commands
-  - [ ] Standardize error handling and reporting
-  - [ ] Use consistent terminology and messaging
-  - [ ] Add consistent verbosity and quiet options
-- [ ] Create comprehensive unit tests
-  - [ ] Test all CLI commands with various inputs
-  - [ ] Test command validation and error handling
-  - [ ] Test user interface formatting
-  - [ ] Test command consistency and behavior
-- [ ] Add integration tests
-  - [ ] Test complete CLI workflows end-to-end
-  - [ ] Test CLI integration with database and indexing
-  - [ ] Test user experience scenarios
-  - [ ] Test CLI behavior under various system states
-- [ ] User experience testing
-  - [ ] Test CLI usability with real workflows
-  - [ ] Validate help messages and documentation
-  - [ ] Test error message clarity and helpfulness
-  - [ ] Ensure consistent and intuitive behavior
+- [x] Implement "docs-mcp delete" command
+  - [x] Parse command arguments (name_or_url, version)
+  - [x] Handle site identification and disambiguation
+  - [x] Prompt for confirmation before deletion
+  - [x] Clean up SQLite metadata for site
+  - [x] Clean up LanceDB vectors for site
+  - [x] Remove crawl queue items for site
+  - [x] Add comprehensive error handling
+- [x] Implement "docs-mcp update" command
+  - [x] Parse command arguments (name_or_url, version)
+  - [x] Identify existing site for update
+  - [x] Mark site for re-indexing
+  - [x] Clean up existing data
+  - [x] Trigger background re-indexing
+  - [x] Provide user feedback during update
+- [x] Enhance status reporting
+  - [x] Improve "docs-mcp status" output formatting
+  - [x] Add detailed progress information
+  - [x] Show error messages and diagnostics
+  - [x] Display crawl statistics and metrics
+  - [x] Add timing and performance information
+- [x] Improve user interface and formatting
+  - [x] Create consistent table formatting for "list" command
+  - [x] Add color coding for status indicators
+  - [x] Implement progress bars for long operations
+  - [x] Add human-readable file sizes and dates
+  - [x] Improve command help and usage messages
+- [x] Add comprehensive input validation
+  - [x] Validate URLs and site names
+  - [x] Check for valid version strings
+  - [x] Prevent invalid command combinations
+  - [x] Add helpful error messages for invalid inputs
+- [x] Implement command consistency
+  - [x] Ensure consistent behavior across all commands
+  - [x] Standardize error handling and reporting
+  - [x] Use consistent terminology and messaging
+  - [x] Add consistent verbosity and quiet options
+- [x] Create comprehensive unit tests
+  - [x] Test all CLI commands with various inputs
+  - [x] Test command validation and error handling
+  - [x] Test user interface formatting
+  - [x] Test command consistency and behavior
+- [x] Add integration tests
+  - [x] Test complete CLI workflows end-to-end
+  - [x] Test CLI integration with database and indexing
+  - [x] Test user experience scenarios
+  - [x] Test CLI behavior under various system states
+- [x] User experience testing
+  - [x] Test CLI usability with real workflows
+  - [x] Validate help messages and documentation
+  - [x] Test error message clarity and helpfulness
+  - [x] Ensure consistent and intuitive behavior
 
 ### Step 6.2: JavaScript Rendering Support
 

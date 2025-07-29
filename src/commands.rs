@@ -3,17 +3,194 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use crate::config::{Config, get_config_dir};
-use crate::crawler::{CrawlerConfig, SiteCrawler, validate_url};
+use crate::crawler::{CrawlerConfig, SiteCrawler};
 use crate::database::sqlite::{Database, NewSite, SiteQueries};
 use crate::indexer::BackgroundIndexer;
 
-/// Add a new documentation site for indexing
+/// Common formatting utilities for consistent CLI output
+pub mod formatting {
+    use std::io::{self, Write};
+
+    /// Print a step indicator with consistent formatting
+    #[inline]
+    pub fn print_step(message: &str) -> io::Result<()> {
+        print!("{} ", message);
+        io::stdout().flush()
+    }
+
+    /// Print success indicator
+    #[inline]
+    pub fn print_success() {
+        println!("✅");
+    }
+
+    /// Print warning indicator
+    #[inline]
+    pub fn print_warning() {
+        println!("⚠️");
+    }
+
+    /// Print error indicator
+    #[inline]
+    pub fn print_error() {
+        println!("❌");
+    }
+
+    /// Print a section header with consistent formatting
+    #[inline]
+    pub fn print_section_header(title: &str) {
+        println!();
+        println!("{}", title);
+    }
+
+    /// Print a subsection with consistent indentation
+    #[inline]
+    pub fn print_subsection(label: &str, value: &str) {
+        println!("   {}: {}", label, value);
+    }
+
+    /// Print a status line with emoji and text
+    #[inline]
+    pub fn print_status(emoji: &str, message: &str) {
+        println!("{} {}", emoji, message);
+    }
+
+    /// Print a tip/suggestion
+    #[inline]
+    pub fn print_tip(message: &str) {
+        println!("💡 {}", message);
+    }
+
+    /// Print a completion message
+    #[inline]
+    pub fn print_completion(message: &str) {
+        println!();
+        println!("🎉 {}", message);
+    }
+
+    /// Print an error message with consistent formatting
+    #[inline]
+    pub fn print_error_message(context: &str, error: &str) {
+        println!("❌ {}: {}", context, error);
+    }
+
+    /// Print help suggestions
+    #[inline]
+    pub fn print_help_suggestions(suggestions: &[&str]) {
+        println!();
+        for suggestion in suggestions {
+            print_tip(suggestion);
+        }
+    }
+}
+
+/// Validation functions for CLI commands
+pub mod validation {
+    use anyhow::{Result, anyhow};
+    use url::Url;
+
+    /// Validate that a site identifier is either a valid ID or a non-empty name
+    #[inline]
+    pub fn validate_site_identifier(identifier: &str) -> Result<()> {
+        if identifier.trim().is_empty() {
+            return Err(anyhow!("Site identifier cannot be empty"));
+        }
+
+        // If it's a number, validate it's positive
+        if let Ok(id) = identifier.parse::<i64>() {
+            if id <= 0 {
+                return Err(anyhow!("Site ID must be a positive number, got: {}", id));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Validate URL format and accessibility
+    #[inline]
+    pub fn validate_documentation_url(url: &str) -> Result<Url> {
+        if url.trim().is_empty() {
+            return Err(anyhow!("URL cannot be empty"));
+        }
+
+        let parsed_url = Url::parse(url).map_err(|e| anyhow!("Invalid URL format: {}", e))?;
+
+        // Must be HTTP or HTTPS
+        if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
+            return Err(anyhow!(
+                "URL must use HTTP or HTTPS protocol, got: {}",
+                parsed_url.scheme()
+            ));
+        }
+
+        // Must have a host
+        if parsed_url.host().is_none() {
+            return Err(anyhow!("URL must have a valid host"));
+        }
+
+        Ok(parsed_url)
+    }
+
+    /// Validate site name format
+    #[inline]
+    pub fn validate_site_name(name: &str) -> Result<()> {
+        let name = name.trim();
+
+        if name.is_empty() {
+            return Err(anyhow!("Site name cannot be empty"));
+        }
+
+        if name.len() > 100 {
+            return Err(anyhow!("Site name must be 100 characters or less"));
+        }
+
+        // Check for invalid characters that might cause issues
+        if name.contains('\n') || name.contains('\r') || name.contains('\t') {
+            return Err(anyhow!("Site name cannot contain newlines or tabs"));
+        }
+
+        Ok(())
+    }
+
+    /// Validate port number
+    #[inline]
+    pub fn validate_port(port: u16) -> Result<()> {
+        if port == 0 {
+            return Err(anyhow!("Port number cannot be 0"));
+        }
+
+        if port < 1024 {
+            eprintln!(
+                "⚠️  Warning: Using port {} (below 1024) may require administrator privileges",
+                port
+            );
+        }
+
+        Ok(())
+    }
+}
+
+/// Add a new documentation site for indexing with comprehensive progress display
 #[inline]
 pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
+    println!("🚀 Adding new documentation site");
+    println!("   URL: {}", url);
+
     info!("Adding documentation site: {}", url);
 
-    // Validate URL
-    let parsed_url = validate_url(&url)?;
+    // Validate inputs
+    print!("🔍 Validating inputs... ");
+    use std::io::{self, Write};
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    let parsed_url =
+        validation::validate_documentation_url(&url).context("Invalid URL provided")?;
+
+    if let Some(ref site_name) = name {
+        validation::validate_site_name(site_name).context("Invalid site name provided")?;
+    }
+
+    println!("✅");
 
     // Generate name if not provided
     let site_name = name.unwrap_or_else(|| {
@@ -30,27 +207,62 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
         }
     });
 
+    println!("   Name: {}", site_name);
+    println!();
+
     // Initialize database
+    print!("🗄️  Connecting to database... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
     let config_dir = get_config_dir()?;
     let db_path = config_dir.join("docs.db");
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
         .context("Failed to initialize database")?;
+    println!("✅");
 
     // Check if site already exists
+    print!("🔍 Checking for existing site... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
     if let Some(existing_site) = SiteQueries::get_by_base_url(database.pool(), &url).await? {
+        println!("⚠️  Found existing site!");
+        println!();
         println!(
-            "Site already exists: {} ({})",
-            existing_site.name, existing_site.base_url
+            "📚 Site already exists: {} (ID: {})",
+            existing_site.name, existing_site.id
         );
-        println!("Status: {}", existing_site.status);
+        println!("   URL: {}", existing_site.base_url);
+        println!("   Status: {}", existing_site.status);
+
         if existing_site.progress_percent > 0 {
-            println!("Progress: {}%", existing_site.progress_percent);
+            println!("   Progress: {}%", existing_site.progress_percent);
         }
+
+        // Show statistics if available
+        if let Ok(Some(stats)) =
+            SiteQueries::get_statistics(database.pool(), existing_site.id).await
+        {
+            println!("   Content Chunks: {}", stats.total_chunks);
+            if stats.pending_crawl_items > 0 {
+                println!("   Pending Pages: {}", stats.pending_crawl_items);
+            }
+        }
+
+        println!();
+        println!(
+            "💡 Use 'docs-mcp update {}' to re-index this site",
+            existing_site.id
+        );
+        println!("💡 Use 'docs-mcp list' to see all indexed sites");
         return Ok(());
     }
+    println!("✅");
 
     // Create new site entry
+    print!("📝 Creating site entry... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
     let new_site = NewSite {
         base_url: url.clone(),
         name: site_name.clone(),
@@ -60,11 +272,21 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     let site = SiteQueries::create(database.pool(), new_site)
         .await
         .context("Failed to create site entry")?;
+    println!("✅");
 
-    println!("Created site: {} (ID: {})", site.name, site.id);
-    println!("Base URL: {}", site.base_url);
+    println!();
+    println!("✅ Site created successfully!");
+    println!("   📚 Name: {}", site.name);
+    println!("   🆔 ID: {}", site.id);
+    println!("   🌐 URL: {}", site.base_url);
+    println!();
 
-    // Start crawling in background
+    // Start crawling
+    println!("🕷️  Starting web crawling...");
+    println!("   This may take several minutes depending on site size.");
+    println!("   Respecting robots.txt and rate limiting (250ms between requests)");
+    println!();
+
     info!("Starting crawl for site {}", site.id);
 
     let crawler_config = CrawlerConfig::default();
@@ -72,16 +294,48 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
 
     match crawler.crawl_site(site.id, &url).await {
         Ok(stats) => {
-            println!("Crawl completed successfully!");
-            println!("  Total URLs discovered: {}", stats.total_urls);
-            println!("  Successfully crawled: {}", stats.successful_crawls);
-            println!("  Failed crawls: {}", stats.failed_crawls);
-            println!("  Blocked by robots.txt: {}", stats.robots_blocked);
-            println!("  Duration: {:?}", stats.duration);
+            println!("✅ Crawling completed successfully!");
+            println!();
+            println!("📊 Crawl Statistics:");
+            println!("   🔍 Total URLs discovered: {}", stats.total_urls);
+            println!("   ✅ Successfully crawled: {}", stats.successful_crawls);
+
+            if stats.failed_crawls > 0 {
+                println!("   ❌ Failed crawls: {}", stats.failed_crawls);
+            }
+            if stats.robots_blocked > 0 {
+                println!("   🚫 Blocked by robots.txt: {}", stats.robots_blocked);
+            }
+
+            println!("   ⏱️  Duration: {:?}", stats.duration);
+
+            // Show content statistics
+            if let Ok(Some(content_stats)) =
+                SiteQueries::get_statistics(database.pool(), site.id).await
+            {
+                println!(
+                    "   📄 Content chunks created: {}",
+                    content_stats.total_chunks
+                );
+            }
+
+            println!();
+            println!("🎉 Site successfully added and crawled!");
+            println!("💡 The background indexer will now generate embeddings for search");
+            println!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
+            println!("💡 Use 'docs-mcp serve' to start the MCP server for AI assistants");
         }
         Err(e) => {
             error!("Crawl failed: {}", e);
-            println!("Crawl failed: {}", e);
+            println!("❌ Crawling failed: {}", e);
+            println!();
+            println!("📝 Site entry has been created but crawling was unsuccessful.");
+            println!(
+                "💡 You can try updating the site later with 'docs-mcp update {}'",
+                site.id
+            );
+            println!("💡 Check the site URL and your internet connection");
+            return Err(e);
         }
     }
 
@@ -190,9 +444,12 @@ pub async fn list_sites() -> Result<()> {
     Ok(())
 }
 
-/// Delete a documentation site
+/// Delete a documentation site with proper cleanup
 #[inline]
 pub async fn delete_site(site_identifier: String) -> Result<()> {
+    // Validate input
+    validation::validate_site_identifier(&site_identifier).context("Invalid site identifier")?;
+
     let config_dir = get_config_dir()?;
     let db_path = config_dir.join("docs.db");
     let database = Database::new(db_path.to_string_lossy().as_ref())
@@ -214,26 +471,117 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
 
     let site = site.ok_or_else(|| anyhow::anyhow!("Site not found: {}", site_identifier))?;
 
-    println!("Found site: {} ({})", site.name, site.base_url);
-    println!("This will delete the site and all its indexed content.");
+    println!("📚 Found site: {} (ID: {})", site.name, site.id);
+    println!("   URL: {}", site.base_url);
+    println!("   Status: {}", site.status);
 
-    // Simple confirmation (in a real CLI, you'd want proper input handling)
-    println!("Delete this site? This action cannot be undone.");
-    println!("Site deleted: {} (ID: {})", site.name, site.id);
+    // Get statistics before deletion
+    if let Ok(Some(stats)) = SiteQueries::get_statistics(database.pool(), site.id).await {
+        println!("   Content Chunks: {}", stats.total_chunks);
+        if stats.pending_crawl_items > 0 {
+            println!("   Pending Pages: {}", stats.pending_crawl_items);
+        }
+        if stats.failed_crawl_items > 0 {
+            println!("   Failed Pages: {}", stats.failed_crawl_items);
+        }
+    }
 
-    // Note: The actual deletion would happen here using foreign key cascades
-    // For now, just show what would be deleted
-    println!("✓ Site metadata deleted");
-    println!("✓ Crawl queue entries deleted");
-    println!("✓ Indexed content chunks deleted");
-    println!("✓ Vector embeddings deleted");
+    println!();
+    println!("⚠️  This will permanently delete:");
+    println!("   • Site metadata and configuration");
+    println!("   • All crawl queue entries");
+    println!("   • All indexed content chunks");
+    println!("   • All vector embeddings");
+    println!();
+    println!("❌ This action cannot be undone!");
+    println!();
+
+    // Get user confirmation
+    print!("Type 'DELETE' to confirm deletion: ");
+    use std::io::{self, Write};
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .context("Failed to read input")?;
+    let input = input.trim();
+
+    if input != "DELETE" {
+        println!("❌ Deletion cancelled. No changes were made.");
+        return Ok(());
+    }
+
+    println!();
+    println!("🗑️  Deleting site and all associated data...");
+
+    // Initialize vector store for cleanup
+    let config = Config::load().unwrap_or_default();
+    let mut vector_store = crate::database::lancedb::VectorStore::new(&config)
+        .await
+        .context("Failed to initialize vector store")?;
+
+    // Delete vector embeddings first
+    print!("   Deleting vector embeddings... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    match vector_store
+        .delete_site_embeddings(&site.id.to_string())
+        .await
+    {
+        Ok(_) => println!("✅"),
+        Err(e) => {
+            println!("⚠️  Warning: Failed to delete vector embeddings: {}", e);
+            println!("   Some vector data may remain in LanceDB");
+        }
+    }
+
+    // Delete from SQLite database (this will cascade to delete crawl_queue and indexed_chunks)
+    print!("   Deleting site metadata and chunks... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    let deleted = SiteQueries::delete(database.pool(), site.id)
+        .await
+        .context("Failed to delete site from database")?;
+
+    if deleted {
+        println!("✅");
+        println!();
+        println!(
+            "✅ Site successfully deleted: {} (ID: {})",
+            site.name, site.id
+        );
+        println!("   All associated data has been removed.");
+    } else {
+        println!("❌");
+        return Err(anyhow::anyhow!(
+            "Failed to delete site - site may have already been removed"
+        ));
+    }
+
+    // Optimize database after deletion
+    print!("   Optimizing database... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    if let Err(e) = database.optimize().await {
+        println!("⚠️  Warning: Failed to optimize database: {}", e);
+    } else {
+        println!("✅");
+    }
+
+    println!();
+    println!("💡 Use 'docs-mcp list' to see remaining sites");
+    println!("💡 Use 'docs-mcp add <url>' to index a new site");
 
     Ok(())
 }
 
-/// Update/re-index a documentation site
+/// Update/re-index a documentation site with proper cleanup
 #[inline]
 pub async fn update_site(site_identifier: String) -> Result<()> {
+    // Validate input
+    validation::validate_site_identifier(&site_identifier).context("Invalid site identifier")?;
+
     let config_dir = get_config_dir()?;
     let db_path = config_dir.join("docs.db");
     let database = Database::new(db_path.to_string_lossy().as_ref())
@@ -255,26 +603,140 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
 
     let site = site.ok_or_else(|| anyhow::anyhow!("Site not found: {}", site_identifier))?;
 
-    println!("Updating site: {} ({})", site.name, site.base_url);
+    println!("🔄 Updating site: {} (ID: {})", site.name, site.id);
+    println!("   URL: {}", site.base_url);
+    println!("   Current Status: {}", site.status);
+
+    // Get statistics before update
+    if let Ok(Some(stats)) = SiteQueries::get_statistics(database.pool(), site.id).await {
+        println!("   Current Content: {} chunks", stats.total_chunks);
+        if stats.pending_crawl_items > 0 {
+            println!("   Pending Pages: {}", stats.pending_crawl_items);
+        }
+    }
+
+    println!();
+    println!("⚠️  This will:");
+    println!("   • Clear all existing crawl queue entries");
+    println!("   • Clear all existing indexed content and embeddings");
+    println!("   • Re-crawl the entire site from scratch");
+    println!("   • Re-generate all embeddings");
+    println!();
+
+    // Get user confirmation for destructive operation
+    print!("Continue with re-indexing? [y/N]: ");
+    use std::io::{self, Write};
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .context("Failed to read input")?;
+    let input = input.trim().to_lowercase();
+
+    if input != "y" && input != "yes" {
+        println!("❌ Update cancelled. No changes were made.");
+        return Ok(());
+    }
+
+    println!();
+    println!("🧹 Preparing for re-indexing...");
+
+    // Initialize vector store for cleanup
+    let config = Config::load().unwrap_or_default();
+    let mut vector_store = crate::database::lancedb::VectorStore::new(&config)
+        .await
+        .context("Failed to initialize vector store")?;
+
+    // Clear existing embeddings
+    print!("   Clearing old embeddings... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    match vector_store
+        .delete_site_embeddings(&site.id.to_string())
+        .await
+    {
+        Ok(_) => println!("✅"),
+        Err(e) => {
+            println!("⚠️  Warning: Failed to clear embeddings: {}", e);
+            println!("   Proceeding with update anyway...");
+        }
+    }
+
+    // Clear crawl queue and chunks (they will be recreated)
+    print!("   Clearing crawl queue and chunks... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    // Clear crawl queue entries for this site
+    sqlx::query!("DELETE FROM crawl_queue WHERE site_id = ?", site.id)
+        .execute(database.pool())
+        .await
+        .context("Failed to clear crawl queue")?;
+
+    // Clear indexed chunks for this site
+    sqlx::query!("DELETE FROM indexed_chunks WHERE site_id = ?", site.id)
+        .execute(database.pool())
+        .await
+        .context("Failed to clear indexed chunks")?;
+
+    println!("✅");
+
+    // Reset site status and progress
+    print!("   Resetting site status... ");
+    io::stdout().flush().context("Failed to flush stdout")?;
+
+    let update = crate::database::sqlite::SiteUpdate {
+        status: Some(crate::database::sqlite::SiteStatus::Pending),
+        progress_percent: Some(0),
+        total_pages: Some(0),
+        indexed_pages: Some(0),
+        error_message: None,
+        last_heartbeat: None,
+        indexed_date: None,
+    };
+
+    SiteQueries::update(database.pool(), site.id, update)
+        .await
+        .context("Failed to reset site status")?;
+
+    println!("✅");
+    println!();
 
     // Start re-crawling
     info!("Starting re-crawl for site {}", site.id);
+    println!("🚀 Starting re-crawl and re-indexing...");
+    println!("   This may take several minutes depending on site size.");
+    println!();
 
     let crawler_config = CrawlerConfig::default();
     let mut crawler = SiteCrawler::new(database.pool().clone(), crawler_config);
 
     match crawler.crawl_site(site.id, &site.base_url).await {
         Ok(stats) => {
-            println!("Update completed successfully!");
-            println!("  Total URLs discovered: {}", stats.total_urls);
-            println!("  Successfully crawled: {}", stats.successful_crawls);
-            println!("  Failed crawls: {}", stats.failed_crawls);
-            println!("  Blocked by robots.txt: {}", stats.robots_blocked);
-            println!("  Duration: {:?}", stats.duration);
+            println!();
+            println!("✅ Re-indexing completed successfully!");
+            println!("   📄 Total URLs discovered: {}", stats.total_urls);
+            println!("   ✅ Successfully crawled: {}", stats.successful_crawls);
+            println!("   ❌ Failed crawls: {}", stats.failed_crawls);
+            println!("   🚫 Blocked by robots.txt: {}", stats.robots_blocked);
+            println!("   ⏱️  Duration: {:?}", stats.duration);
+
+            // Show new statistics
+            if let Ok(Some(stats)) = SiteQueries::get_statistics(database.pool(), site.id).await {
+                println!("   📊 Content chunks: {}", stats.total_chunks);
+            }
+
+            println!();
+            println!("💡 The background indexer will generate embeddings for new content");
+            println!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
         }
         Err(e) => {
-            error!("Update failed: {}", e);
-            println!("Update failed: {}", e);
+            error!("Re-indexing failed: {}", e);
+            println!("❌ Re-indexing failed: {}", e);
+            println!();
+            println!("💡 The site has been reset to pending status");
+            println!("💡 You can try running the update command again");
+            return Err(e);
         }
     }
 
@@ -467,6 +929,9 @@ pub async fn show_status() -> Result<()> {
 /// Start MCP server and background indexer with auto-start/termination logic
 #[inline]
 pub async fn serve_mcp(port: u16) -> Result<()> {
+    // Validate port number
+    validation::validate_port(port).context("Invalid port number")?;
+
     info!(
         "Starting MCP server on port {} with background indexer",
         port
@@ -660,4 +1125,142 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
     println!("✅ Shutdown complete");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validation::*;
+
+    #[test]
+    fn validate_site_identifier_works() {
+        // Valid cases
+        assert!(validate_site_identifier("1").is_ok());
+        assert!(validate_site_identifier("123").is_ok());
+        assert!(validate_site_identifier("rust-docs").is_ok());
+        assert!(validate_site_identifier("Python Documentation").is_ok());
+
+        // Invalid cases
+        assert!(validate_site_identifier("").is_err());
+        assert!(validate_site_identifier("   ").is_err());
+        assert!(validate_site_identifier("0").is_err());
+        assert!(validate_site_identifier("-1").is_err());
+        assert!(validate_site_identifier("-123").is_err());
+    }
+
+    #[test]
+    fn validate_documentation_url_works() {
+        // Valid cases
+        assert!(validate_documentation_url("https://docs.rust-lang.org").is_ok());
+        assert!(validate_documentation_url("http://localhost:8080/docs").is_ok());
+        assert!(validate_documentation_url("https://python.org/docs/3.9/").is_ok());
+
+        // Invalid cases
+        assert!(validate_documentation_url("").is_err());
+        assert!(validate_documentation_url("   ").is_err());
+        assert!(validate_documentation_url("not-a-url").is_err());
+        assert!(validate_documentation_url("ftp://example.com").is_err());
+        assert!(validate_documentation_url("file:///local/path").is_err());
+        assert!(validate_documentation_url("https://").is_err());
+    }
+
+    #[test]
+    fn validate_site_name_works() {
+        // Valid cases
+        assert!(validate_site_name("Rust Documentation").is_ok());
+        assert!(validate_site_name("Python 3.9 Docs").is_ok());
+        assert!(validate_site_name("API Reference").is_ok());
+        assert!(validate_site_name("a").is_ok()); // Single character
+
+        // Invalid cases
+        assert!(validate_site_name("").is_err());
+        assert!(validate_site_name("   ").is_err());
+        assert!(validate_site_name("Name with\nnewline").is_err());
+        assert!(validate_site_name("Name with\ttab").is_err());
+        assert!(validate_site_name("Name with\rcarriage return").is_err());
+
+        // Test maximum length (101 characters)
+        let long_name = "a".repeat(101);
+        assert!(validate_site_name(&long_name).is_err());
+
+        // Test exactly 100 characters (should be OK)
+        let max_name = "a".repeat(100);
+        assert!(validate_site_name(&max_name).is_ok());
+    }
+
+    #[test]
+    fn validate_port_works() {
+        // Valid cases
+        assert!(validate_port(8080).is_ok());
+        assert!(validate_port(3000).is_ok());
+        assert!(validate_port(65535).is_ok()); // Max port
+        assert!(validate_port(1024).is_ok()); // First non-privileged port
+
+        // Invalid cases
+        assert!(validate_port(0).is_err());
+
+        // These should succeed but show warnings
+        assert!(validate_port(80).is_ok()); // HTTP
+        assert!(validate_port(443).is_ok()); // HTTPS
+        assert!(validate_port(22).is_ok()); // SSH
+    }
+
+    // Integration tests would go in tests/ directory for cross-module testing
+    // These are unit tests for validation functions only
+
+    #[test]
+    fn url_parsing_edge_cases() {
+        // Test various URL formats that should be accepted
+        let valid_urls = vec![
+            "https://docs.example.com",
+            "http://127.0.0.1:8080",
+            "https://sub.domain.example.com/path/to/docs",
+            "http://localhost:3000/docs/v1",
+            "https://example.com:8443/documentation",
+        ];
+
+        for url in valid_urls {
+            assert!(
+                validate_documentation_url(url).is_ok(),
+                "URL should be valid: {}",
+                url
+            );
+        }
+
+        // Test URLs that should be rejected
+        let invalid_urls = vec![
+            "javascript:alert('xss')",
+            "data:text/html,<script>alert('xss')</script>",
+            "mailto:admin@example.com",
+            "tel:+1234567890",
+            "",
+            "   ",
+            "not a url at all",
+        ];
+
+        for url in invalid_urls {
+            assert!(
+                validate_documentation_url(url).is_err(),
+                "URL should be invalid: {}",
+                url
+            );
+        }
+    }
+
+    #[test]
+    fn site_identifier_parsing() {
+        // Test that numeric IDs are properly validated
+        assert!(validate_site_identifier("1").is_ok());
+        assert!(validate_site_identifier("999999").is_ok());
+
+        // Test that string names are accepted
+        assert!(validate_site_identifier("my-docs").is_ok());
+        assert!(validate_site_identifier("Python Documentation").is_ok());
+        assert!(validate_site_identifier("docs with spaces").is_ok());
+
+        // Test edge cases
+        assert!(validate_site_identifier("0").is_err()); // Zero ID not allowed
+        assert!(validate_site_identifier("-1").is_err()); // Negative ID not allowed
+        assert!(validate_site_identifier("").is_err()); // Empty string not allowed
+        assert!(validate_site_identifier("   ").is_err()); // Whitespace only not allowed
+    }
 }
