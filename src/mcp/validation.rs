@@ -5,7 +5,7 @@
 
 use crate::mcp::protocol::*;
 use anyhow::{Result, anyhow};
-use jsonschema::{Draft, JSONSchema};
+use jsonschema::{Draft, Validator};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use tracing::debug;
@@ -13,7 +13,7 @@ use tracing::debug;
 /// JSON Schema validator for MCP messages
 #[derive(Debug)]
 pub struct McpValidator {
-    schemas: HashMap<String, JSONSchema>,
+    schemas: HashMap<String, Validator>,
 }
 
 impl McpValidator {
@@ -160,9 +160,9 @@ impl McpValidator {
     /// Add a JSON schema to the validator
     #[inline]
     pub fn add_schema(&mut self, name: &str, schema: &Value) -> Result<()> {
-        let compiled = JSONSchema::options()
+        let compiled = Validator::options()
             .with_draft(Draft::Draft7)
-            .compile(schema)
+            .build(schema)
             .map_err(|e| anyhow!("Failed to compile schema '{}': {}", name, e))?;
 
         self.schemas.insert(name.to_string(), compiled);
@@ -238,13 +238,12 @@ impl McpValidator {
             .get(schema_name)
             .ok_or_else(|| anyhow!("Schema '{}' not found", schema_name))?;
 
-        let validation_result = schema.validate(value);
-        if let Err(errors) = validation_result {
-            let error_messages: Vec<String> = errors
-                .into_iter()
-                .map(|e| format!("{}:{}", e.instance_path, e))
-                .collect();
+        let error_messages: Vec<String> = schema
+            .iter_errors(value)
+            .map(|e| format!("{}:{}", e.instance_path, e))
+            .collect();
 
+        if !error_messages.is_empty() {
             return Err(anyhow!(
                 "Schema validation failed for '{}': {}",
                 schema_name,
