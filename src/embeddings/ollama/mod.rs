@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
@@ -26,7 +26,7 @@ pub struct OllamaClient {
 #[derive(Debug, Serialize)]
 struct EmbedRequest {
     model: String,
-    prompt: String,
+    input: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -34,11 +34,6 @@ struct BatchEmbedRequest {
     model: String,
     #[serde(rename = "input")]
     inputs: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EmbedResponse {
-    embedding: Vec<f32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -215,7 +210,7 @@ impl OllamaClient {
 
         let request = EmbedRequest {
             model: self.model.clone(),
-            prompt: text.to_string(),
+            input: text.to_string(),
         };
 
         let url = self
@@ -236,12 +231,16 @@ impl OllamaClient {
             })
             .context("Failed to generate embedding")?;
 
-        let embed_response: EmbedResponse =
+        let embed_response: BatchEmbedResponse =
             serde_json::from_str(&response_text).context("Failed to parse embedding response")?;
 
         let result = EmbeddingResult {
             text: text.to_string(),
-            embedding: embed_response.embedding,
+            embedding: embed_response
+                .embeddings
+                .first()
+                .cloned()
+                .ok_or_else(|| anyhow!("Ollama did not return any embeddings"))?,
             token_count: crate::embeddings::chunking::estimate_token_count(text),
             chunk_index: None,
             heading_path: None,

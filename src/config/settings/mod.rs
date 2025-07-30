@@ -19,6 +19,7 @@ pub struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OllamaConfig {
+    pub protocol: String,
     pub host: String,
     pub port: u16,
     pub model: String,
@@ -61,6 +62,8 @@ pub enum ConfigError {
     InvalidBrowserPoolSize(usize),
     #[error("Invalid window dimensions: {0}x{1} (must be between 100 and 4000)")]
     InvalidWindowDimensions(u32, u32),
+    #[error("Invalid protocol: {0} (must be 'http' or 'https')")]
+    InvalidProtocol(String),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("TOML parsing error: {0}")]
@@ -74,6 +77,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             ollama: OllamaConfig {
+                protocol: "http".to_string(),
                 host: "localhost".to_string(),
                 port: 11434,
                 model: "nomic-embed-text:latest".to_string(),
@@ -185,7 +189,10 @@ impl Config {
 
     #[inline]
     pub fn ollama_url(&self) -> Result<Url, ConfigError> {
-        let url_str = format!("http://{}:{}", self.ollama.host, self.ollama.port);
+        let url_str = format!(
+            "{}://{}:{}",
+            self.ollama.protocol, self.ollama.host, self.ollama.port
+        );
         Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))
     }
 
@@ -213,6 +220,10 @@ impl Config {
 impl OllamaConfig {
     #[inline]
     pub fn validate(&self) -> Result<(), ConfigError> {
+        if self.protocol != "http" && self.protocol != "https" {
+            return Err(ConfigError::InvalidProtocol(self.protocol.clone()));
+        }
+
         if self.port == 0 {
             return Err(ConfigError::InvalidPort(self.port));
         }
@@ -225,9 +236,18 @@ impl OllamaConfig {
             return Err(ConfigError::InvalidBatchSize(self.batch_size));
         }
 
-        let url_str = format!("http://{}:{}", self.host, self.port);
+        let url_str = format!("{}://{}:{}", self.protocol, self.host, self.port);
         Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))?;
 
+        Ok(())
+    }
+
+    #[inline]
+    pub fn set_protocol(&mut self, protocol: String) -> Result<(), ConfigError> {
+        if protocol != "http" && protocol != "https" {
+            return Err(ConfigError::InvalidProtocol(protocol));
+        }
+        self.protocol = protocol;
         Ok(())
     }
 

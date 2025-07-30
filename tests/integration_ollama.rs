@@ -27,6 +27,7 @@ fn create_integration_test_client() -> OllamaClient {
 
     let config = Config {
         ollama: OllamaConfig {
+            protocol: "http".to_string(),
             host,
             port,
             model,
@@ -408,6 +409,7 @@ fn real_ollama_error_recovery() {
     // Create client with invalid model to test error handling
     let config = Config {
         ollama: OllamaConfig {
+            protocol: "http".to_string(),
             host: "localhost".to_string(),
             port: 11434,
             model: "non-existent-model-12345".to_string(),

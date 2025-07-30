@@ -47,6 +47,7 @@ fn create_test_config() -> (Config, TempDir) {
     let config = Config {
         base_dir: Some(temp_dir.path().to_path_buf()),
         ollama: OllamaConfig {
+            protocol: "http".to_string(),
             host,
             port,
             model,

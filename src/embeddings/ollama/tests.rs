@@ -5,6 +5,7 @@ use crate::config::{BrowserConfig, Config, OllamaConfig};
 fn client_configuration() {
     let config = Config {
         ollama: OllamaConfig {
+            protocol: "http".to_string(),
             host: "test-host".to_string(),
             port: 1234,
             model: "test-model".to_string(),

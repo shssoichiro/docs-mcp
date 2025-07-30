@@ -3,7 +3,7 @@ mod tests;
 
 use anyhow::{Context, Result};
 use console::style;
-use dialoguer::{Confirm, Input};
+use dialoguer::{Confirm, Input, Select};
 
 use super::{Config, ConfigError, OllamaConfig};
 
@@ -97,11 +97,26 @@ fn load_existing_config() -> Result<Config> {
 }
 
 fn configure_ollama(ollama: &mut OllamaConfig) -> Result<()> {
+    let protocols = &["http", "https"];
+    let default_index = protocols
+        .iter()
+        .position(|&p| p == ollama.protocol)
+        .unwrap_or(0);
+
+    let protocol_index = Select::new()
+        .with_prompt("Ollama protocol")
+        .default(default_index)
+        .items(protocols)
+        .interact()?;
+
+    let protocol = protocols[protocol_index].to_string();
+
     let host: String = Input::new()
         .with_prompt("Ollama host")
         .default(ollama.host.clone())
         .validate_with(|input: &String| -> Result<(), ConfigError> {
             let temp_config = OllamaConfig {
+                protocol: protocol.clone(),
                 host: input.clone(),
                 port: 11434, // Use default port for validation
                 model: "test".to_string(),
@@ -150,6 +165,7 @@ fn configure_ollama(ollama: &mut OllamaConfig) -> Result<()> {
         })
         .interact_text()?;
 
+    ollama.set_protocol(protocol)?;
     ollama.set_host(host)?;
     ollama.set_port(port)?;
     ollama.set_model(model)?;
@@ -159,7 +175,10 @@ fn configure_ollama(ollama: &mut OllamaConfig) -> Result<()> {
 }
 
 fn test_ollama_connection(ollama: &OllamaConfig) -> Result<bool> {
-    let url = format!("http://{}:{}/api/version", ollama.host, ollama.port);
+    let url = format!(
+        "{}://{}:{}/api/version",
+        ollama.protocol, ollama.host, ollama.port
+    );
 
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(std::time::Duration::from_secs(5)))

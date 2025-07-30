@@ -8,6 +8,7 @@ async fn create_test_setup() -> Result<(QueueManager, Database, i64, TempDir)> {
     let temp_dir = TempDir::new()?;
     let config = Config {
         ollama: OllamaConfig {
+            protocol: "http".to_string(),
             host: "localhost".to_string(),
             port: 11434,
             model: "nomic-embed-text:latest".to_string(),
@@ -80,6 +81,7 @@ async fn queue_stats_empty_queue() {
     let temp_dir = TempDir::new().expect("can create temp dir");
     let config = Config {
         ollama: OllamaConfig {
+            protocol: "http".to_string(),
             host: "localhost".to_string(),
             port: 11434,
             model: "nomic-embed-text:latest".to_string(),

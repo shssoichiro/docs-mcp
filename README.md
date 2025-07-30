@@ -44,6 +44,7 @@ docs-mcp config
 
 This will interactively prompt for:
 
+- Ollama protocol (default: `http`)
 - Ollama host (default: `localhost`)
 - Ollama port (default: `11434`)
 - Embedding model (default: `nomic-embed-text`)
@@ -178,6 +179,7 @@ Configuration is stored in TOML format at:
 
 ```toml
 [ollama]
+protocol = "http"
 host = "localhost"
 port = 11434
 model = "nomic-embed-text"

@@ -10,6 +10,7 @@ async fn create_test_indexer() -> Result<(BackgroundIndexer, TempDir)> {
     let temp_dir = TempDir::new()?;
     let config = Config {
         ollama: OllamaConfig {
+            protocol: "http".to_string(),
             host: "localhost".to_string(),
             port: 11434,
             model: "nomic-embed-text:latest".to_string(),
@@ -138,6 +139,7 @@ async fn concurrent_lock_file_access() {
     // Create second indexer with same config directory
     let config = Config {
         ollama: OllamaConfig {
+            protocol: "http".to_string(),
             host: "localhost".to_string(),
             port: 11434,
             model: "nomic-embed-text:latest".to_string(),

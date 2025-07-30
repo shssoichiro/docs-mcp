@@ -13,6 +13,7 @@ mod integration_tests {
 
         let original_config = Config {
             ollama: OllamaConfig {
+                protocol: "https".to_string(),
                 host: "test-host".to_string(),
                 port: 8080,
                 model: "test-model".to_string(),
@@ -73,6 +74,7 @@ mod integration_tests {
     fn complete_valid_config() {
         let valid_toml = r#"
             [ollama]
+            protocol = "http"
             host = "localhost"
             port = 11434
             model = "nomic-embed-text:latest"
@@ -80,6 +82,7 @@ mod integration_tests {
         "#;
 
         let config: Config = toml::from_str(valid_toml).expect("should parse toml successfully");
+        assert_eq!(config.ollama.protocol, "http");
         assert_eq!(config.ollama.host, "localhost");
         assert_eq!(config.ollama.port, 11434);
         assert_eq!(config.ollama.model, "nomic-embed-text:latest");
@@ -90,6 +93,7 @@ mod integration_tests {
     fn config_validation_edge_cases() {
         let config = Config {
             ollama: OllamaConfig {
+                protocol: "http".to_string(),
                 host: String::new(),
                 port: 80,
                 model: "test".to_string(),
@@ -106,6 +110,7 @@ mod integration_tests {
     #[test]
     fn port_boundary_validation() {
         let mut config = OllamaConfig {
+            protocol: "http".to_string(),
             host: "localhost".to_string(),
             port: 1,
             model: "test".to_string(),
@@ -120,6 +125,7 @@ mod integration_tests {
     #[test]
     fn batch_size_boundary_validation() {
         let mut config = OllamaConfig {
+            protocol: "http".to_string(),
             host: "localhost".to_string(),
             port: 11434,
             model: "test".to_string(),
@@ -135,14 +141,21 @@ mod integration_tests {
     #[test]
     fn ollama_url_generation_with_different_hosts() {
         let configs = vec![
-            ("localhost", 11434, "http://localhost:11434/"),
-            ("127.0.0.1", 8080, "http://127.0.0.1:8080/"),
-            ("example.com", 3000, "http://example.com:3000/"),
+            ("http", "localhost", 11434, "http://localhost:11434/"),
+            ("http", "127.0.0.1", 8080, "http://127.0.0.1:8080/"),
+            ("http", "example.com", 3000, "http://example.com:3000/"),
+            (
+                "https",
+                "secure.example.com",
+                443,
+                "https://secure.example.com/",
+            ),
         ];
 
-        for (host, port, expected_url) in configs {
+        for (protocol, host, port, expected_url) in configs {
             let config = Config {
                 ollama: OllamaConfig {
+                    protocol: protocol.to_string(),
                     host: host.to_string(),
                     port,
                     model: "test".to_string(),
@@ -160,6 +173,7 @@ mod integration_tests {
     #[test]
     fn model_name_validation() {
         let mut config = OllamaConfig {
+            protocol: "http".to_string(),
             host: "localhost".to_string(),
             port: 11434,
             model: "valid-model".to_string(),
@@ -175,6 +189,7 @@ mod integration_tests {
     #[test]
     fn error_display_messages() {
         let errors = vec![
+            ConfigError::InvalidProtocol("ftp".to_string()),
             ConfigError::InvalidPort(0),
             ConfigError::InvalidBatchSize(0),
             ConfigError::InvalidModel(String::new()),
