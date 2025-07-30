@@ -1,3 +1,5 @@
+⚠️ This project is in an alpha state. There may be breaking changes or bugs. ⚠️
+
 # docs-mcp
 
 A documentation indexing and search system that provides an MCP (Model Context Protocol) server for AI assistants to search locally-indexed developer documentation. The system crawls documentation websites, indexes their content using embeddings, and provides semantic search capabilities through an MCP interface.
