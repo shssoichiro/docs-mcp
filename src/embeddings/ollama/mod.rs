@@ -220,7 +220,7 @@ impl OllamaClient {
 
         let url = self
             .base_url
-            .join("/api/embeddings")
+            .join("/api/embed")
             .context("Failed to build embedding URL")?;
 
         let request_json =
