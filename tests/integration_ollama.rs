@@ -95,7 +95,7 @@ fn real_ollama_list_models() {
     // Check if our test model is available
     let has_test_model = models.iter().any(|m| m.name == TEST_MODEL);
     if !has_test_model {
-        println!(
+        eprintln!(
             "Warning: Test model '{}' not found. Available models: {:?}",
             TEST_MODEL,
             models.iter().map(|m| &m.name).collect::<Vec<_>>()

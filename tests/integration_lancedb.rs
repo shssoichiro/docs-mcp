@@ -468,8 +468,8 @@ async fn vector_index_creation_and_performance() {
     );
 
     // Log timing information (index may or may not improve performance with small datasets)
-    println!("Search time before index: {:?}", time_before_index);
-    println!("Search time after index: {:?}", time_after_index);
+    eprintln!("Search time before index: {:?}", time_before_index);
+    eprintln!("Search time after index: {:?}", time_after_index);
 }
 
 #[tokio::test]

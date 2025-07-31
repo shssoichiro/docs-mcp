@@ -7,83 +7,6 @@ use crate::crawler::{CrawlerConfig, SiteCrawler};
 use crate::database::sqlite::{Database, NewSite, SiteQueries};
 use crate::indexer::BackgroundIndexer;
 
-/// Common formatting utilities for consistent CLI output
-pub mod formatting {
-    use std::io::{self, Write};
-
-    /// Print a step indicator with consistent formatting
-    #[inline]
-    pub fn print_step(message: &str) -> io::Result<()> {
-        print!("{} ", message);
-        io::stdout().flush()
-    }
-
-    /// Print success indicator
-    #[inline]
-    pub fn print_success() {
-        println!("✅");
-    }
-
-    /// Print warning indicator
-    #[inline]
-    pub fn print_warning() {
-        println!("⚠️");
-    }
-
-    /// Print error indicator
-    #[inline]
-    pub fn print_error() {
-        println!("❌");
-    }
-
-    /// Print a section header with consistent formatting
-    #[inline]
-    pub fn print_section_header(title: &str) {
-        println!();
-        println!("{}", title);
-    }
-
-    /// Print a subsection with consistent indentation
-    #[inline]
-    pub fn print_subsection(label: &str, value: &str) {
-        println!("   {}: {}", label, value);
-    }
-
-    /// Print a status line with emoji and text
-    #[inline]
-    pub fn print_status(emoji: &str, message: &str) {
-        println!("{} {}", emoji, message);
-    }
-
-    /// Print a tip/suggestion
-    #[inline]
-    pub fn print_tip(message: &str) {
-        println!("💡 {}", message);
-    }
-
-    /// Print a completion message
-    #[inline]
-    pub fn print_completion(message: &str) {
-        println!();
-        println!("🎉 {}", message);
-    }
-
-    /// Print an error message with consistent formatting
-    #[inline]
-    pub fn print_error_message(context: &str, error: &str) {
-        println!("❌ {}: {}", context, error);
-    }
-
-    /// Print help suggestions
-    #[inline]
-    pub fn print_help_suggestions(suggestions: &[&str]) {
-        println!();
-        for suggestion in suggestions {
-            print_tip(suggestion);
-        }
-    }
-}
-
 /// Validation functions for CLI commands
 pub mod validation {
     use anyhow::{Result, anyhow};
@@ -173,8 +96,8 @@ pub mod validation {
 /// Add a new documentation site for indexing with comprehensive progress display
 #[inline]
 pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
-    println!("🚀 Adding new documentation site");
-    println!("   URL: {}", url);
+    eprintln!("🚀 Adding new documentation site");
+    eprintln!("   URL: {}", url);
 
     info!("Adding documentation site: {}", url);
 
@@ -190,7 +113,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
         validation::validate_site_name(site_name).context("Invalid site name provided")?;
     }
 
-    println!("✅");
+    eprintln!("✅");
 
     // Generate name if not provided
     let site_name = name.unwrap_or_else(|| {
@@ -207,8 +130,8 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
         }
     });
 
-    println!("   Name: {}", site_name);
-    println!();
+    eprintln!("   Name: {}", site_name);
+    eprintln!();
 
     // Initialize database
     print!("🗄️  Connecting to database... ");
@@ -219,45 +142,45 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
         .context("Failed to initialize database")?;
-    println!("✅");
+    eprintln!("✅");
 
     // Check if site already exists
     print!("🔍 Checking for existing site... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     if let Some(existing_site) = SiteQueries::get_by_base_url(database.pool(), &url).await? {
-        println!("⚠️  Found existing site!");
-        println!();
-        println!(
+        eprintln!("⚠️  Found existing site!");
+        eprintln!();
+        eprintln!(
             "📚 Site already exists: {} (ID: {})",
             existing_site.name, existing_site.id
         );
-        println!("   URL: {}", existing_site.base_url);
-        println!("   Status: {}", existing_site.status);
+        eprintln!("   URL: {}", existing_site.base_url);
+        eprintln!("   Status: {}", existing_site.status);
 
         if existing_site.progress_percent > 0 {
-            println!("   Progress: {}%", existing_site.progress_percent);
+            eprintln!("   Progress: {}%", existing_site.progress_percent);
         }
 
         // Show statistics if available
         if let Ok(Some(stats)) =
             SiteQueries::get_statistics(database.pool(), existing_site.id).await
         {
-            println!("   Content Chunks: {}", stats.total_chunks);
+            eprintln!("   Content Chunks: {}", stats.total_chunks);
             if stats.pending_crawl_items > 0 {
-                println!("   Pending Pages: {}", stats.pending_crawl_items);
+                eprintln!("   Pending Pages: {}", stats.pending_crawl_items);
             }
         }
 
-        println!();
-        println!(
+        eprintln!();
+        eprintln!(
             "💡 Use 'docs-mcp update {}' to re-index this site",
             existing_site.id
         );
-        println!("💡 Use 'docs-mcp list' to see all indexed sites");
+        eprintln!("💡 Use 'docs-mcp list' to see all indexed sites");
         return Ok(());
     }
-    println!("✅");
+    eprintln!("✅");
 
     // Create new site entry
     print!("📝 Creating site entry... ");
@@ -272,20 +195,20 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     let site = SiteQueries::create(database.pool(), new_site)
         .await
         .context("Failed to create site entry")?;
-    println!("✅");
+    eprintln!("✅");
 
-    println!();
-    println!("✅ Site created successfully!");
-    println!("   📚 Name: {}", site.name);
-    println!("   🆔 ID: {}", site.id);
-    println!("   🌐 URL: {}", site.base_url);
-    println!();
+    eprintln!();
+    eprintln!("✅ Site created successfully!");
+    eprintln!("   📚 Name: {}", site.name);
+    eprintln!("   🆔 ID: {}", site.id);
+    eprintln!("   🌐 URL: {}", site.base_url);
+    eprintln!();
 
     // Start crawling
-    println!("🕷️  Starting web crawling...");
-    println!("   This may take several minutes depending on site size.");
-    println!("   Respecting robots.txt and rate limiting (250ms between requests)");
-    println!();
+    eprintln!("🕷️  Starting web crawling...");
+    eprintln!("   This may take several minutes depending on site size.");
+    eprintln!("   Respecting robots.txt and rate limiting (250ms between requests)");
+    eprintln!();
 
     info!("Starting crawl for site {}", site.id);
 
@@ -294,47 +217,47 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
 
     match crawler.crawl_site(site.id, &url).await {
         Ok(stats) => {
-            println!("✅ Crawling completed successfully!");
-            println!();
-            println!("📊 Crawl Statistics:");
-            println!("   🔍 Total URLs discovered: {}", stats.total_urls);
-            println!("   ✅ Successfully crawled: {}", stats.successful_crawls);
+            eprintln!("✅ Crawling completed successfully!");
+            eprintln!();
+            eprintln!("📊 Crawl Statistics:");
+            eprintln!("   🔍 Total URLs discovered: {}", stats.total_urls);
+            eprintln!("   ✅ Successfully crawled: {}", stats.successful_crawls);
 
             if stats.failed_crawls > 0 {
-                println!("   ❌ Failed crawls: {}", stats.failed_crawls);
+                eprintln!("   ❌ Failed crawls: {}", stats.failed_crawls);
             }
             if stats.robots_blocked > 0 {
-                println!("   🚫 Blocked by robots.txt: {}", stats.robots_blocked);
+                eprintln!("   🚫 Blocked by robots.txt: {}", stats.robots_blocked);
             }
 
-            println!("   ⏱️  Duration: {:?}", stats.duration);
+            eprintln!("   ⏱️  Duration: {:?}", stats.duration);
 
             // Show content statistics
             if let Ok(Some(content_stats)) =
                 SiteQueries::get_statistics(database.pool(), site.id).await
             {
-                println!(
+                eprintln!(
                     "   📄 Content chunks created: {}",
                     content_stats.total_chunks
                 );
             }
 
-            println!();
-            println!("🎉 Site successfully added and crawled!");
-            println!("💡 The background indexer will now generate embeddings for search");
-            println!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
-            println!("💡 Use 'docs-mcp serve' to start the MCP server for AI assistants");
+            eprintln!();
+            eprintln!("🎉 Site successfully added and crawled!");
+            eprintln!("💡 The background indexer will now generate embeddings for search");
+            eprintln!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
+            eprintln!("💡 Use 'docs-mcp serve' to start the MCP server for AI assistants");
         }
         Err(e) => {
             error!("Crawl failed: {}", e);
-            println!("❌ Crawling failed: {}", e);
-            println!();
-            println!("📝 Site entry has been created but crawling was unsuccessful.");
-            println!(
+            eprintln!("❌ Crawling failed: {}", e);
+            eprintln!();
+            eprintln!("📝 Site entry has been created but crawling was unsuccessful.");
+            eprintln!(
                 "💡 You can try updating the site later with 'docs-mcp update {}'",
                 site.id
             );
-            println!("💡 Check the site URL and your internet connection");
+            eprintln!("💡 Check the site URL and your internet connection");
             return Err(e);
         }
     }
@@ -356,22 +279,22 @@ pub async fn list_sites() -> Result<()> {
         .context("Failed to list sites")?;
 
     if sites.is_empty() {
-        println!("No documentation sites have been added yet.");
-        println!("Use 'docs-mcp add <url>' to add a site.");
+        eprintln!("No documentation sites have been added yet.");
+        eprintln!("Use 'docs-mcp add <url>' to add a site.");
         return Ok(());
     }
 
-    println!("Documentation Sites ({} total):", sites.len());
-    println!();
+    eprintln!("Documentation Sites ({} total):", sites.len());
+    eprintln!();
 
     for site in &sites {
-        println!("📚 {} (ID: {})", site.name, site.id);
-        println!("   URL: {}", site.base_url);
-        println!("   Status: {}", site.status);
+        eprintln!("📚 {} (ID: {})", site.name, site.id);
+        eprintln!("   URL: {}", site.base_url);
+        eprintln!("   Status: {}", site.status);
 
         // Show crawl progress
         if site.total_pages > 0 {
-            println!(
+            eprintln!(
                 "   Crawl Progress: {}/{} pages ({}%)",
                 site.indexed_pages, site.total_pages, site.progress_percent
             );
@@ -380,23 +303,23 @@ pub async fn list_sites() -> Result<()> {
         // Get comprehensive statistics
         match SiteQueries::get_statistics(database.pool(), site.id).await {
             Ok(Some(stats)) => {
-                println!("   Content Chunks: {}", stats.total_chunks);
+                eprintln!("   Content Chunks: {}", stats.total_chunks);
 
                 if stats.pending_crawl_items > 0 {
-                    println!("   Pending Pages: {}", stats.pending_crawl_items);
+                    eprintln!("   Pending Pages: {}", stats.pending_crawl_items);
                 }
 
                 if stats.failed_crawl_items > 0 {
-                    println!("   Failed Pages: {}", stats.failed_crawl_items);
+                    eprintln!("   Failed Pages: {}", stats.failed_crawl_items);
                 }
             }
-            Ok(None) => println!("   Statistics: Not available"),
-            Err(e) => println!("   Statistics: Error - {}", e),
+            Ok(None) => eprintln!("   Statistics: Not available"),
+            Err(e) => eprintln!("   Statistics: Error - {}", e),
         }
 
         // Show indexing dates
         if let Some(indexed_date) = site.indexed_date {
-            println!(
+            eprintln!(
                 "   Last Indexed: {}",
                 indexed_date.format("%Y-%m-%d %H:%M:%S")
             );
@@ -409,24 +332,24 @@ pub async fn list_sites() -> Result<()> {
                 .num_seconds();
 
             if elapsed < 120 {
-                println!("   Indexer: Active ({}s ago)", elapsed);
+                eprintln!("   Indexer: Active ({}s ago)", elapsed);
             } else {
-                println!("   Indexer: Inactive ({}s ago)", elapsed);
+                eprintln!("   Indexer: Inactive ({}s ago)", elapsed);
             }
         }
 
         // Show errors
         if let Some(error) = &site.error_message {
-            println!("   ⚠️  Error: {}", error);
+            eprintln!("   ⚠️  Error: {}", error);
         }
 
         // Show creation date
-        println!(
+        eprintln!(
             "   Created: {}",
             site.created_date.format("%Y-%m-%d %H:%M:%S")
         );
 
-        println!();
+        eprintln!();
     }
 
     // Show summary statistics
@@ -435,11 +358,11 @@ pub async fn list_sites() -> Result<()> {
     let indexing_sites = sites.iter().filter(|s| s.is_indexing()).count();
     let failed_sites = sites.iter().filter(|s| s.is_failed()).count();
 
-    println!("Summary:");
-    println!("  Total Sites: {}", total_sites);
-    println!("  Completed: {}", completed_sites);
-    println!("  Currently Indexing: {}", indexing_sites);
-    println!("  Failed: {}", failed_sites);
+    eprintln!("Summary:");
+    eprintln!("  Total Sites: {}", total_sites);
+    eprintln!("  Completed: {}", completed_sites);
+    eprintln!("  Currently Indexing: {}", indexing_sites);
+    eprintln!("  Failed: {}", failed_sites);
 
     Ok(())
 }
@@ -471,30 +394,30 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
 
     let site = site.ok_or_else(|| anyhow::anyhow!("Site not found: {}", site_identifier))?;
 
-    println!("📚 Found site: {} (ID: {})", site.name, site.id);
-    println!("   URL: {}", site.base_url);
-    println!("   Status: {}", site.status);
+    eprintln!("📚 Found site: {} (ID: {})", site.name, site.id);
+    eprintln!("   URL: {}", site.base_url);
+    eprintln!("   Status: {}", site.status);
 
     // Get statistics before deletion
     if let Ok(Some(stats)) = SiteQueries::get_statistics(database.pool(), site.id).await {
-        println!("   Content Chunks: {}", stats.total_chunks);
+        eprintln!("   Content Chunks: {}", stats.total_chunks);
         if stats.pending_crawl_items > 0 {
-            println!("   Pending Pages: {}", stats.pending_crawl_items);
+            eprintln!("   Pending Pages: {}", stats.pending_crawl_items);
         }
         if stats.failed_crawl_items > 0 {
-            println!("   Failed Pages: {}", stats.failed_crawl_items);
+            eprintln!("   Failed Pages: {}", stats.failed_crawl_items);
         }
     }
 
-    println!();
-    println!("⚠️  This will permanently delete:");
-    println!("   • Site metadata and configuration");
-    println!("   • All crawl queue entries");
-    println!("   • All indexed content chunks");
-    println!("   • All vector embeddings");
-    println!();
-    println!("❌ This action cannot be undone!");
-    println!();
+    eprintln!();
+    eprintln!("⚠️  This will permanently delete:");
+    eprintln!("   • Site metadata and configuration");
+    eprintln!("   • All crawl queue entries");
+    eprintln!("   • All indexed content chunks");
+    eprintln!("   • All vector embeddings");
+    eprintln!();
+    eprintln!("❌ This action cannot be undone!");
+    eprintln!();
 
     // Get user confirmation
     print!("Type 'DELETE' to confirm deletion: ");
@@ -508,12 +431,12 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
     let input = input.trim();
 
     if input != "DELETE" {
-        println!("❌ Deletion cancelled. No changes were made.");
+        eprintln!("❌ Deletion cancelled. No changes were made.");
         return Ok(());
     }
 
-    println!();
-    println!("🗑️  Deleting site and all associated data...");
+    eprintln!();
+    eprintln!("🗑️  Deleting site and all associated data...");
 
     // Initialize vector store for cleanup
     let config = Config::load().unwrap_or_default();
@@ -529,10 +452,10 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
         .delete_site_embeddings(&site.id.to_string())
         .await
     {
-        Ok(_) => println!("✅"),
+        Ok(_) => eprintln!("✅"),
         Err(e) => {
-            println!("⚠️  Warning: Failed to delete vector embeddings: {}", e);
-            println!("   Some vector data may remain in LanceDB");
+            eprintln!("⚠️  Warning: Failed to delete vector embeddings: {}", e);
+            eprintln!("   Some vector data may remain in LanceDB");
         }
     }
 
@@ -545,15 +468,15 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
         .context("Failed to delete site from database")?;
 
     if deleted {
-        println!("✅");
-        println!();
-        println!(
+        eprintln!("✅");
+        eprintln!();
+        eprintln!(
             "✅ Site successfully deleted: {} (ID: {})",
             site.name, site.id
         );
-        println!("   All associated data has been removed.");
+        eprintln!("   All associated data has been removed.");
     } else {
-        println!("❌");
+        eprintln!("❌");
         return Err(anyhow::anyhow!(
             "Failed to delete site - site may have already been removed"
         ));
@@ -564,14 +487,14 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
     io::stdout().flush().context("Failed to flush stdout")?;
 
     if let Err(e) = database.optimize().await {
-        println!("⚠️  Warning: Failed to optimize database: {}", e);
+        eprintln!("⚠️  Warning: Failed to optimize database: {}", e);
     } else {
-        println!("✅");
+        eprintln!("✅");
     }
 
-    println!();
-    println!("💡 Use 'docs-mcp list' to see remaining sites");
-    println!("💡 Use 'docs-mcp add <url>' to index a new site");
+    eprintln!();
+    eprintln!("💡 Use 'docs-mcp list' to see remaining sites");
+    eprintln!("💡 Use 'docs-mcp add <url>' to index a new site");
 
     Ok(())
 }
@@ -603,25 +526,25 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
 
     let site = site.ok_or_else(|| anyhow::anyhow!("Site not found: {}", site_identifier))?;
 
-    println!("🔄 Updating site: {} (ID: {})", site.name, site.id);
-    println!("   URL: {}", site.base_url);
-    println!("   Current Status: {}", site.status);
+    eprintln!("🔄 Updating site: {} (ID: {})", site.name, site.id);
+    eprintln!("   URL: {}", site.base_url);
+    eprintln!("   Current Status: {}", site.status);
 
     // Get statistics before update
     if let Ok(Some(stats)) = SiteQueries::get_statistics(database.pool(), site.id).await {
-        println!("   Current Content: {} chunks", stats.total_chunks);
+        eprintln!("   Current Content: {} chunks", stats.total_chunks);
         if stats.pending_crawl_items > 0 {
-            println!("   Pending Pages: {}", stats.pending_crawl_items);
+            eprintln!("   Pending Pages: {}", stats.pending_crawl_items);
         }
     }
 
-    println!();
-    println!("⚠️  This will:");
-    println!("   • Clear all existing crawl queue entries");
-    println!("   • Clear all existing indexed content and embeddings");
-    println!("   • Re-crawl the entire site from scratch");
-    println!("   • Re-generate all embeddings");
-    println!();
+    eprintln!();
+    eprintln!("⚠️  This will:");
+    eprintln!("   • Clear all existing crawl queue entries");
+    eprintln!("   • Clear all existing indexed content and embeddings");
+    eprintln!("   • Re-crawl the entire site from scratch");
+    eprintln!("   • Re-generate all embeddings");
+    eprintln!();
 
     // Get user confirmation for destructive operation
     print!("Continue with re-indexing? [y/N]: ");
@@ -635,12 +558,12 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
     let input = input.trim().to_lowercase();
 
     if input != "y" && input != "yes" {
-        println!("❌ Update cancelled. No changes were made.");
+        eprintln!("❌ Update cancelled. No changes were made.");
         return Ok(());
     }
 
-    println!();
-    println!("🧹 Preparing for re-indexing...");
+    eprintln!();
+    eprintln!("🧹 Preparing for re-indexing...");
 
     // Initialize vector store for cleanup
     let config = Config::load().unwrap_or_default();
@@ -656,10 +579,10 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
         .delete_site_embeddings(&site.id.to_string())
         .await
     {
-        Ok(_) => println!("✅"),
+        Ok(_) => eprintln!("✅"),
         Err(e) => {
-            println!("⚠️  Warning: Failed to clear embeddings: {}", e);
-            println!("   Proceeding with update anyway...");
+            eprintln!("⚠️  Warning: Failed to clear embeddings: {}", e);
+            eprintln!("   Proceeding with update anyway...");
         }
     }
 
@@ -679,7 +602,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
         .await
         .context("Failed to clear indexed chunks")?;
 
-    println!("✅");
+    eprintln!("✅");
 
     // Reset site status and progress
     print!("   Resetting site status... ");
@@ -699,43 +622,43 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
         .await
         .context("Failed to reset site status")?;
 
-    println!("✅");
-    println!();
+    eprintln!("✅");
+    eprintln!();
 
     // Start re-crawling
     info!("Starting re-crawl for site {}", site.id);
-    println!("🚀 Starting re-crawl and re-indexing...");
-    println!("   This may take several minutes depending on site size.");
-    println!();
+    eprintln!("🚀 Starting re-crawl and re-indexing...");
+    eprintln!("   This may take several minutes depending on site size.");
+    eprintln!();
 
     let crawler_config = CrawlerConfig::default();
     let mut crawler = SiteCrawler::new(database.pool().clone(), crawler_config);
 
     match crawler.crawl_site(site.id, &site.base_url).await {
         Ok(stats) => {
-            println!();
-            println!("✅ Re-indexing completed successfully!");
-            println!("   📄 Total URLs discovered: {}", stats.total_urls);
-            println!("   ✅ Successfully crawled: {}", stats.successful_crawls);
-            println!("   ❌ Failed crawls: {}", stats.failed_crawls);
-            println!("   🚫 Blocked by robots.txt: {}", stats.robots_blocked);
-            println!("   ⏱️  Duration: {:?}", stats.duration);
+            eprintln!();
+            eprintln!("✅ Re-indexing completed successfully!");
+            eprintln!("   📄 Total URLs discovered: {}", stats.total_urls);
+            eprintln!("   ✅ Successfully crawled: {}", stats.successful_crawls);
+            eprintln!("   ❌ Failed crawls: {}", stats.failed_crawls);
+            eprintln!("   🚫 Blocked by robots.txt: {}", stats.robots_blocked);
+            eprintln!("   ⏱️  Duration: {:?}", stats.duration);
 
             // Show new statistics
             if let Ok(Some(stats)) = SiteQueries::get_statistics(database.pool(), site.id).await {
-                println!("   📊 Content chunks: {}", stats.total_chunks);
+                eprintln!("   📊 Content chunks: {}", stats.total_chunks);
             }
 
-            println!();
-            println!("💡 The background indexer will generate embeddings for new content");
-            println!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
+            eprintln!();
+            eprintln!("💡 The background indexer will generate embeddings for new content");
+            eprintln!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
         }
         Err(e) => {
             error!("Re-indexing failed: {}", e);
-            println!("❌ Re-indexing failed: {}", e);
-            println!();
-            println!("💡 The site has been reset to pending status");
-            println!("💡 You can try running the update command again");
+            eprintln!("❌ Re-indexing failed: {}", e);
+            eprintln!();
+            eprintln!("💡 The site has been reset to pending status");
+            eprintln!("💡 You can try running the update command again");
             return Err(e);
         }
     }
@@ -748,123 +671,123 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
 pub async fn show_status() -> Result<()> {
     let config = Config::load().unwrap_or_default();
 
-    println!("📊 Docs-MCP Status Report");
-    println!("{}", "=".repeat(50));
-    println!();
+    eprintln!("📊 Docs-MCP Status Report");
+    eprintln!("{}", "=".repeat(50));
+    eprintln!();
 
     // Database connectivity
-    println!("🗄️  Database Status:");
+    eprintln!("🗄️  Database Status:");
     let database = match Database::new(&config.database_path()).await {
         Ok(db) => {
-            println!("   ✅ SQLite: Connected");
+            eprintln!("   ✅ SQLite: Connected");
             Some(db)
         }
         Err(e) => {
-            println!("   ❌ SQLite: Failed to connect - {}", e);
+            eprintln!("   ❌ SQLite: Failed to connect - {}", e);
             None
         }
     };
 
     // Ollama connectivity
-    println!("🤖 Ollama Status:");
+    eprintln!("🤖 Ollama Status:");
     match crate::embeddings::ollama::OllamaClient::new(&config) {
         Ok(client) => match client.health_check() {
             Ok(()) => {
-                println!(
+                eprintln!(
                     "   ✅ Ollama: Connected ({}:{})",
                     config.ollama.host, config.ollama.port
                 );
-                println!("   📋 Model: {}", config.ollama.model);
-                println!("   🔢 Batch Size: {}", config.ollama.batch_size);
+                eprintln!("   📋 Model: {}", config.ollama.model);
+                eprintln!("   🔢 Batch Size: {}", config.ollama.batch_size);
             }
             Err(e) => {
-                println!("   ⚠️  Ollama: Connected but unhealthy - {}", e);
+                eprintln!("   ⚠️  Ollama: Connected but unhealthy - {}", e);
             }
         },
         Err(e) => {
-            println!("   ❌ Ollama: Failed to connect - {}", e);
+            eprintln!("   ❌ Ollama: Failed to connect - {}", e);
         }
     }
 
     // Vector database status
-    println!("🔍 Vector Database Status:");
+    eprintln!("🔍 Vector Database Status:");
     match crate::database::lancedb::VectorStore::new(&config).await {
         Ok(_store) => {
-            println!("   ✅ LanceDB: Connected");
+            eprintln!("   ✅ LanceDB: Connected");
         }
         Err(e) => {
-            println!("   ❌ LanceDB: Failed to connect - {}", e);
+            eprintln!("   ❌ LanceDB: Failed to connect - {}", e);
         }
     }
 
     if let Some(database) = database {
-        println!();
-        println!("🔄 Indexer Status:");
+        eprintln!();
+        eprintln!("🔄 Indexer Status:");
 
         // Check if indexer is running
         let mut indexer = BackgroundIndexer::new(config.clone()).await?;
         match indexer.get_indexing_status().await {
             Ok(status) => match status {
                 crate::indexer::IndexingStatus::Idle => {
-                    println!("   💤 Status: Idle");
+                    eprintln!("   💤 Status: Idle");
                 }
                 crate::indexer::IndexingStatus::ProcessingSite { site_id, site_name } => {
-                    println!(
+                    eprintln!(
                         "   🔄 Status: Processing site {} (ID: {})",
                         site_name, site_id
                     );
                 }
                 crate::indexer::IndexingStatus::GeneratingEmbeddings { remaining_chunks } => {
-                    println!(
+                    eprintln!(
                         "   🧮 Status: Generating embeddings ({} chunks remaining)",
                         remaining_chunks
                     );
                 }
                 crate::indexer::IndexingStatus::Failed { error } => {
-                    println!("   ❌ Status: Failed - {}", error);
+                    eprintln!("   ❌ Status: Failed - {}", error);
                 }
             },
             Err(e) => {
-                println!("   ⚠️  Status: Unknown - {}", e);
+                eprintln!("   ⚠️  Status: Unknown - {}", e);
             }
         }
 
         // Check database consistency
         // Show queue resource usage
-        println!();
-        println!("🚦 Queue Resource Usage:");
+        eprintln!();
+        eprintln!("🚦 Queue Resource Usage:");
         let queue_usage = indexer.get_queue_resource_usage();
-        println!(
+        eprintln!(
             "   📊 Processing Items Tracked: {}",
             queue_usage.processing_items_tracked
         );
-        println!(
+        eprintln!(
             "   💾 Estimated Memory Usage: {:.2} MB",
             queue_usage.estimated_memory_usage_mb
         );
-        println!("   📦 Active Batch Size: {}", queue_usage.active_batch_size);
-        println!("   ⏱️  Timeout: {}s", queue_usage.timeout_seconds);
+        eprintln!("   📦 Active Batch Size: {}", queue_usage.active_batch_size);
+        eprintln!("   ⏱️  Timeout: {}s", queue_usage.timeout_seconds);
 
-        println!();
-        println!("🔍 Database Consistency:");
+        eprintln!();
+        eprintln!("🔍 Database Consistency:");
         match indexer.validate_consistency().await {
             Ok(report) => {
                 if report.is_consistent {
-                    println!("   ✅ Databases are consistent");
-                    println!("   📊 SQLite chunks: {}", report.sqlite_chunks);
-                    println!("   📊 LanceDB embeddings: {}", report.lancedb_embeddings);
+                    eprintln!("   ✅ Databases are consistent");
+                    eprintln!("   📊 SQLite chunks: {}", report.sqlite_chunks);
+                    eprintln!("   📊 LanceDB embeddings: {}", report.lancedb_embeddings);
                 } else {
-                    println!("   ⚠️  Consistency issues found:");
-                    println!("   📊 SQLite chunks: {}", report.sqlite_chunks);
-                    println!("   📊 LanceDB embeddings: {}", report.lancedb_embeddings);
+                    eprintln!("   ⚠️  Consistency issues found:");
+                    eprintln!("   📊 SQLite chunks: {}", report.sqlite_chunks);
+                    eprintln!("   📊 LanceDB embeddings: {}", report.lancedb_embeddings);
                     if !report.missing_in_lancedb.is_empty() {
-                        println!(
+                        eprintln!(
                             "   🚫 Missing in LanceDB: {}",
                             report.missing_in_lancedb.len()
                         );
                     }
                     if !report.orphaned_in_lancedb.is_empty() {
-                        println!(
+                        eprintln!(
                             "   👻 Orphaned in LanceDB: {}",
                             report.orphaned_in_lancedb.len()
                         );
@@ -872,17 +795,17 @@ pub async fn show_status() -> Result<()> {
                 }
             }
             Err(e) => {
-                println!("   ❌ Failed to check consistency: {}", e);
+                eprintln!("   ❌ Failed to check consistency: {}", e);
             }
         }
 
         // Show site statistics
-        println!();
-        println!("📚 Site Overview:");
+        eprintln!();
+        eprintln!("📚 Site Overview:");
         match SiteQueries::list_all(database.pool()).await {
             Ok(sites) => {
                 if sites.is_empty() {
-                    println!("   📭 No sites indexed yet");
+                    eprintln!("   📭 No sites indexed yet");
                 } else {
                     let total_sites = sites.len();
                     let completed_sites = sites.iter().filter(|s| s.is_completed()).count();
@@ -893,11 +816,11 @@ pub async fn show_status() -> Result<()> {
                         .filter(|s| s.status == crate::database::sqlite::SiteStatus::Pending)
                         .count();
 
-                    println!("   📊 Total Sites: {}", total_sites);
-                    println!("   ✅ Completed: {}", completed_sites);
-                    println!("   🔄 Currently Indexing: {}", indexing_sites);
-                    println!("   ⏳ Pending: {}", pending_sites);
-                    println!("   ❌ Failed: {}", failed_sites);
+                    eprintln!("   📊 Total Sites: {}", total_sites);
+                    eprintln!("   ✅ Completed: {}", completed_sites);
+                    eprintln!("   🔄 Currently Indexing: {}", indexing_sites);
+                    eprintln!("   ⏳ Pending: {}", pending_sites);
+                    eprintln!("   ❌ Failed: {}", failed_sites);
 
                     // Show total chunks across all sites
                     let mut total_chunks = 0;
@@ -908,20 +831,20 @@ pub async fn show_status() -> Result<()> {
                             total_chunks += stats.total_chunks;
                         }
                     }
-                    println!("   📄 Total Chunks Indexed: {}", total_chunks);
+                    eprintln!("   📄 Total Chunks Indexed: {}", total_chunks);
                 }
             }
             Err(e) => {
-                println!("   ❌ Failed to load site statistics: {}", e);
+                eprintln!("   ❌ Failed to load site statistics: {}", e);
             }
         }
     }
 
-    println!();
-    println!("💡 Next Steps:");
-    println!("   • Use 'docs-mcp add <url>' to index a new documentation site");
-    println!("   • Use 'docs-mcp list' to see detailed site information");
-    println!("   • Use 'docs-mcp serve' to start the MCP server for AI assistants");
+    eprintln!();
+    eprintln!("💡 Next Steps:");
+    eprintln!("   • Use 'docs-mcp add <url>' to index a new documentation site");
+    eprintln!("   • Use 'docs-mcp list' to see detailed site information");
+    eprintln!("   • Use 'docs-mcp serve' to start the MCP server for AI assistants");
 
     Ok(())
 }
@@ -951,17 +874,17 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
             }
             Err(e) => {
                 warn!("⚠️  Ollama is reachable but unhealthy: {}", e);
-                println!("Warning: Ollama may not be ready. Background indexing may fail.");
+                eprintln!("Warning: Ollama may not be ready. Background indexing may fail.");
             }
         },
         Err(e) => {
             error!("❌ Failed to connect to Ollama: {}", e);
-            println!(
+            eprintln!(
                 "Error: Cannot connect to Ollama at {}:{}",
                 config.ollama.host, config.ollama.port
             );
-            println!("Please ensure Ollama is running and accessible.");
-            println!("Use 'docs-mcp config' to update connection settings.");
+            eprintln!("Please ensure Ollama is running and accessible.");
+            eprintln!("Use 'docs-mcp config' to update connection settings.");
             return Err(e);
         }
     }
@@ -973,12 +896,12 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
 
     // Check if another indexer is already running
     let indexer_handle = if indexer.is_indexer_running().await? {
-        println!("⚠️  Background indexer is already running");
-        println!("Use 'docs-mcp status' to check the current status");
-        println!("Starting MCP server only...");
+        eprintln!("⚠️  Background indexer is already running");
+        eprintln!("Use 'docs-mcp status' to check the current status");
+        eprintln!("Starting MCP server only...");
         None
     } else {
-        println!("🚀 Starting background indexer...");
+        eprintln!("🚀 Starting background indexer...");
 
         // Start background indexer in a separate task
         let indexer_handle = {
@@ -1000,7 +923,7 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
 
         // Verify indexer started successfully
         if indexer.is_indexer_running().await? {
-            println!("✅ Background indexer started successfully");
+            eprintln!("✅ Background indexer started successfully");
         } else {
             warn!("⚠️  Background indexer may have failed to start");
         }
@@ -1010,7 +933,7 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
     };
 
     // Initialize MCP server components
-    println!("🌐 Initializing MCP server...");
+    eprintln!("🌐 Initializing MCP server...");
 
     let config_dir = crate::config::get_config_dir()?;
     let sqlite_db = std::sync::Arc::new(
@@ -1063,13 +986,13 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
         .await
         .context("Failed to register list_sites tool")?;
 
-    println!("✅ MCP server initialized with tools: search_docs, list_sites");
-    println!("🌐 Starting MCP server on stdio transport...");
-    println!("📊 Use 'docs-mcp status' to monitor indexing progress");
-    println!("📚 Use 'docs-mcp list' to see indexed sites");
-    println!();
-    println!("Note: This server uses stdio transport. Connect via MCP client.");
-    println!("Press Ctrl+C to stop the server and background indexer");
+    eprintln!("✅ MCP server initialized with tools: search_docs, list_sites");
+    eprintln!("🌐 Starting MCP server with stdio transport...");
+    eprintln!("📊 Use 'docs-mcp status' to monitor indexing progress");
+    eprintln!("📚 Use 'docs-mcp list' to see indexed sites");
+    eprintln!();
+    eprintln!("Note: Server ready for MCP client connections via stdio.");
+    eprintln!("Press Ctrl+C to stop the server and background indexer");
 
     // Start MCP server and background indexer concurrently with retry logic
     let mut restart_count = 0;
@@ -1092,14 +1015,14 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
                             break;
                         }
 
-                        println!("⚠️  MCP server encountered an error, restarting in 5 seconds...");
+                        eprintln!("⚠️  MCP server encountered an error, restarting in 5 seconds...");
                         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                        println!("🔄 Restarting MCP server (attempt {}/{})...", restart_count + 1, MAX_RESTARTS + 1);
+                        eprintln!("🔄 Restarting MCP server (attempt {}/{})...", restart_count + 1, MAX_RESTARTS + 1);
                     }
                 }
             }
             _ = tokio::signal::ctrl_c() => {
-                println!("\n📴 Received interrupt signal, shutting down...");
+                eprintln!("\n📴 Received interrupt signal, shutting down...");
                 break;
             }
         }
@@ -1108,12 +1031,12 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
     // Cleanup background indexer if needed
     if indexer.is_indexer_running().await? {
         if let Some(handle) = indexer_handle {
-            println!("🛑 Stopping background indexer...");
+            eprintln!("🛑 Stopping background indexer...");
             handle.abort(); // Force stop the background task
             match handle.await {
                 Ok(()) => {}
                 Err(e) if e.is_cancelled() => {
-                    println!("✅ Background indexer stopped");
+                    eprintln!("✅ Background indexer stopped");
                 }
                 Err(e) => {
                     warn!("⚠️  Error stopping background indexer: {}", e);
@@ -1122,7 +1045,7 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
         }
     }
 
-    println!("✅ Shutdown complete");
+    eprintln!("✅ Shutdown complete");
 
     Ok(())
 }

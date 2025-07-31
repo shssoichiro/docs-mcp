@@ -115,8 +115,6 @@ async fn complete_background_indexing_workflow() {
         .await
         .expect("can optimize performance");
     assert!(!optimization_result.is_empty());
-
-    println!("✅ Complete background indexing workflow test passed");
 }
 
 /// Test auto-start and termination logic
@@ -168,8 +166,6 @@ async fn auto_start_termination_logic() {
         .cleanup_lock_file()
         .await
         .expect("can cleanup lock file");
-
-    println!("✅ Auto-start and termination logic test passed");
 }
 
 /// Test progress tracking and status reporting
@@ -240,8 +236,6 @@ async fn progress_tracking_and_status_reporting() {
         .await
         .expect("can get queue performance metrics");
     assert_eq!(performance_metrics.items_processed_per_minute, 0.0);
-
-    println!("✅ Progress tracking and status reporting test passed");
 }
 
 /// Test health monitoring and error detection
@@ -301,8 +295,6 @@ async fn health_monitoring_and_error_detection() {
         .await
         .expect("can validate consistency");
     assert!(consistency_report.is_consistent, "Should be consistent");
-
-    println!("✅ Health monitoring and error detection test passed");
 }
 
 /// Test resource management under various load conditions
@@ -464,8 +456,6 @@ async fn cleanup_procedures() {
         .await
         .expect("can optimize performance");
     assert!(!optimization_result.is_empty());
-
-    println!("✅ Cleanup procedures test passed");
 }
 
 /// Test that queue manager resource methods are properly integrated
@@ -511,6 +501,4 @@ async fn queue_manager_integration() {
         optimization_result.contains("cleaned up"),
         "Should mention cleanup operations"
     );
-
-    println!("✅ Queue manager integration test passed");
 }

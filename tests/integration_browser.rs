@@ -56,12 +56,12 @@ async fn browser_page_rendering() {
             assert_eq!(rendered_page.title, "Test Page");
             assert!(rendered_page.content.contains("Hello World"));
             assert!(rendered_page.content.contains("JavaScript works!"));
-            println!("Render time: {:?}", rendered_page.render_time);
+            eprintln!("Render time: {:?}", rendered_page.render_time);
         }
         Err(e) => {
             // Skip test if Chrome is not available
             if e.to_string().contains("Chrome") || e.to_string().contains("browser") {
-                println!("Skipping test - Chrome not available: {}", e);
+                eprintln!("Skipping test - Chrome not available: {}", e);
                 return;
             }
             panic!("Unexpected error: {}", e);
@@ -116,7 +116,7 @@ async fn browser_javascript_detection() {
         }
         Err(e) => {
             if e.to_string().contains("Chrome") || e.to_string().contains("browser") {
-                println!("Skipping test - Chrome not available: {}", e);
+                eprintln!("Skipping test - Chrome not available: {}", e);
                 return;
             }
             panic!("Unexpected error: {}", e);
@@ -193,6 +193,6 @@ async fn browser_concurrent_requests() {
 
     if success_count.load(Ordering::Relaxed) {
         let stats = client.get_pool_stats();
-        println!("Final pool stats: {:?}", stats);
+        eprintln!("Final pool stats: {:?}", stats);
     }
 }

@@ -9,46 +9,46 @@ use super::{Config, ConfigError, OllamaConfig};
 
 #[inline]
 pub fn run_interactive_config() -> Result<()> {
-    println!("{}", style("🔧 Docs MCP Configuration Setup").bold().cyan());
-    println!();
+    eprintln!("{}", style("🔧 Docs MCP Configuration Setup").bold().cyan());
+    eprintln!();
 
     let mut config = load_existing_config()?;
 
-    println!("{}", style("Ollama Configuration").bold().yellow());
-    println!("Configure your local Ollama instance for embedding generation.");
-    println!();
+    eprintln!("{}", style("Ollama Configuration").bold().yellow());
+    eprintln!("Configure your local Ollama instance for embedding generation.");
+    eprintln!();
 
     configure_ollama(&mut config.ollama)?;
 
-    println!();
-    println!("{}", style("Testing configuration...").yellow());
+    eprintln!();
+    eprintln!("{}", style("Testing configuration...").yellow());
 
     if test_ollama_connection(&config.ollama)? {
-        println!("{}", style("✓ Ollama connection successful!").green());
+        eprintln!("{}", style("✓ Ollama connection successful!").green());
     } else {
-        println!(
+        eprintln!(
             "{}",
             style("⚠ Warning: Could not connect to Ollama").yellow()
         );
-        println!("You can continue, but make sure Ollama is running before indexing.");
+        eprintln!("You can continue, but make sure Ollama is running before indexing.");
     }
 
-    println!();
+    eprintln!();
     if Confirm::new()
         .with_prompt("Save configuration?")
         .default(true)
         .interact()?
     {
         config.save().context("Failed to save configuration")?;
-        println!("{}", style("✓ Configuration saved successfully!").green());
+        eprintln!("{}", style("✓ Configuration saved successfully!").green());
 
         let config_path = Config::config_file_path().context("Failed to get config file path")?;
-        println!(
+        eprintln!(
             "Configuration saved to: {}",
             style(config_path.display()).cyan()
         );
     } else {
-        println!("Configuration not saved.");
+        eprintln!("Configuration not saved.");
     }
 
     Ok(())
@@ -58,24 +58,24 @@ pub fn run_interactive_config() -> Result<()> {
 pub fn show_config() -> Result<()> {
     let config = Config::load().context("Failed to load configuration")?;
 
-    println!("{}", style("📋 Current Configuration").bold().cyan());
-    println!();
+    eprintln!("{}", style("📋 Current Configuration").bold().cyan());
+    eprintln!();
 
-    println!("{}", style("Ollama Settings:").bold().yellow());
-    println!("  Host: {}", style(&config.ollama.host).cyan());
-    println!("  Port: {}", style(config.ollama.port).cyan());
-    println!("  Model: {}", style(&config.ollama.model).cyan());
-    println!("  Batch Size: {}", style(config.ollama.batch_size).cyan());
+    eprintln!("{}", style("Ollama Settings:").bold().yellow());
+    eprintln!("  Host: {}", style(&config.ollama.host).cyan());
+    eprintln!("  Port: {}", style(config.ollama.port).cyan());
+    eprintln!("  Model: {}", style(&config.ollama.model).cyan());
+    eprintln!("  Batch Size: {}", style(config.ollama.batch_size).cyan());
 
-    println!();
+    eprintln!();
     match config.ollama_url() {
-        Ok(url) => println!("  Ollama URL: {}", style(url).cyan()),
-        Err(e) => println!("  Ollama URL: {} ({})", style("Invalid").red(), e),
+        Ok(url) => eprintln!("  Ollama URL: {}", style(url).cyan()),
+        Err(e) => eprintln!("  Ollama URL: {} ({})", style("Invalid").red(), e),
     }
 
     let config_path = Config::config_file_path().context("Failed to get config file path")?;
-    println!();
-    println!("Config file: {}", style(config_path.display()).dim());
+    eprintln!();
+    eprintln!("Config file: {}", style(config_path.display()).dim());
 
     Ok(())
 }
@@ -83,14 +83,14 @@ pub fn show_config() -> Result<()> {
 fn load_existing_config() -> Result<Config> {
     Config::load().map_or_else(
         |_| {
-            println!(
+            eprintln!(
                 "{}",
                 style("No existing configuration found. Using defaults.").yellow()
             );
             Ok(Config::default())
         },
         |config| {
-            println!("{}", style("Found existing configuration.").green());
+            eprintln!("{}", style("Found existing configuration.").green());
             Ok(config)
         },
     )
