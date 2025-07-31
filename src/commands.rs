@@ -9,7 +9,6 @@ use tracing::{error, info, warn};
 use crate::config::{Config, get_config_dir};
 use crate::crawler::{CrawlerConfig, SiteCrawler};
 use crate::database::sqlite::{Database, NewSite, SiteQueries};
-use crate::indexer::BackgroundIndexer;
 use crate::mcp::tools::{CallToolParams, ToolHandler};
 
 /// Validation functions for CLI commands
@@ -728,81 +727,6 @@ pub async fn show_status() -> Result<()> {
     if let Some(database) = database {
         eprintln!();
         eprintln!("🔄 Indexer Status:");
-
-        // Check if indexer is running
-        let mut indexer = BackgroundIndexer::new(config.clone()).await?;
-        match indexer.get_indexing_status().await {
-            Ok(status) => match status {
-                crate::indexer::IndexingStatus::Idle => {
-                    eprintln!("   💤 Status: Idle");
-                }
-                crate::indexer::IndexingStatus::ProcessingSite { site_id, site_name } => {
-                    eprintln!(
-                        "   🔄 Status: Processing site {} (ID: {})",
-                        site_name, site_id
-                    );
-                }
-                crate::indexer::IndexingStatus::GeneratingEmbeddings { remaining_chunks } => {
-                    eprintln!(
-                        "   🧮 Status: Generating embeddings ({} chunks remaining)",
-                        remaining_chunks
-                    );
-                }
-                crate::indexer::IndexingStatus::Failed { error } => {
-                    eprintln!("   ❌ Status: Failed - {}", error);
-                }
-            },
-            Err(e) => {
-                eprintln!("   ⚠️  Status: Unknown - {}", e);
-            }
-        }
-
-        // Check database consistency
-        // Show queue resource usage
-        eprintln!();
-        eprintln!("🚦 Queue Resource Usage:");
-        let queue_usage = indexer.get_queue_resource_usage();
-        eprintln!(
-            "   📊 Processing Items Tracked: {}",
-            queue_usage.processing_items_tracked
-        );
-        eprintln!(
-            "   💾 Estimated Memory Usage: {:.2} MB",
-            queue_usage.estimated_memory_usage_mb
-        );
-        eprintln!("   📦 Active Batch Size: {}", queue_usage.active_batch_size);
-        eprintln!("   ⏱️  Timeout: {}s", queue_usage.timeout_seconds);
-
-        eprintln!();
-        eprintln!("🔍 Database Consistency:");
-        match indexer.validate_consistency().await {
-            Ok(report) => {
-                if report.is_consistent {
-                    eprintln!("   ✅ Databases are consistent");
-                    eprintln!("   📊 SQLite chunks: {}", report.sqlite_chunks);
-                    eprintln!("   📊 LanceDB embeddings: {}", report.lancedb_embeddings);
-                } else {
-                    eprintln!("   ⚠️  Consistency issues found:");
-                    eprintln!("   📊 SQLite chunks: {}", report.sqlite_chunks);
-                    eprintln!("   📊 LanceDB embeddings: {}", report.lancedb_embeddings);
-                    if !report.missing_in_lancedb.is_empty() {
-                        eprintln!(
-                            "   🚫 Missing in LanceDB: {}",
-                            report.missing_in_lancedb.len()
-                        );
-                    }
-                    if !report.orphaned_in_lancedb.is_empty() {
-                        eprintln!(
-                            "   👻 Orphaned in LanceDB: {}",
-                            report.orphaned_in_lancedb.len()
-                        );
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("   ❌ Failed to check consistency: {}", e);
-            }
-        }
 
         // Show site statistics
         eprintln!();

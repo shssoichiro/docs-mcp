@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
 use docs_mcp::Result;
 use docs_mcp::commands::{add_site, delete_site, list_sites, serve_mcp, show_status, update_site};
-use docs_mcp::config::{run_interactive_config, show_config};
+use docs_mcp::config::{Config, run_interactive_config, show_config};
+use docs_mcp::indexer::BackgroundIndexer;
 
 #[derive(Parser)]
 #[command(name = "docs-mcp")]
@@ -40,10 +41,12 @@ enum Commands {
         /// Site ID or name to update
         site: String,
     },
-    /// Start MCP server and background indexer
+    /// Start MCP server on stdio
     Serve,
     /// Show detailed status of the indexing pipeline
     Status,
+    /// Run the indexer, finishing any crawls that were interrupted
+    Index,
 }
 
 #[tokio::main]
@@ -79,6 +82,12 @@ async fn main() -> Result<()> {
         }
         Commands::Status => {
             show_status().await?;
+        }
+        Commands::Index => {
+            BackgroundIndexer::new(Config::load()?)
+                .await?
+                .start()
+                .await?;
         }
     }
 
