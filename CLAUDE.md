@@ -53,7 +53,7 @@ The project follows a modular architecture split across several main components:
 - `src/crawler/` - Web crawling with JavaScript rendering support
 - `src/embeddings/` - Ollama integration and content chunking
 - `src/indexer/` - Background process coordination and queue management
-- `src/mcp/` - MCP server implementation and tool definitions
+- `src/mcp/` - MCP server tool definitions
 
 ## Architecture Overview
 
@@ -271,7 +271,7 @@ Comprehensive test suite covering all aspects of the JavaScript rendering system
 
 - **Resource Management**: Efficient browser pooling prevents excessive resource consumption
 - **Concurrent Safety**: Thread-safe operations with proper synchronization primitives
-- **Memory Optimization**: Smart cleanup prevents memory leaks during long crawling sessions  
+- **Memory Optimization**: Smart cleanup prevents memory leaks during long crawling sessions
 - **Scalable Architecture**: Supports high-volume documentation site crawling with stable performance
 
 ### Ollama API Client Implementation (`src/embeddings/ollama.rs`)
@@ -388,27 +388,7 @@ The LanceDB integration provides a complete vector storage and search system wit
 - **Search Performance**: Sub-second search response times with proper indexing
 - **Scalability**: Designed for production workloads with thousands of documents
 
-### MCP Server Implementation (`src/mcp/`)
-
-The MCP server provides a complete implementation following JSON-RPC 2.0 and MCP protocol 2025-06-18:
-
-#### Core Server Features
-
-- **Protocol Compliance**: Full JSON-RPC 2.0 message handling with MCP protocol validation
-- **Connection Management**: Stdio transport with connection state tracking and health monitoring
-- **Tool Registration**: Dynamic tool registration and discovery system with comprehensive metadata
-- **Error Recovery**: Production-ready error handling with timeouts, retry logic, and circuit breakers
-- **Performance Monitoring**: Request timing, message counting, and comprehensive logging throughout
-
-#### Production-Ready Features
-
-- **Timeout Management**: 5-minute connection timeouts, 2-minute tool execution timeouts
-- **Error Resilience**: Consecutive error tracking (max 10), automatic restart capability (max 3 attempts)
-- **Health Monitoring**: Server health status, uptime tracking, and component health checks
-- **Resource Management**: Memory-efficient operations with proper cleanup and Arc/RwLock safety
-- **Comprehensive Logging**: Debug-level message processing, performance metrics, and error context
-
-#### MCP Tools Provided
+### MCP Tools Provided
 
 - **search_docs**: Semantic search with site filtering and relevance scoring
 
@@ -424,13 +404,6 @@ The MCP server provides a complete implementation following JSON-RPC 2.0 and MCP
   - **Metadata Included**: Site ID, name, version, URL, status, indexed date, and page count
   - **Error Handling**: Graceful handling of database connectivity and query issues
 
-#### Server Startup and Integration
-
-- **CLI Command**: Complete `docs-mcp serve` implementation with background indexer coordination
-- **Component Initialization**: Automatic setup of SQLite database, LanceDB vector store, and Ollama client
-- **Background Integration**: Seamless coordination with background indexing processes
-- **Graceful Shutdown**: Proper cleanup of background processes and resource management
-
 ### CLI Commands Structure
 
 - `docs-mcp config [--show]`: Interactive setup of Ollama connection or show current config
@@ -439,7 +412,7 @@ The MCP server provides a complete implementation following JSON-RPC 2.0 and MCP
 - `docs-mcp delete <site>`: Delete a documentation site with proper cleanup and user confirmation
 - `docs-mcp update <site>`: Update/re-index a documentation site with complete data cleanup and re-crawling
 - `docs-mcp status`: Show detailed pipeline status with health checks and consistency validation
-- `docs-mcp serve`: Start MCP server and background indexer (uses stdio transport)
+- `docs-mcp serve`: Start MCP server (uses stdio transport)
 
 #### CLI Command Features
 
@@ -574,121 +547,3 @@ The project uses `just precommit` which runs:
 3. `cargo test` - Full test suite
 
 **Always run `just precommit` before committing changes** to ensure code quality standards.
-
-## Implementation Status
-
-### Completed Components
-
-- ✅ CLI framework with clap command parsing and comprehensive tests
-- ✅ Configuration system with TOML support, interactive setup, and validation
-- ✅ SQLite database schema with migrations and constraints
-- ✅ Error handling architecture with centralized `DocsError` enum
-- ✅ Project structure and module organization
-- ✅ Database operations (SQLite models and queries)
-- ✅ Web crawler HTTP client with rate limiting and retry logic
-- ✅ HTML content extraction with heading hierarchy preservation
-- ✅ Semantic content chunking with code block preservation
-- ✅ robots.txt handling and URL filtering
-- ✅ **Site crawling integration and orchestration**
-  - ✅ Complete breadth-first crawling implementation
-  - ✅ URL queue management with SQLite integration
-  - ✅ Progress tracking and site status updates
-  - ✅ "docs-mcp add" command implementation
-  - ✅ Comprehensive error handling and recovery
-  - ✅ Integration tests with mock HTTP servers
-- ✅ **Ollama API Client and Embedding Generation** (`src/embeddings/ollama.rs`)
-  - ✅ Complete HTTP client using ureq 3.0 with proper timeout configuration
-  - ✅ Full embedding generation for single texts and batch processing
-  - ✅ Model availability checking and validation with health checks
-  - ✅ Comprehensive error handling for HTTP status codes and transport errors
-  - ✅ Retry logic with exponential backoff for transient failures
-  - ✅ Rate limiting compliance with configurable batch sizes
-  - ✅ Integration with ContentChunk system preserving metadata
-  - ✅ 8 comprehensive integration tests with real Ollama instance
-- ✅ **LanceDB Vector Storage System** (`src/database/lancedb/`)
-  - ✅ Complete vector database integration with Arrow/LanceDB 0.21
-  - ✅ Dynamic vector dimension support (auto-detects 5-dim for tests, 768-dim for production)
-  - ✅ Comprehensive vector storage with metadata preservation (EmbeddingRecord/ChunkMetadata)
-  - ✅ Vector similarity search with cosine similarity and relevance scoring
-  - ✅ Site-based filtering and flexible metadata queries
-  - ✅ Batch processing for efficient embedding storage
-  - ✅ Database maintenance: optimization, indexing, corruption recovery
-  - ✅ Vector index creation for improved search performance (requires 256+ records)
-  - ✅ 8 unit tests and 9 integration tests covering all functionality
-  - ✅ Production-ready with 768-dimensional nomic-embed-text compatibility
-- ✅ **Complete Background Indexing System** (`src/indexer/mod.rs`)
-  - ✅ File locking mechanism with `~/.docs-mcp/.indexer.lock` for process coordination
-  - ✅ Heartbeat system with SQLite timestamp updates every 30 seconds
-  - ✅ Complete indexing pipeline from crawled content to embeddings
-  - ✅ Cross-database consistency validation between SQLite and LanceDB
-  - ✅ Auto-start/termination logic with queue management
-  - ✅ Resource management and error recovery throughout pipeline
-  - ✅ 3 comprehensive unit tests covering indexer creation, lock files, and status
-- ✅ **Cross-Database Consistency Validation** (`src/indexer/consistency.rs`)
-  - ✅ ConsistencyValidator with comprehensive validation between SQLite and LanceDB
-  - ✅ Orphaned embedding cleanup and missing embedding regeneration
-  - ✅ Site-level consistency checking with detailed reporting
-  - ✅ 3 unit tests covering consistency reports and validation logic
-- ✅ **Complete CLI Commands Implementation** (`src/commands.rs`)
-  - ✅ Enhanced `docs-mcp add` with comprehensive progress tracking and user-friendly interface
-  - ✅ Comprehensive `docs-mcp list` with site statistics, progress, and heartbeat monitoring
-  - ✅ Complete `docs-mcp status` with pipeline health checking and actionable next steps
-  - ✅ Full `docs-mcp delete` with proper cleanup, user confirmation, and vector store cleanup
-  - ✅ Complete `docs-mcp update` with data cleanup, re-crawling, and progress tracking
-  - ✅ Input validation and parameter checking with meaningful error messages
-  - ✅ Consistent formatting utilities and user interface elements
-  - ✅ Comprehensive test coverage with 6 unit tests covering all validation functions
-  - ✅ Database connectivity checking, Ollama health monitoring, and consistency validation
-- ✅ **Complete MCP Server Implementation** (`src/mcp/server.rs` and related modules)
-  - ✅ Full JSON-RPC 2.0 protocol compliance with MCP 2025-06-18 specification
-  - ✅ Production-ready server with stdio transport and comprehensive error handling
-  - ✅ Tool registration system with search_docs and list_sites tools
-  - ✅ Health monitoring, performance metrics, and request/response logging
-  - ✅ Timeout management (5min connections, 2min tool execution)
-  - ✅ Error resilience with circuit breakers and automatic restart (max 3 attempts)
-  - ✅ 11 comprehensive integration tests covering all server functionality
-- ✅ **MCP Tool Implementations**
-  - ✅ search_docs: Full parameter support for query, site_id, sites_filter, and limit
-  - ✅ search_docs: Integration with LanceDB vector search and Ollama embedding generation
-  - ✅ search_docs: Result ranking with relevance scoring and site filtering
-  - ✅ search_docs: Response formatting matching SPEC.md requirements
-  - ✅ list_sites: JSON-formatted response with completed sites filtering
-  - ✅ Comprehensive error handling and timeout management for both tools
-- ✅ **Complete "docs-mcp serve" CLI Command**
-  - ✅ Full server initialization with component setup (SQLite, LanceDB, Ollama)
-  - ✅ Background indexer coordination and startup management
-  - ✅ Graceful shutdown with proper resource cleanup
-  - ✅ Production-ready error recovery and restart logic
-- ✅ **JavaScript Rendering System** (`src/crawler/browser/`)
-  - ✅ Complete headless Chrome integration using headless_chrome crate
-  - ✅ Browser pool management with resource limiting and automatic cleanup
-  - ✅ Critical BrowserTab Drop implementation fix for proper resource management
-  - ✅ Index-stable storage pattern with Vec<Option<ManagedBrowser>> for concurrent safety
-  - ✅ Dynamic content detection for React, Vue.js, Angular, and general SPA applications
-  - ✅ Intelligent fallback system: JavaScript rendering with HTTP client backup
-  - ✅ Complete configuration integration with validation and TOML serialization
-  - ✅ Comprehensive testing with 12 test functions covering all browser operations
-  - ✅ Performance optimization with configurable timeouts, resource limits, and cleanup strategies
-  - ✅ Production-ready error handling, thread safety, and memory management
-
-### Remaining Components
-
-- 🚧 Advanced monitoring and observability features
-
-### CLI Commands Implementation Status
-
-- ✅ `docs-mcp config [--show]`: Interactive setup of Ollama connection or show current config
-- ✅ `docs-mcp add <url> [--name <name>]`: Add new documentation site with comprehensive progress tracking and user feedback
-- ✅ `docs-mcp list`: List all indexed documentation sites with detailed statistics, progress monitoring, and heartbeat tracking
-- ✅ `docs-mcp delete <site>`: Delete a documentation site with proper cleanup, user confirmation, and cross-database consistency
-- ✅ `docs-mcp update <site>`: Update/re-index a documentation site with complete data cleanup and re-crawling workflow
-- ✅ `docs-mcp status`: Show detailed pipeline status with health checks, consistency validation, and actionable next steps
-- ✅ `docs-mcp serve`: Start MCP server and background indexer with full production-ready features and error recovery
-
-**All CLI commands are now fully implemented with:**
-
-- Comprehensive input validation and parameter checking
-- User-friendly progress displays and status reporting
-- Consistent error handling and recovery patterns
-- Production-ready database operations and resource management
-- Extensive test coverage and quality assurance
