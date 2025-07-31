@@ -75,20 +75,23 @@ Monitor indexing progress:
 docs-mcp status
 ```
 
-### 4. Start MCP Server
+### 4. Configure the MCP Server
 
-Launch the MCP server for AI assistant integration:
+The `docs-mcp serve` command provides an interface for MCP clients to connect
+and query documentation.
+
+#### Claude Code
 
 ```bash
-docs-mcp serve
+claude mcp add docs -- docs-mcp serve
 ```
 
-The server uses stdio transport and provides tools:
+####
+
+The server provides tools:
 
 - `search_docs`: Semantic search across indexed documentation
 - `list_sites`: List available documentation sites
-
-TODO: Show how to integrate with Claude Code and other popular coding agents.
 
 ## Usage
 

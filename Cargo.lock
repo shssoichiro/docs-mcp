@@ -2305,6 +2305,7 @@ dependencies = [
  "headless_chrome",
  "jsonschema",
  "lancedb",
+ "modelcontextprotocol-server",
  "scraper",
  "serde",
  "serde_json",
@@ -4159,6 +4160,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mcp-protocol"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1286a2e7f3c1bbd21e5f03f1aa4a26a36f1ffb4f6f8a02e3c116147f68ce6084"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "md-5"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4225,6 +4236,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9366861eb2a2c436c20b12c8dbec5f798cea6b47ad99216be0282942e2c81ea0"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "modelcontextprotocol-server"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96617e1cc80b84860d7113c4ed652527eeb2bb9fa514c0e511dfa9481c6a96b1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "mcp-protocol",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

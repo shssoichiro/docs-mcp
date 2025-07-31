@@ -6,14 +6,26 @@
 use crate::database::lancedb::VectorStore;
 use crate::database::sqlite::Database as SqliteDB;
 use crate::embeddings::ollama::OllamaClient;
-use crate::mcp::protocol::*;
-use crate::mcp::server::ToolHandler;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
+use modelcontextprotocol_server::mcp_protocol::tool::{Tool, ToolCallResult, ToolContent};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, error};
+
+/// Tool handler trait for implementing tool execution
+#[async_trait]
+pub trait ToolHandler: Send + Sync {
+    async fn handle(&self, params: CallToolParams) -> Result<ToolCallResult>;
+}
+
+/// Tool call request parameters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallToolParams {
+    pub name: String,
+    pub arguments: Option<HashMap<String, serde_json::Value>>,
+}
 
 /// Documentation search tool handler
 pub struct SearchDocsHandler {
@@ -71,6 +83,7 @@ impl SearchDocsHandler {
                 "required": ["query"],
                 "additionalProperties": false
             }),
+            annotations: None,
         }
     }
 }
@@ -78,7 +91,7 @@ impl SearchDocsHandler {
 #[async_trait]
 impl ToolHandler for SearchDocsHandler {
     #[inline]
-    async fn handle(&self, params: CallToolParams) -> Result<CallToolResult> {
+    async fn handle(&self, params: CallToolParams) -> Result<ToolCallResult> {
         let args = params.arguments.unwrap_or_default();
 
         // Extract and validate parameters
@@ -106,7 +119,7 @@ impl ToolHandler for SearchDocsHandler {
             Ok(result) => result.embedding,
             Err(e) => {
                 error!("Failed to generate embedding for query: {}", e);
-                return Ok(CallToolResult {
+                return Ok(ToolCallResult {
                     content: vec![ToolContent::Text {
                         text: format!("Failed to generate embedding for query: {}", e),
                     }],
@@ -133,7 +146,7 @@ impl ToolHandler for SearchDocsHandler {
                         .collect();
 
                     if matching_sites.is_empty() {
-                        return Ok(CallToolResult {
+                        return Ok(ToolCallResult {
                             content: vec![ToolContent::Text {
                                 text: format!(
                                     "No sites found matching pattern '{}'. Use list_sites tool to see available sites.",
@@ -150,7 +163,7 @@ impl ToolHandler for SearchDocsHandler {
                 }
                 Err(e) => {
                     error!("Error listing sites for filter '{}': {}", filter_pattern, e);
-                    return Ok(CallToolResult {
+                    return Ok(ToolCallResult {
                         content: vec![ToolContent::Text {
                             text: format!("Error listing sites: {}", e),
                         }],
@@ -173,7 +186,7 @@ impl ToolHandler for SearchDocsHandler {
                     let empty_response = json!({
                         "results": []
                     });
-                    return Ok(CallToolResult {
+                    return Ok(ToolCallResult {
                         content: vec![ToolContent::Text {
                             text: serde_json::to_string_pretty(&empty_response)?,
                         }],
@@ -213,7 +226,7 @@ impl ToolHandler for SearchDocsHandler {
                     "results": formatted_results
                 });
 
-                Ok(CallToolResult {
+                Ok(ToolCallResult {
                     content: vec![ToolContent::Text {
                         text: serde_json::to_string_pretty(&response)?,
                     }],
@@ -222,7 +235,7 @@ impl ToolHandler for SearchDocsHandler {
             }
             Err(e) => {
                 error!("Error performing search: {}", e);
-                Ok(CallToolResult {
+                Ok(ToolCallResult {
                     content: vec![ToolContent::Text {
                         text: format!("Search error: {}", e),
                     }],
@@ -251,6 +264,7 @@ impl ListSitesHandler {
                 "properties": {},
                 "additionalProperties": false
             }),
+            annotations: None,
         }
     }
 }
@@ -258,7 +272,7 @@ impl ListSitesHandler {
 #[async_trait]
 impl ToolHandler for ListSitesHandler {
     #[inline]
-    async fn handle(&self, _params: CallToolParams) -> Result<CallToolResult> {
+    async fn handle(&self, _params: CallToolParams) -> Result<ToolCallResult> {
         debug!("Listing documentation sites");
 
         match self.sqlite_db.list_sites().await {
@@ -290,7 +304,7 @@ impl ToolHandler for ListSitesHandler {
                     "sites": site_list
                 });
 
-                Ok(CallToolResult {
+                Ok(ToolCallResult {
                     content: vec![ToolContent::Text {
                         text: serde_json::to_string_pretty(&response)?,
                     }],
@@ -299,7 +313,7 @@ impl ToolHandler for ListSitesHandler {
             }
             Err(e) => {
                 error!("Error listing sites: {}", e);
-                Ok(CallToolResult {
+                Ok(ToolCallResult {
                     content: vec![ToolContent::Text {
                         text: format!("Error listing sites: {}", e),
                     }],
@@ -307,57 +321,5 @@ impl ToolHandler for ListSitesHandler {
                 })
             }
         }
-    }
-}
-
-/// Tool registry for managing tool registration
-pub struct ToolRegistry {
-    tools: HashMap<String, Tool>,
-}
-
-impl ToolRegistry {
-    /// Create a new tool registry
-    #[inline]
-    pub fn new() -> Self {
-        Self {
-            tools: HashMap::new(),
-        }
-    }
-
-    /// Register a tool
-    #[inline]
-    pub fn register(&mut self, tool: Tool) {
-        self.tools.insert(tool.name.clone(), tool);
-    }
-
-    /// Get all registered tools
-    #[inline]
-    pub fn list_tools(&self) -> Vec<Tool> {
-        self.tools.values().cloned().collect()
-    }
-
-    /// Get a specific tool by name
-    #[inline]
-    pub fn get_tool(&self, name: &str) -> Option<&Tool> {
-        self.tools.get(name)
-    }
-
-    /// Create the default tool registry with documentation tools
-    #[inline]
-    pub fn create_default() -> Self {
-        let mut registry = Self::new();
-
-        // Register default tools
-        registry.register(SearchDocsHandler::tool_definition());
-        registry.register(ListSitesHandler::tool_definition());
-
-        registry
-    }
-}
-
-impl Default for ToolRegistry {
-    #[inline]
-    fn default() -> Self {
-        Self::create_default()
     }
 }

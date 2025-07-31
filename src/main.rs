@@ -41,11 +41,7 @@ enum Commands {
         site: String,
     },
     /// Start MCP server and background indexer
-    Serve {
-        /// Port to run MCP server on
-        #[arg(long, default_value = "3000")]
-        port: u16,
-    },
+    Serve,
     /// Show detailed status of the indexing pipeline
     Status,
 }
@@ -78,8 +74,8 @@ async fn main() -> Result<()> {
         Commands::Update { site } => {
             update_site(site).await?;
         }
-        Commands::Serve { port } => {
-            serve_mcp(port).await?;
+        Commands::Serve => {
+            serve_mcp().await?;
         }
         Commands::Status => {
             show_status().await?;
@@ -137,26 +133,12 @@ mod tests {
     }
 
     #[test]
-    fn serve_command_default_port() {
+    fn serve_command() {
         let cli = Cli::try_parse_from(["docs-mcp", "serve"]);
         assert!(cli.is_ok());
 
         if let Ok(parsed) = cli {
-            if let Commands::Serve { port } = parsed.command {
-                assert_eq!(port, 3000);
-            }
-        }
-    }
-
-    #[test]
-    fn serve_command_custom_port() {
-        let cli = Cli::try_parse_from(["docs-mcp", "serve", "--port", "8080"]);
-        assert!(cli.is_ok());
-
-        if let Ok(parsed) = cli {
-            if let Commands::Serve { port } = parsed.command {
-                assert_eq!(port, 8080);
-            }
+            matches!(parsed.command, Commands::Serve);
         }
     }
 

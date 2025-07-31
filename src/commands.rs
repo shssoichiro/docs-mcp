@@ -1,11 +1,16 @@
 use anyhow::{Context, Result};
-use std::sync::Arc;
+use modelcontextprotocol_server::ServerBuilder;
+use modelcontextprotocol_server::transport::StdioTransport;
+use serde_json::from_value;
+use tokio::runtime::Handle;
+use tokio::task::block_in_place;
 use tracing::{error, info, warn};
 
 use crate::config::{Config, get_config_dir};
 use crate::crawler::{CrawlerConfig, SiteCrawler};
 use crate::database::sqlite::{Database, NewSite, SiteQueries};
 use crate::indexer::BackgroundIndexer;
+use crate::mcp::tools::{CallToolParams, ToolHandler};
 
 /// Validation functions for CLI commands
 pub mod validation {
@@ -849,16 +854,10 @@ pub async fn show_status() -> Result<()> {
     Ok(())
 }
 
-/// Start MCP server and background indexer with auto-start/termination logic
+/// Start MCP server and background indexer with stdio transport
 #[inline]
-pub async fn serve_mcp(port: u16) -> Result<()> {
-    // Validate port number
-    validation::validate_port(port).context("Invalid port number")?;
-
-    info!(
-        "Starting MCP server on port {} with background indexer",
-        port
-    );
+pub async fn serve_mcp() -> Result<()> {
+    info!("Starting MCP server with stdio transport and background indexer");
 
     // Load configuration
     let config = Config::load().context("Failed to load configuration")?;
@@ -953,38 +952,51 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
             .context("Failed to create Ollama client")?,
     );
 
-    // Create MCP server
-    let server = std::sync::Arc::new(
-        crate::mcp::McpServer::new(
-            "docs-mcp".to_string(),
-            env!("CARGO_PKG_VERSION").to_string(),
-        )
-        .context("Failed to create MCP server")?,
-    );
-
     // Register tools
-    let search_handler = crate::mcp::tools::SearchDocsHandler::new(
-        std::sync::Arc::clone(&sqlite_db),
-        std::sync::Arc::clone(&vector_store),
-        std::sync::Arc::clone(&ollama_client),
-    );
-    let list_handler = crate::mcp::tools::ListSitesHandler::new(std::sync::Arc::clone(&sqlite_db));
+    let search_definition = crate::mcp::tools::SearchDocsHandler::tool_definition();
+    let list_definition = crate::mcp::tools::ListSitesHandler::tool_definition();
 
-    server
-        .register_tool(
-            crate::mcp::tools::SearchDocsHandler::tool_definition(),
-            search_handler,
+    // Create MCP server
+    let server = ServerBuilder::new("docs-mcp", env!("CARGO_PKG_VERSION"))
+        .with_transport(StdioTransport::new())
+        .with_tool(
+            &search_definition.name,
+            search_definition.description.as_deref(),
+            search_definition.input_schema,
+            {
+                let sqlite_db = std::sync::Arc::clone(&sqlite_db);
+                let vector_store = std::sync::Arc::clone(&vector_store);
+                let ollama_client = std::sync::Arc::clone(&ollama_client);
+                move |args| {
+                    let handler = crate::mcp::tools::SearchDocsHandler::new(
+                        std::sync::Arc::clone(&sqlite_db),
+                        std::sync::Arc::clone(&vector_store),
+                        std::sync::Arc::clone(&ollama_client),
+                    );
+                    let params: CallToolParams = from_value(args)?;
+                    block_in_place(move || {
+                        Handle::current().block_on(async move { handler.handle(params).await })
+                    })
+                }
+            },
         )
-        .await
-        .context("Failed to register search_docs tool")?;
-
-    server
-        .register_tool(
-            crate::mcp::tools::ListSitesHandler::tool_definition(),
-            list_handler,
+        .with_tool(
+            &list_definition.name,
+            list_definition.description.as_deref(),
+            list_definition.input_schema,
+            {
+                let sqlite_db = std::sync::Arc::clone(&sqlite_db);
+                move |args| {
+                    let handler =
+                        crate::mcp::tools::ListSitesHandler::new(std::sync::Arc::clone(&sqlite_db));
+                    let params: CallToolParams = from_value(args)?;
+                    block_in_place(move || {
+                        Handle::current().block_on(async move { handler.handle(params).await })
+                    })
+                }
+            },
         )
-        .await
-        .context("Failed to register list_sites tool")?;
+        .build()?;
 
     eprintln!("✅ MCP server initialized with tools: search_docs, list_sites");
     eprintln!("🌐 Starting MCP server with stdio transport...");
@@ -994,39 +1006,9 @@ pub async fn serve_mcp(port: u16) -> Result<()> {
     eprintln!("Note: Server ready for MCP client connections via stdio.");
     eprintln!("Press Ctrl+C to stop the server and background indexer");
 
-    // Start MCP server and background indexer concurrently with retry logic
-    let mut restart_count = 0;
-    const MAX_RESTARTS: u32 = 3;
+    server.run().await?;
 
-    loop {
-        tokio::select! {
-            result = Arc::clone(&server).serve_stdio() => {
-                match result {
-                    Ok(()) => {
-                        info!("MCP server stopped normally");
-                        break;
-                    }
-                    Err(e) => {
-                        error!("MCP server error (attempt {}/{}): {}", restart_count + 1, MAX_RESTARTS + 1, e);
-                        restart_count += 1;
-
-                        if restart_count > MAX_RESTARTS {
-                            error!("Maximum restart attempts reached, shutting down");
-                            break;
-                        }
-
-                        eprintln!("⚠️  MCP server encountered an error, restarting in 5 seconds...");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                        eprintln!("🔄 Restarting MCP server (attempt {}/{})...", restart_count + 1, MAX_RESTARTS + 1);
-                    }
-                }
-            }
-            _ = tokio::signal::ctrl_c() => {
-                eprintln!("\n📴 Received interrupt signal, shutting down...");
-                break;
-            }
-        }
-    }
+    info!("Server shutting down");
 
     // Cleanup background indexer if needed
     if indexer.is_indexer_running().await? {
