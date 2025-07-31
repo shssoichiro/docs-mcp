@@ -13,7 +13,7 @@ use lancedb::{
     Connection,
     query::{ExecutableQuery, QueryBase},
 };
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
@@ -42,7 +42,8 @@ impl VectorStore {
     /// * `Result<Self, DocsError>` - New VectorStore instance or error
     #[inline]
     pub async fn new(config: &Config) -> Result<Self, DocsError> {
-        let db_path = Self::get_vector_db_path(config)?;
+        let raw_path = config.vector_database_path();
+        let db_path = Path::new(&raw_path);
         debug!("Initializing LanceDB at path: {:?}", db_path);
 
         // Ensure the directory exists
@@ -67,7 +68,7 @@ impl VectorStore {
                     || error_msg.contains("malformed")
                 {
                     warn!("Database corruption detected, attempting recovery");
-                    Self::attempt_corruption_recovery(&db_path)?;
+                    Self::attempt_corruption_recovery(db_path)?;
 
                     // Retry connection after recovery
                     lancedb::connect(&uri).execute().await.map_err(|e| {
@@ -98,14 +99,6 @@ impl VectorStore {
 
         info!("Vector store initialized successfully");
         Ok(store)
-    }
-
-    /// Get the path where the vector database should be stored
-    fn get_vector_db_path(config: &Config) -> Result<PathBuf, DocsError> {
-        let base_dir = config
-            .get_base_dir()
-            .map_err(|e| DocsError::Config(format!("Failed to get base directory: {}", e)))?;
-        Ok(base_dir.join("vectors"))
     }
 
     /// Initialize the embeddings table with the correct schema
@@ -638,7 +631,7 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<(), DocsError>` - Success or error
-    fn attempt_corruption_recovery(db_path: &PathBuf) -> Result<(), DocsError> {
+    fn attempt_corruption_recovery(db_path: &Path) -> Result<(), DocsError> {
         warn!("Attempting database corruption recovery at {:?}", db_path);
 
         // Create backup of corrupted database if it exists

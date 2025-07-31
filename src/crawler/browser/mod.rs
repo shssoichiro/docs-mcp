@@ -1,5 +1,4 @@
 use anyhow::{Context, Result, anyhow};
-use headless_chrome::protocol::cdp::Page::CaptureScreenshotFormatOption;
 use headless_chrome::{Browser, LaunchOptions, Tab};
 use std::ffi::OsStr;
 use std::sync::{Arc, Mutex};
@@ -517,23 +516,6 @@ impl BrowserTab {
             }
         }
     }
-
-    /// Take a screenshot of the rendered page (useful for debugging)
-    #[inline]
-    pub fn take_screenshot(&self) -> Result<Vec<u8>> {
-        debug!("Taking screenshot of rendered page");
-
-        let screenshot = self
-            .tab
-            .capture_screenshot(CaptureScreenshotFormatOption::Png, None, None, true)
-            .with_context(|| "Failed to capture screenshot")?;
-
-        debug!(
-            "Successfully captured screenshot ({} bytes)",
-            screenshot.len()
-        );
-        Ok(screenshot)
-    }
 }
 
 impl Drop for BrowserTab {
@@ -617,18 +599,6 @@ impl BrowserClient {
     pub async fn get_rendered_html(&self, url: &Url) -> Result<String> {
         let rendered_page = self.render_page(url).await?;
         Ok(rendered_page.content)
-    }
-
-    /// Clean up idle browsers in the pool
-    #[inline]
-    pub fn cleanup_idle_browsers(&self, max_idle_time: Duration) -> usize {
-        self.pool.cleanup_idle_browsers(max_idle_time)
-    }
-
-    /// Get browser pool statistics
-    #[inline]
-    pub fn get_pool_stats(&self) -> BrowserPoolStats {
-        self.pool.get_stats()
     }
 }
 

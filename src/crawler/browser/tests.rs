@@ -49,23 +49,6 @@ async fn browser_pool_creation_and_stats() {
 }
 
 #[tokio::test]
-async fn browser_client_creation() {
-    let config = BrowserConfig {
-        headless: true,
-        max_browsers: 1,
-        max_tabs_per_browser: 1,
-        navigation_timeout_seconds: 5,
-        ..Default::default()
-    };
-
-    let client = BrowserClient::new(config);
-    let stats = client.get_pool_stats();
-
-    assert_eq!(stats.total_browsers, 0);
-    assert_eq!(stats.total_tabs, 0);
-}
-
-#[tokio::test]
 async fn browser_pool_cleanup() {
     let config = BrowserConfig {
         headless: true,

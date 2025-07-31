@@ -6,7 +6,7 @@ use tokio::runtime::Handle;
 use tokio::task::block_in_place;
 use tracing::{error, info, warn};
 
-use crate::config::{Config, get_config_dir};
+use crate::config::{Config, get_default_config_dir};
 use crate::crawler::{CrawlerConfig, SiteCrawler};
 use crate::database::sqlite::{Database, NewSite, SiteQueries};
 use crate::mcp::tools::{CallToolParams, ToolHandler};
@@ -78,23 +78,6 @@ pub mod validation {
 
         Ok(())
     }
-
-    /// Validate port number
-    #[inline]
-    pub fn validate_port(port: u16) -> Result<()> {
-        if port == 0 {
-            return Err(anyhow!("Port number cannot be 0"));
-        }
-
-        if port < 1024 {
-            eprintln!(
-                "⚠️  Warning: Using port {} (below 1024) may require administrator privileges",
-                port
-            );
-        }
-
-        Ok(())
-    }
 }
 
 /// Add a new documentation site for indexing with comprehensive progress display
@@ -141,7 +124,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     eprint!("🗄️ Connecting to database... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
-    let config_dir = get_config_dir()?;
+    let config_dir = get_default_config_dir()?;
     let db_path = config_dir.join("docs.db");
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
@@ -272,7 +255,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
 /// List all indexed documentation sites with comprehensive information
 #[inline]
 pub async fn list_sites() -> Result<()> {
-    let config_dir = get_config_dir()?;
+    let config_dir = get_default_config_dir()?;
     let db_path = config_dir.join("docs.db");
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
@@ -377,7 +360,7 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
     // Validate input
     validation::validate_site_identifier(&site_identifier).context("Invalid site identifier")?;
 
-    let config_dir = get_config_dir()?;
+    let config_dir = get_default_config_dir()?;
     let db_path = config_dir.join("docs.db");
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
@@ -509,7 +492,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
     // Validate input
     validation::validate_site_identifier(&site_identifier).context("Invalid site identifier")?;
 
-    let config_dir = get_config_dir()?;
+    let config_dir = get_default_config_dir()?;
     let db_path = config_dir.join("docs.db");
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
@@ -815,7 +798,7 @@ pub async fn serve_mcp() -> Result<()> {
     // Initialize MCP server components
     eprintln!("🌐 Initializing MCP server...");
 
-    let config_dir = crate::config::get_config_dir()?;
+    let config_dir = crate::config::get_default_config_dir()?;
     let sqlite_db = std::sync::Arc::new(
         crate::database::sqlite::Database::initialize_from_config_dir(&config_dir)
             .await
@@ -952,23 +935,6 @@ mod tests {
         // Test exactly 100 characters (should be OK)
         let max_name = "a".repeat(100);
         assert!(validate_site_name(&max_name).is_ok());
-    }
-
-    #[test]
-    fn validate_port_works() {
-        // Valid cases
-        assert!(validate_port(8080).is_ok());
-        assert!(validate_port(3000).is_ok());
-        assert!(validate_port(65535).is_ok()); // Max port
-        assert!(validate_port(1024).is_ok()); // First non-privileged port
-
-        // Invalid cases
-        assert!(validate_port(0).is_err());
-
-        // These should succeed but show warnings
-        assert!(validate_port(80).is_ok()); // HTTP
-        assert!(validate_port(443).is_ok()); // HTTPS
-        assert!(validate_port(22).is_ok()); // SSH
     }
 
     // Integration tests would go in tests/ directory for cross-module testing

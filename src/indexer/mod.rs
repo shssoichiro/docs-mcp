@@ -2,7 +2,6 @@
 // This module handles background process coordination and queue management
 
 pub mod consistency;
-pub mod queue;
 
 #[cfg(test)]
 mod tests;
@@ -31,18 +30,13 @@ use crate::embeddings::chunking::{ChunkingConfig, ContentChunk, chunk_content};
 use crate::embeddings::ollama::OllamaClient;
 
 pub use consistency::{ConsistencyReport, ConsistencyValidator, SiteConsistencyIssue};
-pub use queue::{
-    QueueConfig, QueueManager, QueueMetrics, QueuePriority, QueueResourceUsage, QueueStats,
-};
 
 /// Background indexer that processes crawled content into searchable embeddings
 pub struct BackgroundIndexer {
-    config: Config,
     database: Database,
     vector_store: VectorStore,
     ollama_client: OllamaClient,
     chunking_config: ChunkingConfig,
-    queue_manager: QueueManager,
     pub lock_file_path: PathBuf,
     heartbeat_interval: Duration,
     batch_size: usize,
@@ -109,16 +103,13 @@ impl BackgroundIndexer {
         let ollama_client =
             OllamaClient::new(&config).context("Failed to initialize Ollama client")?;
 
-        let queue_manager = QueueManager::new(database.clone(), QueueConfig::default());
         let lock_file_path = config.config_dir_path().join(".indexer.lock");
 
         Ok(Self {
-            config,
             database,
             vector_store,
             ollama_client,
             chunking_config: ChunkingConfig::default(),
-            queue_manager,
             lock_file_path,
             heartbeat_interval: Duration::from_secs(30),
             batch_size: 64,
@@ -675,142 +666,6 @@ impl BackgroundIndexer {
                 .context("Failed to remove indexer lock file")?;
         }
         Ok(())
-    }
-
-    /// Get performance metrics for the indexing system
-    #[inline]
-    pub async fn get_performance_metrics(&self) -> Result<IndexingPerformanceMetrics> {
-        use crate::database::sqlite::queries::SiteQueries;
-
-        let sites = SiteQueries::list_all(self.database.pool()).await?;
-        let mut metrics = IndexingPerformanceMetrics::default();
-
-        // Calculate processing rates and statistics
-        let mut total_pages_processed = 0;
-        let mut total_chunks_created = 0;
-        let mut total_processing_time = std::time::Duration::ZERO;
-
-        for site in &sites {
-            total_pages_processed += site.indexed_pages;
-
-            if let Ok(Some(stats)) =
-                SiteQueries::get_statistics(self.database.pool(), site.id).await
-            {
-                total_chunks_created += stats.total_chunks;
-            }
-
-            // Calculate processing time if site is completed
-            if let (Some(created), Some(indexed)) = (Some(site.created_date), site.indexed_date) {
-                let processing_duration = indexed.signed_duration_since(created);
-                if processing_duration.num_seconds() > 0 {
-                    total_processing_time +=
-                        std::time::Duration::from_secs(processing_duration.num_seconds() as u64);
-                }
-            }
-        }
-
-        metrics.total_sites_processed = sites.len();
-        metrics.total_pages_processed = total_pages_processed as usize;
-        metrics.total_chunks_created = total_chunks_created as usize;
-        metrics.average_processing_time_per_site = if sites.is_empty() {
-            std::time::Duration::ZERO
-        } else {
-            total_processing_time / sites.len() as u32
-        };
-
-        // Calculate throughput metrics
-        if total_processing_time.as_secs() > 0 {
-            metrics.pages_per_minute =
-                (total_pages_processed as f64 * 60.0) / total_processing_time.as_secs() as f64;
-            metrics.chunks_per_minute =
-                (total_chunks_created as f64 * 60.0) / total_processing_time.as_secs() as f64;
-        }
-
-        // Resource usage estimates
-        metrics.database_size_mb = self.get_database_size().await?;
-
-        Ok(metrics)
-    }
-
-    /// Optimize indexer performance by cleaning up and reorganizing data
-    #[inline]
-    pub async fn optimize_performance(&mut self) -> Result<String> {
-        info!("Starting indexer performance optimization");
-        let mut optimizations = Vec::new();
-
-        // Database optimization
-        if let Err(e) = self.database.optimize().await {
-            warn!("Database optimization failed: {}", e);
-        } else {
-            optimizations.push("Database optimized".to_string());
-        }
-
-        // Vector store optimization
-        if let Err(e) = self.vector_store.optimize().await {
-            warn!("Vector store optimization failed: {}", e);
-        } else {
-            optimizations.push("Vector store optimized".to_string());
-        }
-
-        // Queue resource cleanup and optimization
-        self.queue_manager.cleanup_resources();
-        optimizations.push("Queue resources cleaned up".to_string());
-
-        // Clean up old queue items
-        let cleaned_items = self.queue_manager.cleanup_old_items(None).await?;
-        if cleaned_items > 0 {
-            optimizations.push(format!("Cleaned up {} old queue items", cleaned_items));
-        }
-
-        // Reset stuck queue items
-        let reset_items = self.queue_manager.reset_stuck_items().await?;
-        if reset_items > 0 {
-            optimizations.push(format!("Reset {} stuck queue items", reset_items));
-        }
-
-        // Optimize queue performance
-        let queue_optimization = self.queue_manager.optimize_queue().await?;
-        optimizations.push(format!("Queue optimization: {}", queue_optimization));
-
-        // Get queue resource usage for logging
-        let queue_usage = self.queue_manager.get_resource_usage();
-        info!(
-            "Queue resource usage after cleanup: {} processing items, {:.2} MB memory",
-            queue_usage.processing_items_tracked, queue_usage.estimated_memory_usage_mb
-        );
-
-        // Consistency validation and cleanup
-        let consistency_report = self.validate_consistency().await?;
-        if !consistency_report.is_consistent {
-            self.cleanup_inconsistencies(&consistency_report).await?;
-            optimizations.push("Database consistency issues resolved".to_string());
-        }
-
-        let summary = if optimizations.is_empty() {
-            "System is already optimized".to_string()
-        } else {
-            format!("Optimizations applied: {}", optimizations.join(", "))
-        };
-
-        info!("Performance optimization completed: {}", summary);
-        Ok(summary)
-    }
-
-    /// Get total database size in MB
-    async fn get_database_size(&self) -> Result<f64> {
-        let db_path = self.config.database_path();
-        let metadata = tokio::fs::metadata(&db_path)
-            .await
-            .context("Failed to get database file metadata")?;
-
-        let size_mb = metadata.len() as f64 / 1024.0 / 1024.0;
-        Ok(size_mb)
-    }
-
-    /// Get queue resource usage statistics
-    #[inline]
-    pub fn get_queue_resource_usage(&self) -> QueueResourceUsage {
-        self.queue_manager.get_resource_usage()
     }
 }
 

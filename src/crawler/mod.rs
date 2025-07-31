@@ -747,24 +747,4 @@ impl SiteCrawler {
             Err(anyhow!("Browser client not available"))
         }
     }
-
-    /// Cleanup idle browsers to free resources
-    #[inline]
-    pub fn cleanup_idle_browsers(&self) {
-        if let Some(ref browser_client) = self.browser_client {
-            let idle_time = Duration::from_secs(300); // 5 minutes
-            let cleaned = browser_client.cleanup_idle_browsers(idle_time);
-            if cleaned > 0 {
-                info!("Cleaned up {} idle browser instances", cleaned);
-            }
-        }
-    }
-
-    /// Get browser pool statistics for monitoring
-    #[inline]
-    pub fn get_browser_stats(&self) -> Option<browser::BrowserPoolStats> {
-        self.browser_client
-            .as_ref()
-            .map(|client| client.get_pool_stats())
-    }
 }

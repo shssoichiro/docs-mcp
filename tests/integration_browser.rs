@@ -190,9 +190,4 @@ async fn browser_concurrent_requests() {
     for task in tasks {
         task.await.expect("Task panicked");
     }
-
-    if success_count.load(Ordering::Relaxed) {
-        let stats = client.get_pool_stats();
-        eprintln!("Final pool stats: {:?}", stats);
-    }
 }

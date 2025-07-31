@@ -152,26 +152,4 @@ impl Site {
     pub fn is_failed(&self) -> bool {
         self.status == SiteStatus::Failed
     }
-
-    #[inline]
-    pub fn progress_percentage(&self) -> f64 {
-        if self.total_pages == 0 {
-            0.0
-        } else {
-            (self.indexed_pages as f64 / self.total_pages as f64) * 100.0
-        }
-    }
-}
-
-impl CrawlQueueItem {
-    #[inline]
-    pub fn can_retry(&self) -> bool {
-        self.status == CrawlStatus::Failed && self.retry_count < 3
-    }
-
-    #[inline]
-    pub fn should_process(&self) -> bool {
-        self.status == CrawlStatus::Pending
-            || (self.status == CrawlStatus::Failed && self.can_retry())
-    }
 }
