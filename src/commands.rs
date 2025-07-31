@@ -888,49 +888,6 @@ pub async fn serve_mcp() -> Result<()> {
         }
     }
 
-    // Initialize background indexer
-    let indexer = BackgroundIndexer::new(config.clone())
-        .await
-        .context("Failed to create background indexer")?;
-
-    // Check if another indexer is already running
-    let indexer_handle = if indexer.is_indexer_running().await? {
-        eprintln!("⚠️  Background indexer is already running");
-        eprintln!("Use 'docs-mcp status' to check the current status");
-        eprintln!("Starting MCP server only...");
-        None
-    } else {
-        eprintln!("🚀 Starting background indexer...");
-
-        // Start background indexer in a separate task
-        let indexer_handle = {
-            let mut indexer_clone = BackgroundIndexer::new(config.clone()).await?;
-            tokio::spawn(async move {
-                match indexer_clone.start().await {
-                    Ok(()) => {
-                        info!("Background indexer completed successfully");
-                    }
-                    Err(e) => {
-                        error!("Background indexer failed: {}", e);
-                    }
-                }
-            })
-        };
-
-        // Give indexer a moment to start
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-        // Verify indexer started successfully
-        if indexer.is_indexer_running().await? {
-            eprintln!("✅ Background indexer started successfully");
-        } else {
-            warn!("⚠️  Background indexer may have failed to start");
-        }
-
-        // Store handle for later cleanup
-        Some(indexer_handle)
-    };
-
     // Initialize MCP server components
     eprintln!("🌐 Initializing MCP server...");
 
@@ -1004,29 +961,10 @@ pub async fn serve_mcp() -> Result<()> {
     eprintln!("📚 Use 'docs-mcp list' to see indexed sites");
     eprintln!();
     eprintln!("Note: Server ready for MCP client connections via stdio.");
-    eprintln!("Press Ctrl+C to stop the server and background indexer");
 
     server.run().await?;
 
     info!("Server shutting down");
-
-    // Cleanup background indexer if needed
-    if indexer.is_indexer_running().await? {
-        if let Some(handle) = indexer_handle {
-            eprintln!("🛑 Stopping background indexer...");
-            handle.abort(); // Force stop the background task
-            match handle.await {
-                Ok(()) => {}
-                Err(e) if e.is_cancelled() => {
-                    eprintln!("✅ Background indexer stopped");
-                }
-                Err(e) => {
-                    warn!("⚠️  Error stopping background indexer: {}", e);
-                }
-            }
-        }
-    }
-
     eprintln!("✅ Shutdown complete");
 
     Ok(())
