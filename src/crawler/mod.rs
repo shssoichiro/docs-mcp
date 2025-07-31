@@ -6,6 +6,7 @@ pub mod robots;
 mod tests;
 
 use anyhow::{Context, Result, anyhow};
+use indicatif::{ProgressBar, ProgressStyle};
 use scraper::{Html, Selector};
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
@@ -326,6 +327,13 @@ pub struct CrawlStats {
     pub duration: Duration,
 }
 
+impl CrawlStats {
+    #[inline]
+    pub fn total_crawled(&self) -> usize {
+        self.successful_crawls + self.failed_crawls + self.robots_blocked
+    }
+}
+
 impl SiteCrawler {
     /// Create a new site crawler
     #[inline]
@@ -390,7 +398,12 @@ impl SiteCrawler {
             duration: Duration::default(),
         };
 
-        eprintln!();
+        let bar = ProgressBar::new_spinner().with_style(
+            ProgressStyle::with_template("{spinner} [{pos}/{len}] Crawling {msg}")
+                .expect("style template is valid"),
+        );
+        bar.set_position(0);
+        bar.set_length(1);
 
         // Main crawling loop - breadth-first approach
         loop {
@@ -418,6 +431,7 @@ impl SiteCrawler {
                     CrawlQueueQueries::update(&self.db_pool, queue_item.id, update).await?;
 
                     stats.failed_crawls += 1;
+                    bar.set_position(stats.total_crawled() as u64);
                     continue;
                 }
             };
@@ -435,15 +449,18 @@ impl SiteCrawler {
                 CrawlQueueQueries::update(&self.db_pool, queue_item.id, update).await?;
 
                 stats.robots_blocked += 1;
+                bar.set_position(stats.total_crawled() as u64);
                 continue;
             }
 
             // Crawl the page
+            bar.set_message(url.to_string());
             match self.crawl_page(&url, &base_url).await {
                 Ok(crawl_result) => {
                     if crawl_result.success {
                         info!("Successfully crawled: {}", url);
                         stats.successful_crawls += 1;
+                        bar.set_position(stats.total_crawled() as u64);
 
                         // Mark queue item as completed
                         self.update_queue_item_status(queue_item.id, CrawlStatus::Completed, None)
@@ -461,6 +478,7 @@ impl SiteCrawler {
                                     Ok(_) => {
                                         debug!("Added URL to queue: {}", link_str);
                                         stats.total_urls += 1;
+                                        bar.set_length(stats.total_urls as u64);
                                     }
                                     Err(e) => {
                                         // URL might already exist - that's okay
@@ -479,6 +497,7 @@ impl SiteCrawler {
                         let error_msg = crawl_result.error_message.clone().unwrap_or_default();
                         error!("Failed to crawl: {} - {}", url, error_msg);
                         stats.failed_crawls += 1;
+                        bar.set_position(stats.total_crawled() as u64);
 
                         // Mark queue item as failed
                         self.update_queue_item_status(
@@ -492,6 +511,7 @@ impl SiteCrawler {
                 Err(e) => {
                     error!("Error crawling {}: {}", url, e);
                     stats.failed_crawls += 1;
+                    bar.set_position(stats.total_crawled() as u64);
 
                     // Mark queue item as failed
                     self.update_queue_item_status(
@@ -504,7 +524,7 @@ impl SiteCrawler {
             }
 
             // Update progress periodically
-            if (stats.successful_crawls + stats.failed_crawls) % 10 == 0 {
+            if stats.total_crawled() % 10 == 0 {
                 self.update_site_progress(site_id).await?;
             }
         }
@@ -533,6 +553,7 @@ impl SiteCrawler {
             )
             .await?;
         }
+        bar.finish_and_clear();
 
         info!(
             "Crawl completed for site {}: {} successful, {} failed, {} blocked by robots.txt, took {:?}",
