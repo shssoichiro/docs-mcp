@@ -390,6 +390,8 @@ impl SiteCrawler {
             duration: Duration::default(),
         };
 
+        eprintln!();
+
         // Main crawling loop - breadth-first approach
         loop {
             // Get next URL from queue

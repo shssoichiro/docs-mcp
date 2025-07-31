@@ -107,7 +107,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     info!("Adding documentation site: {}", url);
 
     // Validate inputs
-    print!("🔍 Validating inputs... ");
+    eprint!("🔍 Validating inputs... ");
     use std::io::{self, Write};
     io::stdout().flush().context("Failed to flush stdout")?;
 
@@ -139,7 +139,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     eprintln!();
 
     // Initialize database
-    print!("🗄️  Connecting to database... ");
+    eprint!("🗄️ Connecting to database... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     let config_dir = get_config_dir()?;
@@ -150,7 +150,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     eprintln!("✅");
 
     // Check if site already exists
-    print!("🔍 Checking for existing site... ");
+    eprint!("🔍 Checking for existing site... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     if let Some(existing_site) = SiteQueries::get_by_base_url(database.pool(), &url).await? {
@@ -188,7 +188,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     eprintln!("✅");
 
     // Create new site entry
-    print!("📝 Creating site entry... ");
+    eprint!("📝 Creating site entry... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     let new_site = NewSite {
@@ -210,7 +210,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     eprintln!();
 
     // Start crawling
-    eprintln!("🕷️  Starting web crawling...");
+    eprintln!("🕷️ Starting web crawling...");
     eprintln!("   This may take several minutes depending on site size.");
     eprintln!("   Respecting robots.txt and rate limiting (250ms between requests)");
     eprintln!();
@@ -425,7 +425,7 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
     eprintln!();
 
     // Get user confirmation
-    print!("Type 'DELETE' to confirm deletion: ");
+    eprint!("Type 'DELETE' to confirm deletion: ");
     use std::io::{self, Write};
     io::stdout().flush().context("Failed to flush stdout")?;
 
@@ -450,7 +450,7 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
         .context("Failed to initialize vector store")?;
 
     // Delete vector embeddings first
-    print!("   Deleting vector embeddings... ");
+    eprint!("   Deleting vector embeddings... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     match vector_store
@@ -465,7 +465,7 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
     }
 
     // Delete from SQLite database (this will cascade to delete crawl_queue and indexed_chunks)
-    print!("   Deleting site metadata and chunks... ");
+    eprint!("   Deleting site metadata and chunks... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     let deleted = SiteQueries::delete(database.pool(), site.id)
@@ -488,7 +488,7 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
     }
 
     // Optimize database after deletion
-    print!("   Optimizing database... ");
+    eprint!("   Optimizing database... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     if let Err(e) = database.optimize().await {
@@ -552,7 +552,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
     eprintln!();
 
     // Get user confirmation for destructive operation
-    print!("Continue with re-indexing? [y/N]: ");
+    eprint!("Continue with re-indexing? [y/N]: ");
     use std::io::{self, Write};
     io::stdout().flush().context("Failed to flush stdout")?;
 
@@ -577,7 +577,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
         .context("Failed to initialize vector store")?;
 
     // Clear existing embeddings
-    print!("   Clearing old embeddings... ");
+    eprint!("   Clearing old embeddings... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     match vector_store
@@ -592,7 +592,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
     }
 
     // Clear crawl queue and chunks (they will be recreated)
-    print!("   Clearing crawl queue and chunks... ");
+    eprint!("   Clearing crawl queue and chunks... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     // Clear crawl queue entries for this site
@@ -610,7 +610,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
     eprintln!("✅");
 
     // Reset site status and progress
-    print!("   Resetting site status... ");
+    eprint!("   Resetting site status... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
     let update = crate::database::sqlite::SiteUpdate {
