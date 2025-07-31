@@ -450,7 +450,8 @@ impl SiteCrawler {
                             .await?;
 
                         // Add newly discovered URLs to the queue
-                        for link in &crawl_result.links {
+                        for mut link in crawl_result.links.iter().cloned() {
+                            link.set_fragment(None);
                             let link_str = link.as_str();
                             if !discovered_urls.contains(link_str) {
                                 discovered_urls.insert(link_str.to_string());
