@@ -28,6 +28,9 @@ enum Commands {
         /// Optional name for the site
         #[arg(long)]
         name: Option<String>,
+        /// Optional version number for the site, e.g. "16" or "16.0.2" for React 16
+        #[arg(long)]
+        version: Option<String>,
         /// Override the base URL of the documentation site. Useful for cases where the index URL has additional paths.
         #[arg(long)]
         base_url: Option<String>,
@@ -72,9 +75,10 @@ async fn main() -> Result<()> {
             url,
             name,
             base_url,
+            version,
         } => {
             let base_url = base_url.as_deref().unwrap_or(url.as_str());
-            add_site(&url, name, base_url).await?;
+            add_site(&url, name, version, base_url).await?;
         }
         Commands::List => {
             list_sites().await?;

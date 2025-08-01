@@ -78,11 +78,40 @@ pub mod validation {
 
         Ok(())
     }
+
+    /// Validate site version format
+    ///
+    /// No need to be strict, as this could be semver or it could be a git hash
+    /// or possibly some arbitrary identifier like Jessie.
+    #[inline]
+    pub fn validate_site_version(version: &str) -> Result<()> {
+        let version = version.trim();
+
+        if version.is_empty() {
+            return Err(anyhow!("Site version cannot be empty"));
+        }
+
+        if version.len() > 40 {
+            return Err(anyhow!("Site version must be 40 characters or less"));
+        }
+
+        // Check for invalid characters that might cause issues
+        if version.contains('\n') || version.contains('\r') || version.contains('\t') {
+            return Err(anyhow!("Site version cannot contain newlines or tabs"));
+        }
+
+        Ok(())
+    }
 }
 
 /// Add a new documentation site for indexing with comprehensive progress display
 #[inline]
-pub async fn add_site(url: &str, name: Option<String>, base_url: &str) -> Result<()> {
+pub async fn add_site(
+    url: &str,
+    name: Option<String>,
+    version: Option<String>,
+    base_url: &str,
+) -> Result<()> {
     eprintln!("🚀 Adding new documentation site");
     eprintln!("   URL: {}", url);
 
@@ -97,6 +126,9 @@ pub async fn add_site(url: &str, name: Option<String>, base_url: &str) -> Result
 
     if let Some(ref site_name) = name {
         validation::validate_site_name(site_name).context("Invalid site name provided")?;
+    }
+    if let Some(ref site_version) = version {
+        validation::validate_site_version(site_version).context("Invalid site version provided")?;
     }
 
     eprintln!("✅");
@@ -115,8 +147,11 @@ pub async fn add_site(url: &str, name: Option<String>, base_url: &str) -> Result
             format!("{} {}", host, path_segments.join(" "))
         }
     });
+    // Default site version to "latest" if not provided
+    let site_version = version.as_deref().unwrap_or("latest");
 
     eprintln!("   Name: {}", site_name);
+    eprintln!("   Version: {}", site_version);
     eprintln!();
 
     // Initialize database
@@ -176,7 +211,7 @@ pub async fn add_site(url: &str, name: Option<String>, base_url: &str) -> Result
         index_url: url.to_string(),
         base_url: base_url.to_string(),
         name: site_name.clone(),
-        version: "1.0".to_string(),
+        version: site_version.to_string(),
     };
 
     let site = SiteQueries::create(database.pool(), new_site)
