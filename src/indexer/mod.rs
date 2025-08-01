@@ -94,8 +94,8 @@ impl Indexer {
             .await
             .context("Failed to initialize LanceDB vector store")?;
 
-        let ollama_client =
-            OllamaClient::new(&config).context("Failed to initialize Ollama client")?;
+        let ollama_client = OllamaClient::new(config.ollama.clone())
+            .context("Failed to initialize Ollama client")?;
 
         Ok(Self {
             database,

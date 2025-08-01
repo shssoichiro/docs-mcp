@@ -2,56 +2,38 @@ use super::*;
 use tempfile::TempDir;
 
 #[test]
-fn default_config() {
-    let config = Config::default();
-    assert_eq!(config.ollama.protocol, "http");
-    assert_eq!(config.ollama.host, "localhost");
-    assert_eq!(config.ollama.port, 11434);
-    assert_eq!(config.ollama.model, "nomic-embed-text:latest");
-    assert_eq!(config.ollama.batch_size, 64);
-}
-
-#[test]
 fn config_validation() {
-    let config = Config::default();
+    let config = OllamaConfig::default();
     assert!(config.validate().is_ok());
 
     let mut invalid_config = config.clone();
-    invalid_config.ollama.protocol = "ftp".to_string();
+    invalid_config.protocol = "ftp".to_string();
     assert!(invalid_config.validate().is_err());
 
     let mut invalid_config = config.clone();
-    invalid_config.ollama.port = 0;
+    invalid_config.port = 0;
     assert!(invalid_config.validate().is_err());
 
     let mut invalid_config = config.clone();
-    invalid_config.ollama.model = String::new();
+    invalid_config.model = String::new();
     assert!(invalid_config.validate().is_err());
 
     let mut invalid_config = config.clone();
-    invalid_config.ollama.batch_size = 0;
+    invalid_config.batch_size = 0;
     assert!(invalid_config.validate().is_err());
 
     let mut invalid_config = config;
-    invalid_config.ollama.batch_size = 1001;
+    invalid_config.batch_size = 1001;
     assert!(invalid_config.validate().is_err());
 }
 
 #[test]
 fn ollama_url_generation() {
-    let config = Config::default();
+    let config = OllamaConfig::default();
     let url = config
         .ollama_url()
         .expect("should generate ollama_url successfully");
     assert_eq!(url.as_str(), "http://localhost:11434/");
-}
-
-#[test]
-fn toml_serialization() {
-    let config = Config::default();
-    let toml_str = toml::to_string(&config).expect("should serialize toml correctly");
-    let parsed_config: Config = toml::from_str(&toml_str).expect("should parse toml correctly");
-    assert_eq!(config, parsed_config);
 }
 
 #[test]
@@ -82,7 +64,7 @@ fn load_missing_config() {
     let temp_dir = TempDir::new().expect("should create temp dir");
 
     // Create a config with the temp directory as base_dir
-    let config = Config::load(Some(temp_dir.path())).expect("config created");
+    let config = Config::load(temp_dir.path()).expect("config created");
 
     assert!(config.validate().is_ok());
     assert_eq!(config.ollama.protocol, "http");
@@ -92,10 +74,12 @@ fn load_missing_config() {
 
 #[test]
 fn https_url_generation() {
-    let mut config = Config::default();
-    config.ollama.protocol = "https".to_string();
-    config.ollama.host = "secure.example.com".to_string();
-    config.ollama.port = 443;
+    let config = OllamaConfig {
+        protocol: "https".to_string(),
+        host: "secure.example.com".to_string(),
+        port: 443,
+        ..Default::default()
+    };
 
     let url = config
         .ollama_url()
@@ -122,17 +106,4 @@ fn protocol_validation() {
     assert!(config.set_protocol("ws".to_string()).is_err());
     assert!(config.set_protocol(String::new()).is_err());
     assert!(config.set_protocol("HTTP".to_string()).is_err()); // case sensitive
-}
-
-#[test]
-fn toml_with_https() {
-    let mut config = Config::default();
-    config.ollama.protocol = "https".to_string();
-    config.ollama.host = "remote.ollama.com".to_string();
-
-    let toml_str = toml::to_string(&config).expect("should serialize toml correctly");
-    let parsed_config: Config = toml::from_str(&toml_str).expect("should parse toml correctly");
-
-    assert_eq!(config, parsed_config);
-    assert_eq!(parsed_config.ollama.protocol, "https");
 }

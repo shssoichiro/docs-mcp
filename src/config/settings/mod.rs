@@ -3,7 +3,6 @@ mod tests;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -13,7 +12,7 @@ use url::Url;
 pub struct Config {
     pub ollama: OllamaConfig,
     #[serde(skip)]
-    pub base_dir: Option<PathBuf>,
+    pub base_dir: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -23,6 +22,19 @@ pub struct OllamaConfig {
     pub port: u16,
     pub model: String,
     pub batch_size: u32,
+}
+
+impl Default for OllamaConfig {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            protocol: "http".to_string(),
+            host: "localhost".to_string(),
+            port: 11434,
+            model: "nomic-embed-text:latest".to_string(),
+            batch_size: 64,
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -53,53 +65,16 @@ pub enum ConfigError {
     TomlSerialize(#[from] toml::ser::Error),
 }
 
-impl Default for Config {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            ollama: OllamaConfig {
-                protocol: "http".to_string(),
-                host: "localhost".to_string(),
-                port: 11434,
-                model: "nomic-embed-text:latest".to_string(),
-                batch_size: 64,
-            },
-            base_dir: None,
-        }
-    }
-}
-
 impl Config {
-    fn default_config_dir() -> Result<PathBuf, ConfigError> {
-        dirs::home_dir()
-            .map(|home| home.join(".docs-mcp"))
-            .or({
-                #[cfg(windows)]
-                {
-                    dirs::data_dir().map(|data| data.join("docs-mcp"))
-                }
-                #[cfg(not(windows))]
-                {
-                    None
-                }
-            })
-            .ok_or(ConfigError::DirectoryError)
-    }
-
-    // Ideally we should only ever be calling this from `main.rs` and tests.
-    // Any test usages should pass a temp dir for the `config_dir`.
     #[inline]
-    pub fn load(config_dir: Option<&Path>) -> Result<Self> {
-        let config_dir = match config_dir {
-            Some(path) => Cow::Borrowed(path),
-            None => Cow::Owned(
-                Self::default_config_dir().context("Failed to determine config file path")?,
-            ),
-        };
-        let config_path = config_dir.join("config.toml");
+    pub fn load<P: AsRef<Path>>(config_dir: P) -> Result<Self> {
+        let config_path = config_dir.as_ref().join("config.toml");
 
         if !config_path.exists() {
-            return Ok(Self::default());
+            return Ok(Self {
+                ollama: OllamaConfig::default(),
+                base_dir: config_dir.as_ref().to_path_buf(),
+            });
         }
 
         let content = fs::read_to_string(&config_path)
@@ -120,11 +95,9 @@ impl Config {
         self.validate()
             .context("Configuration validation failed before saving")?;
 
-        let config_dir = self
-            .get_base_dir()
-            .context("Failed to determine config directory")?;
+        let config_dir = self.get_base_dir();
 
-        fs::create_dir_all(&config_dir).with_context(|| {
+        fs::create_dir_all(config_dir).with_context(|| {
             format!(
                 "Failed to create config directory: {}",
                 config_dir.display()
@@ -140,12 +113,10 @@ impl Config {
         Ok(())
     }
 
-    /// Get the base directory for the application, using override if set
+    /// Get the base directory for the application
     #[inline]
-    pub fn get_base_dir(&self) -> Result<PathBuf, ConfigError> {
-        self.base_dir
-            .as_ref()
-            .map_or_else(Self::default_config_dir, |base_dir| Ok(base_dir.clone()))
+    pub fn get_base_dir(&self) -> &Path {
+        &self.base_dir
     }
 
     #[inline]
@@ -155,35 +126,26 @@ impl Config {
     }
 
     #[inline]
-    pub fn ollama_url(&self) -> Result<Url, ConfigError> {
-        let url_str = format!(
-            "{}://{}:{}",
-            self.ollama.protocol, self.ollama.host, self.ollama.port
-        );
-        Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))
-    }
-
-    #[inline]
     pub fn config_file_path(&self) -> Result<PathBuf> {
-        Ok(self.get_base_dir()?.join("config.toml"))
+        Ok(self.get_base_dir().join("config.toml"))
     }
 
     /// Get the path for the SQLite database
     #[inline]
     pub fn database_path(&self) -> Result<PathBuf> {
-        Ok(self.get_base_dir()?.join("metadata.db"))
+        Ok(self.get_base_dir().join("metadata.db"))
     }
 
     /// Get the path for the vector database directory
     #[inline]
     pub fn vector_database_path(&self) -> Result<PathBuf> {
-        Ok(self.get_base_dir()?.join("vectors"))
+        Ok(self.get_base_dir().join("vectors"))
     }
 
     /// Get the cache directory as an instance method
     #[inline]
     pub fn cache_dir_path(&self) -> Result<PathBuf> {
-        Ok(self.get_base_dir()?.join("cache"))
+        Ok(self.get_base_dir().join("cache"))
     }
 }
 
@@ -210,6 +172,12 @@ impl OllamaConfig {
         Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))?;
 
         Ok(())
+    }
+
+    #[inline]
+    pub fn ollama_url(&self) -> Result<Url, ConfigError> {
+        let url_str = format!("{}://{}:{}", self.protocol, self.host, self.port);
+        Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))
     }
 
     #[inline]

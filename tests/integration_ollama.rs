@@ -6,7 +6,7 @@
 // Integration tests that require a local Ollama instance
 // Run with: cargo test --test integration_ollama
 
-use docs_mcp::config::{Config, OllamaConfig};
+use docs_mcp::config::OllamaConfig;
 use docs_mcp::embeddings::chunking::{ContentChunk, estimate_token_count};
 use docs_mcp::embeddings::ollama::OllamaClient;
 use std::env;
@@ -25,18 +25,15 @@ fn create_integration_test_client() -> OllamaClient {
         .unwrap_or(DEFAULT_OLLAMA_PORT);
     let model = env::var("OLLAMA_MODEL").unwrap_or_else(|_| TEST_MODEL.to_string());
 
-    let config = Config {
-        ollama: OllamaConfig {
-            protocol: "http".to_string(),
-            host,
-            port,
-            model,
-            batch_size: 5, // Smaller batch size for testing
-        },
-        base_dir: None,
+    let config = OllamaConfig {
+        protocol: "http".to_string(),
+        host,
+        port,
+        model,
+        batch_size: 5, // Smaller batch size for testing
     };
 
-    OllamaClient::new(&config)
+    OllamaClient::new(config)
         .expect("Failed to create Ollama client")
         .with_timeout(Duration::from_secs(60)) // Longer timeout for embedding generation
         .with_retry_attempts(3)
@@ -406,18 +403,15 @@ fn real_ollama_error_recovery() {
     init_test_tracing();
 
     // Create client with invalid model to test error handling
-    let config = Config {
-        ollama: OllamaConfig {
-            protocol: "http".to_string(),
-            host: "localhost".to_string(),
-            port: 11434,
-            model: "non-existent-model-12345".to_string(),
-            batch_size: 5,
-        },
-        base_dir: None,
+    let config = OllamaConfig {
+        protocol: "http".to_string(),
+        host: "localhost".to_string(),
+        port: 11434,
+        model: "non-existent-model-12345".to_string(),
+        batch_size: 5,
     };
 
-    let client = OllamaClient::new(&config)
+    let client = OllamaClient::new(config)
         .expect("Failed to create client")
         .with_timeout(Duration::from_secs(10))
         .with_retry_attempts(1); // Don't retry too much for this test

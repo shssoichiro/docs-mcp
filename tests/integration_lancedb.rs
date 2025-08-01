@@ -4,7 +4,10 @@
 )]
 
 /// Integration tests for LanceDB vector store with realistic data
-use docs_mcp::database::lancedb::{ChunkMetadata, EmbeddingRecord, VectorStore};
+use docs_mcp::{
+    config::OllamaConfig,
+    database::lancedb::{ChunkMetadata, EmbeddingRecord, VectorStore},
+};
 use tempfile::TempDir;
 use uuid::Uuid;
 
@@ -13,8 +16,8 @@ use docs_mcp::config::Config;
 fn create_test_config() -> (Config, TempDir) {
     let temp_dir = TempDir::new().expect("should create temp dir");
     let config = Config {
-        base_dir: Some(temp_dir.path().to_path_buf()),
-        ..Default::default()
+        base_dir: temp_dir.path().to_path_buf(),
+        ollama: OllamaConfig::default(),
     };
     (config, temp_dir)
 }

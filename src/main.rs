@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
-use docs_mcp::Result;
 use docs_mcp::commands::{add_site, delete_site, list_sites, serve_mcp, show_status, update_site};
-use docs_mcp::config::{Config, run_interactive_config, show_config};
+use docs_mcp::config::{Config, ConfigError, run_interactive_config, show_config};
 use docs_mcp::indexer::Indexer;
+use docs_mcp::{DocsError, Result as DocsResult};
 
 #[derive(Parser)]
 #[command(name = "docs-mcp")]
@@ -54,13 +56,15 @@ enum Commands {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> DocsResult<()> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
     let cli = Cli::parse();
-    let config = Config::load(None)?;
+
+    let config_dir = default_config_dir().map_err(|e| DocsError::Config(e.to_string()))?;
+    let config = Config::load(&config_dir)?;
 
     match cli.command {
         Commands::Config { show } => {
@@ -105,6 +109,22 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn default_config_dir() -> Result<PathBuf, ConfigError> {
+    dirs::home_dir()
+        .map(|home| home.join(".docs-mcp"))
+        .or({
+            #[cfg(windows)]
+            {
+                dirs::data_dir().map(|data| data.join("docs-mcp"))
+            }
+            #[cfg(not(windows))]
+            {
+                None
+            }
+        })
+        .ok_or(ConfigError::DirectoryError)
 }
 
 #[cfg(test)]

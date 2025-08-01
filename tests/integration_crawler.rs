@@ -289,7 +289,7 @@ async fn basic_site_crawling() -> Result<()> {
     let mut crawler = SiteCrawler::new(
         database.pool().clone(),
         config,
-        Config::load(Some(config_path.path()))?,
+        Config::load(config_path.path())?,
     );
     let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
@@ -376,7 +376,7 @@ async fn robots_txt_compliance() -> Result<()> {
     let mut crawler = SiteCrawler::new(
         database.pool().clone(),
         config,
-        Config::load(Some(config_path.path()))?,
+        Config::load(config_path.path())?,
     );
     let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
@@ -438,7 +438,7 @@ async fn error_handling() -> Result<()> {
     let mut crawler = SiteCrawler::new(
         database.pool().clone(),
         config,
-        Config::load(Some(config_path.path()))?,
+        Config::load(config_path.path())?,
     );
     let crawl_error = crawler
         .crawl_site(site.id, &base_url, &base_url)
@@ -525,7 +525,7 @@ async fn content_extraction() -> Result<()> {
     let mut crawler = SiteCrawler::new(
         database.pool().clone(),
         config,
-        Config::load(Some(config_path.path()))?,
+        Config::load(config_path.path())?,
     );
     let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 

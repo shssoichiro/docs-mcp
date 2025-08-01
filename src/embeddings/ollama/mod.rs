@@ -7,7 +7,7 @@ use std::time::Duration;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
-use crate::config::Config;
+use crate::config::OllamaConfig;
 use crate::embeddings::chunking::ContentChunk;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
@@ -79,7 +79,7 @@ pub struct EmbeddingResult {
 
 impl OllamaClient {
     #[inline]
-    pub fn new(config: &Config) -> Result<Self> {
+    pub fn new(config: OllamaConfig) -> Result<Self> {
         let base_url = config
             .ollama_url()
             .context("Failed to generate Ollama URL from config")?;
@@ -91,8 +91,8 @@ impl OllamaClient {
 
         Ok(Self {
             base_url,
-            model: config.ollama.model.clone(),
-            batch_size: config.ollama.batch_size,
+            batch_size: config.batch_size,
+            model: config.model,
             agent,
             retry_attempts: DEFAULT_RETRY_ATTEMPTS,
         })

@@ -1,11 +1,13 @@
+use crate::config::OllamaConfig;
+
 use super::*;
 use tempfile::TempDir;
 
 fn create_test_config() -> (Config, TempDir) {
     let temp_dir = TempDir::new().expect("should create temp dir");
     let config = Config {
-        base_dir: Some(temp_dir.path().to_path_buf()),
-        ..Default::default()
+        base_dir: temp_dir.path().to_path_buf(),
+        ollama: OllamaConfig::default(),
     };
     (config, temp_dir)
 }

@@ -1,20 +1,16 @@
 use super::*;
-use crate::config::{Config, OllamaConfig};
+use crate::config::OllamaConfig;
 
 #[test]
 fn client_configuration() {
-    let config = Config {
-        ollama: OllamaConfig {
-            protocol: "http".to_string(),
-            host: "test-host".to_string(),
-            port: 1234,
-            model: "test-model".to_string(),
-            batch_size: 128,
-        },
-        base_dir: None,
+    let config = OllamaConfig {
+        protocol: "http".to_string(),
+        host: "test-host".to_string(),
+        port: 1234,
+        model: "test-model".to_string(),
+        batch_size: 128,
     };
-
-    let client = OllamaClient::new(&config).expect("Failed to create client");
+    let client = OllamaClient::new(config).expect("Failed to create client");
 
     assert_eq!(client.model, "test-model");
     assert_eq!(client.batch_size, 128);
@@ -26,8 +22,8 @@ fn client_configuration() {
 
 #[test]
 fn client_builder_methods() {
-    let config = Config::default();
-    let client = OllamaClient::new(&config)
+    let config = OllamaConfig::default();
+    let client = OllamaClient::new(config)
         .expect("Failed to create client")
         .with_timeout(Duration::from_secs(60))
         .with_retry_attempts(5);

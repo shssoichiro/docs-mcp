@@ -42,7 +42,7 @@ fn create_test_config() -> (Config, TempDir) {
     let model = env::var("OLLAMA_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.to_string());
 
     let config = Config {
-        base_dir: Some(temp_dir.path().to_path_buf()),
+        base_dir: temp_dir.path().to_path_buf(),
         ollama: OllamaConfig {
             protocol: "http".to_string(),
             host,

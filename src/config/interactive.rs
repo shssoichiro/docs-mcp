@@ -63,7 +63,7 @@ pub fn show_config(config: &Config) -> Result<()> {
     eprintln!("  Batch Size: {}", style(config.ollama.batch_size).cyan());
 
     eprintln!();
-    match config.ollama_url() {
+    match config.ollama.ollama_url() {
         Ok(url) => eprintln!("  Ollama URL: {}", style(url).cyan()),
         Err(e) => eprintln!("  Ollama URL: {} ({})", style("Invalid").red(), e),
     }

@@ -713,7 +713,7 @@ pub async fn show_status(config: &Config) -> Result<()> {
 
     // Ollama connectivity
     eprintln!("🤖 Ollama Status:");
-    match crate::embeddings::ollama::OllamaClient::new(config) {
+    match crate::embeddings::ollama::OllamaClient::new(config.ollama.clone()) {
         Ok(client) => match client.health_check() {
             Ok(()) => {
                 eprintln!(
@@ -803,7 +803,7 @@ pub async fn serve_mcp(config: &Config) -> Result<()> {
     info!("Starting MCP server with stdio transport");
 
     // Verify Ollama connectivity before starting
-    match crate::embeddings::ollama::OllamaClient::new(config) {
+    match crate::embeddings::ollama::OllamaClient::new(config.ollama.clone()) {
         Ok(client) => match client.health_check() {
             Ok(()) => {
                 info!(
@@ -845,7 +845,7 @@ pub async fn serve_mcp(config: &Config) -> Result<()> {
     );
 
     let ollama_client = std::sync::Arc::new(
-        crate::embeddings::ollama::OllamaClient::new(config)
+        crate::embeddings::ollama::OllamaClient::new(config.ollama.clone())
             .context("Failed to create Ollama client")?,
     );
 

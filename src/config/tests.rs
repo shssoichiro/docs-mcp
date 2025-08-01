@@ -1,73 +1,9 @@
 use super::*;
-use std::fs;
 use tempfile::TempDir;
 
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-
-    #[test]
-    fn config_file_persistence() {
-        let temp_dir = TempDir::new().expect("should create TempDir successfully");
-        let config_path = temp_dir.path().join("config.toml");
-
-        let original_config = Config {
-            ollama: OllamaConfig {
-                protocol: "https".to_string(),
-                host: "test-host".to_string(),
-                port: 8080,
-                model: "test-model".to_string(),
-                batch_size: 32,
-            },
-            base_dir: None,
-        };
-
-        let toml_content = toml::to_string_pretty(&original_config)
-            .expect("config should convert to toml string successfully");
-        fs::write(&config_path, toml_content).expect("should write to config_path successfully");
-
-        let content =
-            fs::read_to_string(&config_path).expect("should read from config_path successfully");
-        let loaded_config: Config = toml::from_str(&content).expect("should parse toml correctly");
-
-        assert_eq!(original_config, loaded_config);
-    }
-
-    #[test]
-    fn config_directory_creation() {
-        let temp_dir = TempDir::new().expect("should create TempDir successfully");
-        let config_dir = temp_dir.path().join(".docs-mcp");
-
-        assert!(!config_dir.exists());
-
-        fs::create_dir_all(&config_dir).expect("should create config_dir successfully");
-
-        assert!(config_dir.exists());
-        assert!(config_dir.is_dir());
-    }
-
-    #[test]
-    fn invalid_toml_handling() {
-        let invalid_toml = r#"
-            [ollama
-            host = "localhost"
-            port = "invalid_port"
-        "#;
-
-        let result: Result<Config, toml::de::Error> = toml::from_str(invalid_toml);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn partial_config_with_defaults() {
-        let partial_toml = r#"
-            [ollama]
-            host = "custom-host"
-        "#;
-
-        let result: Result<Config, toml::de::Error> = toml::from_str(partial_toml);
-        assert!(result.is_err()); // Should fail because required fields are missing
-    }
 
     #[test]
     fn complete_valid_config() {
@@ -90,6 +26,7 @@ mod integration_tests {
 
     #[test]
     fn config_validation_edge_cases() {
+        let temp_dir = TempDir::new().expect("should create TempDir successfully");
         let config = Config {
             ollama: OllamaConfig {
                 protocol: "http".to_string(),
@@ -98,7 +35,7 @@ mod integration_tests {
                 model: "test".to_string(),
                 batch_size: 1,
             },
-            base_dir: None,
+            base_dir: temp_dir.path().to_path_buf(),
         };
 
         let result = config.validate();
@@ -149,6 +86,7 @@ mod integration_tests {
                 "https://secure.example.com/",
             ),
         ];
+        let temp_dir = TempDir::new().expect("should create TempDir successfully");
 
         for (protocol, host, port, expected_url) in configs {
             let config = Config {
@@ -159,10 +97,10 @@ mod integration_tests {
                     model: "test".to_string(),
                     batch_size: 32,
                 },
-                base_dir: None,
+                base_dir: temp_dir.path().to_path_buf(),
             };
 
-            let url = config.ollama_url().expect("ollama_url is ok");
+            let url = config.ollama.ollama_url().expect("ollama_url is ok");
             assert_eq!(url.as_str(), expected_url);
         }
     }

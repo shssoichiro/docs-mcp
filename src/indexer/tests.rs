@@ -12,7 +12,7 @@ async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
             model: "nomic-embed-text:latest".to_string(),
             batch_size: 32,
         },
-        base_dir: Some(temp_dir.path().to_path_buf()),
+        base_dir: temp_dir.path().to_path_buf(),
     };
 
     let indexer = Indexer::new(config).await?;
