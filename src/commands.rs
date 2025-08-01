@@ -6,7 +6,7 @@ use tokio::runtime::Handle;
 use tokio::task::block_in_place;
 use tracing::{error, info, warn};
 
-use crate::config::{Config, get_default_config_dir};
+use crate::config::Config;
 use crate::crawler::{CrawlerConfig, SiteCrawler};
 use crate::database::Site;
 use crate::database::sqlite::{Database, NewSite, SiteQueries};
@@ -112,6 +112,7 @@ pub async fn add_site(
     name: Option<String>,
     version: Option<String>,
     base_url: &str,
+    config: &Config,
 ) -> Result<Site> {
     eprintln!("🚀 Adding new documentation site");
     eprintln!("   URL: {}", url);
@@ -159,8 +160,7 @@ pub async fn add_site(
     eprint!("🗄️ Connecting to database... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
-    let config_dir = get_default_config_dir()?;
-    let db_path = config_dir.join("docs.db");
+    let db_path = config.database_path()?;
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
         .context("Failed to initialize database")?;
@@ -235,8 +235,11 @@ pub async fn add_site(
 
     info!("Starting crawl for site {}", site.id);
 
-    let crawler_config = CrawlerConfig::default();
-    let mut crawler = SiteCrawler::new(database.pool().clone(), crawler_config);
+    let mut crawler = SiteCrawler::new(
+        database.pool().clone(),
+        CrawlerConfig::default(),
+        config.clone(),
+    );
 
     match crawler.crawl_site(site.id, url, base_url).await {
         Ok(stats) => {
@@ -290,9 +293,8 @@ pub async fn add_site(
 
 /// List all indexed documentation sites with comprehensive information
 #[inline]
-pub async fn list_sites() -> Result<()> {
-    let config_dir = get_default_config_dir()?;
-    let db_path = config_dir.join("docs.db");
+pub async fn list_sites(config: &Config) -> Result<()> {
+    let db_path = config.database_path()?;
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
         .context("Failed to initialize database")?;
@@ -392,12 +394,11 @@ pub async fn list_sites() -> Result<()> {
 
 /// Delete a documentation site with proper cleanup
 #[inline]
-pub async fn delete_site(site_identifier: String) -> Result<()> {
+pub async fn delete_site(site_identifier: String, config: &Config) -> Result<()> {
     // Validate input
     validation::validate_site_identifier(&site_identifier).context("Invalid site identifier")?;
 
-    let config_dir = get_default_config_dir()?;
-    let db_path = config_dir.join("docs.db");
+    let db_path = config.database_path()?;
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
         .context("Failed to initialize database")?;
@@ -462,8 +463,7 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
     eprintln!("🗑️  Deleting site and all associated data...");
 
     // Initialize vector store for cleanup
-    let config = Config::load().unwrap_or_default();
-    let mut vector_store = crate::database::lancedb::VectorStore::new(&config)
+    let mut vector_store = crate::database::lancedb::VectorStore::new(config)
         .await
         .context("Failed to initialize vector store")?;
 
@@ -524,12 +524,11 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
 
 /// Update/re-index a documentation site with proper cleanup
 #[inline]
-pub async fn update_site(site_identifier: String) -> Result<Site> {
+pub async fn update_site(site_identifier: String, config: &Config) -> Result<Site> {
     // Validate input
     validation::validate_site_identifier(&site_identifier).context("Invalid site identifier")?;
 
-    let config_dir = get_default_config_dir()?;
-    let db_path = config_dir.join("docs.db");
+    let db_path = config.database_path()?;
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
         .context("Failed to initialize database")?;
@@ -588,8 +587,7 @@ pub async fn update_site(site_identifier: String) -> Result<Site> {
     eprintln!("🧹 Preparing for re-indexing...");
 
     // Initialize vector store for cleanup
-    let config = Config::load().unwrap_or_default();
-    let mut vector_store = crate::database::lancedb::VectorStore::new(&config)
+    let mut vector_store = crate::database::lancedb::VectorStore::new(config)
         .await
         .context("Failed to initialize vector store")?;
 
@@ -653,8 +651,11 @@ pub async fn update_site(site_identifier: String) -> Result<Site> {
     eprintln!("   This may take several minutes depending on site size.");
     eprintln!();
 
-    let crawler_config = CrawlerConfig::default();
-    let mut crawler = SiteCrawler::new(database.pool().clone(), crawler_config);
+    let mut crawler = SiteCrawler::new(
+        database.pool().clone(),
+        CrawlerConfig::default(),
+        config.clone(),
+    );
 
     match crawler
         .crawl_site(site.id, &site.index_url, &site.base_url)
@@ -692,16 +693,14 @@ pub async fn update_site(site_identifier: String) -> Result<Site> {
 
 /// Show detailed status of the indexing pipeline
 #[inline]
-pub async fn show_status() -> Result<()> {
-    let config = Config::load().unwrap_or_default();
-
+pub async fn show_status(config: &Config) -> Result<()> {
     eprintln!("📊 Docs-MCP Status Report");
     eprintln!("{}", "=".repeat(50));
     eprintln!();
 
     // Database connectivity
     eprintln!("🗄️  Database Status:");
-    let database = match Database::new(&config.database_path()).await {
+    let database = match Database::new(&config.database_path()?).await {
         Ok(db) => {
             eprintln!("   ✅ SQLite: Connected");
             Some(db)
@@ -714,7 +713,7 @@ pub async fn show_status() -> Result<()> {
 
     // Ollama connectivity
     eprintln!("🤖 Ollama Status:");
-    match crate::embeddings::ollama::OllamaClient::new(&config) {
+    match crate::embeddings::ollama::OllamaClient::new(config) {
         Ok(client) => match client.health_check() {
             Ok(()) => {
                 eprintln!(
@@ -735,7 +734,7 @@ pub async fn show_status() -> Result<()> {
 
     // Vector database status
     eprintln!("🔍 Vector Database Status:");
-    match crate::database::lancedb::VectorStore::new(&config).await {
+    match crate::database::lancedb::VectorStore::new(config).await {
         Ok(_store) => {
             eprintln!("   ✅ LanceDB: Connected");
         }
@@ -800,14 +799,11 @@ pub async fn show_status() -> Result<()> {
 
 /// Start MCP server
 #[inline]
-pub async fn serve_mcp() -> Result<()> {
+pub async fn serve_mcp(config: &Config) -> Result<()> {
     info!("Starting MCP server with stdio transport");
 
-    // Load configuration
-    let config = Config::load().context("Failed to load configuration")?;
-
     // Verify Ollama connectivity before starting
-    match crate::embeddings::ollama::OllamaClient::new(&config) {
+    match crate::embeddings::ollama::OllamaClient::new(config) {
         Ok(client) => match client.health_check() {
             Ok(()) => {
                 info!(
@@ -835,21 +831,21 @@ pub async fn serve_mcp() -> Result<()> {
     // Initialize MCP server components
     eprintln!("🌐 Initializing MCP server...");
 
-    let config_dir = crate::config::get_default_config_dir()?;
+    let db_path = config.database_path()?;
     let sqlite_db = std::sync::Arc::new(
-        crate::database::sqlite::Database::initialize_from_config_dir(&config_dir)
+        crate::database::sqlite::Database::initialize_from_config_dir(&db_path)
             .await
             .context("Failed to initialize SQLite database")?,
     );
 
     let vector_store = std::sync::Arc::new(
-        crate::database::lancedb::VectorStore::new(&config)
+        crate::database::lancedb::VectorStore::new(config)
             .await
             .context("Failed to initialize vector store")?,
     );
 
     let ollama_client = std::sync::Arc::new(
-        crate::embeddings::ollama::OllamaClient::new(&config)
+        crate::embeddings::ollama::OllamaClient::new(config)
             .context("Failed to create Ollama client")?,
     );
 

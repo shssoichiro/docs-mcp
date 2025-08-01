@@ -60,13 +60,14 @@ async fn main() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
+    let config = Config::load(None)?;
 
     match cli.command {
         Commands::Config { show } => {
             if show {
-                show_config()?;
+                show_config(&config)?;
             } else {
-                run_interactive_config()?;
+                run_interactive_config(config)?;
             }
         }
         Commands::Add {
@@ -76,30 +77,30 @@ async fn main() -> Result<()> {
             version,
         } => {
             let base_url = base_url.as_deref().unwrap_or(url.as_str());
-            let site = add_site(&url, name, version, base_url).await?;
-            Indexer::new(Config::load()?)
+            let site = add_site(&url, name, version, base_url, &config).await?;
+            Indexer::new(config)
                 .await?
                 .process_site_embeddings(&site)
                 .await?;
         }
         Commands::List => {
-            list_sites().await?;
+            list_sites(&config).await?;
         }
         Commands::Delete { site } => {
-            delete_site(site).await?;
+            delete_site(site, &config).await?;
         }
         Commands::Update { site } => {
-            let site = update_site(site).await?;
-            Indexer::new(Config::load()?)
+            let site = update_site(site, &config).await?;
+            Indexer::new(config)
                 .await?
                 .process_site_embeddings(&site)
                 .await?;
         }
         Commands::Serve => {
-            serve_mcp().await?;
+            serve_mcp(&config).await?;
         }
         Commands::Status => {
-            show_status().await?;
+            show_status(&config).await?;
         }
     }
 

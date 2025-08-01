@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod tests;
-
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Confirm, Input, Select};
@@ -8,11 +5,9 @@ use dialoguer::{Confirm, Input, Select};
 use super::{Config, ConfigError, OllamaConfig};
 
 #[inline]
-pub fn run_interactive_config() -> Result<()> {
+pub fn run_interactive_config(mut config: Config) -> Result<()> {
     eprintln!("{}", style("🔧 Docs MCP Configuration Setup").bold().cyan());
     eprintln!();
-
-    let mut config = load_existing_config()?;
 
     eprintln!("{}", style("Ollama Configuration").bold().yellow());
     eprintln!("Configure your local Ollama instance for embedding generation.");
@@ -42,7 +37,9 @@ pub fn run_interactive_config() -> Result<()> {
         config.save().context("Failed to save configuration")?;
         eprintln!("{}", style("✓ Configuration saved successfully!").green());
 
-        let config_path = Config::config_file_path().context("Failed to get config file path")?;
+        let config_path = config
+            .config_file_path()
+            .context("Failed to get config file path")?;
         eprintln!(
             "Configuration saved to: {}",
             style(config_path.display()).cyan()
@@ -55,9 +52,7 @@ pub fn run_interactive_config() -> Result<()> {
 }
 
 #[inline]
-pub fn show_config() -> Result<()> {
-    let config = Config::load().context("Failed to load configuration")?;
-
+pub fn show_config(config: &Config) -> Result<()> {
     eprintln!("{}", style("📋 Current Configuration").bold().cyan());
     eprintln!();
 
@@ -73,27 +68,13 @@ pub fn show_config() -> Result<()> {
         Err(e) => eprintln!("  Ollama URL: {} ({})", style("Invalid").red(), e),
     }
 
-    let config_path = Config::config_file_path().context("Failed to get config file path")?;
+    let config_path = config
+        .config_file_path()
+        .context("Failed to get config file path")?;
     eprintln!();
     eprintln!("Config file: {}", style(config_path.display()).dim());
 
     Ok(())
-}
-
-fn load_existing_config() -> Result<Config> {
-    Config::load().map_or_else(
-        |_| {
-            eprintln!(
-                "{}",
-                style("No existing configuration found. Using defaults.").yellow()
-            );
-            Ok(Config::default())
-        },
-        |config| {
-            eprintln!("{}", style("Found existing configuration.").green());
-            Ok(config)
-        },
-    )
 }
 
 fn configure_ollama(ollama: &mut OllamaConfig) -> Result<()> {

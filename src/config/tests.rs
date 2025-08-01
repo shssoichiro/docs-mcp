@@ -20,7 +20,6 @@ mod integration_tests {
                 batch_size: 32,
             },
             base_dir: None,
-            browser: BrowserConfig::default(),
         };
 
         let toml_content = toml::to_string_pretty(&original_config)
@@ -100,7 +99,6 @@ mod integration_tests {
                 batch_size: 1,
             },
             base_dir: None,
-            browser: BrowserConfig::default(),
         };
 
         let result = config.validate();
@@ -162,7 +160,6 @@ mod integration_tests {
                     batch_size: 32,
                 },
                 base_dir: None,
-                browser: BrowserConfig::default(),
             };
 
             let url = config.ollama_url().expect("ollama_url is ok");
@@ -201,33 +198,5 @@ mod integration_tests {
             assert!(!message.is_empty());
             assert!(message.len() > 10); // Ensure meaningful error messages
         }
-    }
-}
-
-#[cfg(test)]
-mod cross_platform_tests {
-    use super::*;
-
-    #[test]
-    fn config_directory_discovery() {
-        let config_dir = Config::config_dir();
-        let dir_path = config_dir.expect("config_dir should be ok");
-
-        #[cfg(windows)]
-        {
-            assert!(dir_path.to_string_lossy().contains("docs-mcp"));
-        }
-
-        #[cfg(not(windows))]
-        {
-            assert!(dir_path.to_string_lossy().contains(".docs-mcp"));
-        }
-    }
-
-    #[test]
-    fn config_file_path_generation() {
-        let config_path = Config::config_file_path();
-        let file_path = config_path.expect("config_path should be ok");
-        assert!(file_path.to_string_lossy().ends_with("config.toml"));
     }
 }

@@ -42,8 +42,7 @@ impl VectorStore {
     /// * `Result<Self, DocsError>` - New VectorStore instance or error
     #[inline]
     pub async fn new(config: &Config) -> Result<Self, DocsError> {
-        let raw_path = config.vector_database_path();
-        let db_path = Path::new(&raw_path);
+        let db_path = config.vector_database_path()?;
         debug!("Initializing LanceDB at path: {:?}", db_path);
 
         // Ensure the directory exists
@@ -68,7 +67,7 @@ impl VectorStore {
                     || error_msg.contains("malformed")
                 {
                     warn!("Database corruption detected, attempting recovery");
-                    Self::attempt_corruption_recovery(db_path)?;
+                    Self::attempt_corruption_recovery(&db_path)?;
 
                     // Retry connection after recovery
                     lancedb::connect(&uri).execute().await.map_err(|e| {

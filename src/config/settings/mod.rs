@@ -3,16 +3,15 @@ mod tests;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use url::Url;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Config {
     pub ollama: OllamaConfig,
-    #[serde(default)]
-    pub browser: BrowserConfig,
     #[serde(skip)]
     pub base_dir: Option<PathBuf>,
 }
@@ -24,24 +23,6 @@ pub struct OllamaConfig {
     pub port: u16,
     pub model: String,
     pub batch_size: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct BrowserConfig {
-    /// Whether to enable JavaScript rendering
-    pub enable_js_rendering: bool,
-    /// Maximum number of browser instances
-    pub max_browsers: usize,
-    /// Maximum tabs per browser
-    pub max_tabs_per_browser: usize,
-    /// Navigation timeout in seconds
-    pub navigation_timeout_seconds: u64,
-    /// Whether to run browsers headlessly
-    pub headless: bool,
-    /// Browser window width
-    pub window_width: u32,
-    /// Browser window height
-    pub window_height: u32,
 }
 
 #[derive(Debug, Error)]
@@ -83,30 +64,13 @@ impl Default for Config {
                 model: "nomic-embed-text:latest".to_string(),
                 batch_size: 64,
             },
-            browser: BrowserConfig::default(),
             base_dir: None,
         }
     }
 }
 
-impl Default for BrowserConfig {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            enable_js_rendering: true,
-            max_browsers: 2,
-            max_tabs_per_browser: 4,
-            navigation_timeout_seconds: 30,
-            headless: true,
-            window_width: 1280,
-            window_height: 720,
-        }
-    }
-}
-
 impl Config {
-    #[inline]
-    pub fn config_dir() -> Result<PathBuf, ConfigError> {
+    fn default_config_dir() -> Result<PathBuf, ConfigError> {
         dirs::home_dir()
             .map(|home| home.join(".docs-mcp"))
             .or({
@@ -122,23 +86,17 @@ impl Config {
             .ok_or(ConfigError::DirectoryError)
     }
 
-    /// Get the base directory for the application, using override if set
+    // Ideally we should only ever be calling this from `main.rs` and tests.
+    // Any test usages should pass a temp dir for the `config_dir`.
     #[inline]
-    pub fn get_base_dir(&self) -> Result<PathBuf, ConfigError> {
-        self.base_dir
-            .as_ref()
-            .map_or_else(Self::config_dir, |base_dir| Ok(base_dir.clone()))
-    }
-
-    #[inline]
-    pub fn config_file_path() -> Result<PathBuf, ConfigError> {
-        Ok(Self::config_dir()?.join("config.toml"))
-    }
-
-    #[inline]
-    pub fn load() -> Result<Self> {
-        let config_path =
-            Self::config_file_path().context("Failed to determine config file path")?;
+    pub fn load(config_dir: Option<&Path>) -> Result<Self> {
+        let config_dir = match config_dir {
+            Some(path) => Cow::Borrowed(path),
+            None => Cow::Owned(
+                Self::default_config_dir().context("Failed to determine config file path")?,
+            ),
+        };
+        let config_path = config_dir.join("config.toml");
 
         if !config_path.exists() {
             return Ok(Self::default());
@@ -162,7 +120,9 @@ impl Config {
         self.validate()
             .context("Configuration validation failed before saving")?;
 
-        let config_dir = Self::config_dir().context("Failed to determine config directory")?;
+        let config_dir = self
+            .get_base_dir()
+            .context("Failed to determine config directory")?;
 
         fs::create_dir_all(&config_dir).with_context(|| {
             format!(
@@ -171,7 +131,7 @@ impl Config {
             )
         })?;
 
-        let config_path = config_dir.join("config.toml");
+        let config_path = self.config_file_path()?;
         let content = toml::to_string_pretty(self).context("Failed to serialize config to TOML")?;
 
         fs::write(&config_path, content)
@@ -180,10 +140,17 @@ impl Config {
         Ok(())
     }
 
+    /// Get the base directory for the application, using override if set
+    #[inline]
+    pub fn get_base_dir(&self) -> Result<PathBuf, ConfigError> {
+        self.base_dir
+            .as_ref()
+            .map_or_else(Self::default_config_dir, |base_dir| Ok(base_dir.clone()))
+    }
+
     #[inline]
     pub fn validate(&self) -> Result<(), ConfigError> {
         self.ollama.validate()?;
-        self.browser.validate()?;
         Ok(())
     }
 
@@ -196,24 +163,27 @@ impl Config {
         Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))
     }
 
+    #[inline]
+    pub fn config_file_path(&self) -> Result<PathBuf> {
+        Ok(self.get_base_dir()?.join("config.toml"))
+    }
+
     /// Get the path for the SQLite database
     #[inline]
-    pub fn database_path(&self) -> String {
-        let base_dir = self.get_base_dir().unwrap_or_else(|_| PathBuf::from("."));
-        base_dir.join("metadata.db").to_string_lossy().to_string()
+    pub fn database_path(&self) -> Result<PathBuf> {
+        Ok(self.get_base_dir()?.join("metadata.db"))
     }
 
     /// Get the path for the vector database directory
     #[inline]
-    pub fn vector_database_path(&self) -> String {
-        let base_dir = self.get_base_dir().unwrap_or_else(|_| PathBuf::from("."));
-        base_dir.join("vectors").to_string_lossy().to_string()
+    pub fn vector_database_path(&self) -> Result<PathBuf> {
+        Ok(self.get_base_dir()?.join("vectors"))
     }
 
-    /// Get the config directory as an instance method
+    /// Get the cache directory as an instance method
     #[inline]
-    pub fn config_dir_path(&self) -> PathBuf {
-        self.get_base_dir().unwrap_or_else(|_| PathBuf::from("."))
+    pub fn cache_dir_path(&self) -> Result<PathBuf> {
+        Ok(self.get_base_dir()?.join("cache"))
     }
 }
 
@@ -286,73 +256,6 @@ impl OllamaConfig {
             return Err(ConfigError::InvalidBatchSize(batch_size));
         }
         self.batch_size = batch_size;
-        Ok(())
-    }
-}
-
-impl BrowserConfig {
-    #[inline]
-    pub fn validate(&self) -> Result<(), ConfigError> {
-        if self.navigation_timeout_seconds == 0 || self.navigation_timeout_seconds > 300 {
-            return Err(ConfigError::InvalidBrowserTimeout(
-                self.navigation_timeout_seconds,
-            ));
-        }
-
-        if self.max_browsers == 0 || self.max_browsers > 10 {
-            return Err(ConfigError::InvalidBrowserPoolSize(self.max_browsers));
-        }
-
-        if self.max_tabs_per_browser == 0 || self.max_tabs_per_browser > 10 {
-            return Err(ConfigError::InvalidBrowserPoolSize(
-                self.max_tabs_per_browser,
-            ));
-        }
-
-        if self.window_width < 100
-            || self.window_width > 4000
-            || self.window_height < 100
-            || self.window_height > 4000
-        {
-            return Err(ConfigError::InvalidWindowDimensions(
-                self.window_width,
-                self.window_height,
-            ));
-        }
-
-        Ok(())
-    }
-
-    #[inline]
-    pub fn set_enable_js_rendering(&mut self, enable: bool) {
-        self.enable_js_rendering = enable;
-    }
-
-    #[inline]
-    pub fn set_max_browsers(&mut self, max_browsers: usize) -> Result<(), ConfigError> {
-        if max_browsers == 0 || max_browsers > 10 {
-            return Err(ConfigError::InvalidBrowserPoolSize(max_browsers));
-        }
-        self.max_browsers = max_browsers;
-        Ok(())
-    }
-
-    #[inline]
-    pub fn set_navigation_timeout(&mut self, timeout_seconds: u64) -> Result<(), ConfigError> {
-        if timeout_seconds == 0 || timeout_seconds > 300 {
-            return Err(ConfigError::InvalidBrowserTimeout(timeout_seconds));
-        }
-        self.navigation_timeout_seconds = timeout_seconds;
-        Ok(())
-    }
-
-    #[inline]
-    pub fn set_window_size(&mut self, width: u32, height: u32) -> Result<(), ConfigError> {
-        if !(100..=4000).contains(&width) || !(100..=4000).contains(&height) {
-            return Err(ConfigError::InvalidWindowDimensions(width, height));
-        }
-        self.window_width = width;
-        self.window_height = height;
         Ok(())
     }
 }

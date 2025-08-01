@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::{BrowserConfig, OllamaConfig};
+use crate::config::OllamaConfig;
 use tempfile::TempDir;
 
 async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
@@ -13,7 +13,6 @@ async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
             batch_size: 32,
         },
         base_dir: Some(temp_dir.path().to_path_buf()),
-        browser: BrowserConfig::default(),
     };
 
     let indexer = Indexer::new(config).await?;

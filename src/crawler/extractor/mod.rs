@@ -1,10 +1,11 @@
 use anyhow::{Result, anyhow};
 use scraper::{ElementRef, Html, Selector};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::debug;
 
 /// Represents a content section with its heading hierarchy
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContentSection {
     /// The heading path (e.g., "Getting Started > Installation > Prerequisites")
     pub heading_path: String,
@@ -17,7 +18,7 @@ pub struct ContentSection {
 }
 
 /// Represents extracted page content with metadata
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExtractedContent {
     /// The page title
     pub title: String,

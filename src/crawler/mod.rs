@@ -8,8 +8,10 @@ mod tests;
 use anyhow::{Context, Result, anyhow, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use scraper::{Html, Selector};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashSet;
+use std::fs::{self, File};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
@@ -19,6 +21,7 @@ use url::Url;
 use self::browser::{BrowserClient, BrowserConfig};
 use self::extractor::{ExtractionConfig, extract_content};
 use self::robots::{RobotsTxt, fetch_robots_txt};
+use crate::config::Config;
 use crate::database::sqlite::{
     CrawlQueueQueries, CrawlQueueUpdate, CrawlStatus, DbPool, NewCrawlQueueItem, SiteQueries,
     SiteStatus, SiteUpdate,
@@ -296,10 +299,11 @@ pub struct SiteCrawler {
     db_pool: DbPool,
     config: CrawlerConfig,
     extraction_config: ExtractionConfig,
+    app_config: Config,
 }
 
 /// Result of crawling a single page
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrawlResult {
     /// The URL that was crawled
     pub url: Url,
@@ -338,10 +342,7 @@ impl CrawlStats {
 impl SiteCrawler {
     /// Create a new site crawler
     #[inline]
-    pub fn new(db_pool: DbPool, config: CrawlerConfig) -> Self {
-        let http_client = HttpClient::new(config.clone());
-        let extraction_config = ExtractionConfig::default();
-
+    pub fn new(db_pool: DbPool, config: CrawlerConfig, app_config: Config) -> Self {
         // Initialize browser client if JavaScript rendering is enabled
         let browser_client = if config.enable_js_rendering {
             info!("JavaScript rendering enabled with browser client");
@@ -351,12 +352,16 @@ impl SiteCrawler {
             None
         };
 
+        let http_client = HttpClient::new(config.clone());
+        let extraction_config = ExtractionConfig::default();
+
         Self {
             http_client,
             browser_client,
             db_pool,
             config,
             extraction_config,
+            app_config,
         }
     }
 
@@ -418,6 +423,11 @@ impl SiteCrawler {
         bar.set_position(0);
         bar.set_length(1);
 
+        let cache_path = self.app_config.cache_dir_path()?.join("pages");
+        if !cache_path.exists() {
+            fs::create_dir_all(&cache_path)?;
+        }
+
         // Main crawling loop - breadth-first approach
         loop {
             // Get next URL from queue
@@ -471,6 +481,13 @@ impl SiteCrawler {
             match self.crawl_page(&url, &base_url).await {
                 Ok(crawl_result) => {
                     if crawl_result.success {
+                        // Write the extracted data to a cache file
+                        let cached_file_path = cache_path.join(format!("{}.json", queue_item.id));
+                        serde_json::to_writer(
+                            &mut File::create(&cached_file_path)?,
+                            &crawl_result.content,
+                        )?;
+
                         info!("Successfully crawled: {}", url);
                         stats.successful_crawls += 1;
                         bar.set_position(stats.total_crawled() as u64);

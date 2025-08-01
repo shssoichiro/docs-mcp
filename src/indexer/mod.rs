@@ -6,6 +6,8 @@ pub mod consistency;
 #[cfg(test)]
 mod tests;
 
+use std::fs::File;
+
 use anyhow::{Context, Result};
 use chrono::Utc;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -30,6 +32,7 @@ pub struct Indexer {
     vector_store: VectorStore,
     ollama_client: OllamaClient,
     chunking_config: ChunkingConfig,
+    app_config: Config,
     batch_size: usize,
 }
 
@@ -83,7 +86,7 @@ impl Indexer {
     /// Create a new indexer
     #[inline]
     pub async fn new(config: Config) -> Result<Self> {
-        let database = Database::new(&config.database_path())
+        let database = Database::new(config.database_path()?)
             .await
             .context("Failed to initialize SQLite database")?;
 
@@ -99,6 +102,7 @@ impl Indexer {
             vector_store,
             ollama_client,
             chunking_config: ChunkingConfig::default(),
+            app_config: config,
             batch_size: 64,
         })
     }
@@ -201,9 +205,7 @@ impl Indexer {
         debug!("Processing page for embeddings: {}", crawl_item.url);
 
         // Get the extracted content for this URL
-        // Note: In a real implementation, this would need to be stored
-        // during crawling or re-extracted here
-        let extracted_content = self.get_extracted_content_for_url(&crawl_item.url).await?;
+        let extracted_content = self.get_extracted_content_for_page(crawl_item.id)?;
 
         // Chunk the content
         let chunks = chunk_content(&extracted_content, &self.chunking_config)
@@ -310,29 +312,23 @@ impl Indexer {
         Ok(())
     }
 
-    /// Get extracted content for a URL by re-extracting it
-    async fn get_extracted_content_for_url(&self, url: &str) -> Result<ExtractedContent> {
-        debug!("Re-extracting content for URL: {}", url);
+    /// Get extracted content for a page from the cached file
+    fn get_extracted_content_for_page(&self, page_id: i64) -> Result<ExtractedContent> {
+        debug!("Re-extracting content for page: {}", page_id);
 
-        // Create HTTP client for content extraction
-        let mut http_client =
-            crate::crawler::HttpClient::new(crate::crawler::CrawlerConfig::default());
-
-        // Fetch the page content
-        let html_content = http_client
-            .get(url)
-            .await
-            .context("Failed to fetch page content for extraction")?;
-
-        // Extract content using the same extractor as the crawler
-        let extraction_config = crate::crawler::extractor::ExtractionConfig::default();
-        let extracted_content =
-            crate::crawler::extractor::extract_content(&html_content, &extraction_config)
-                .context("Failed to extract content from HTML")?;
+        let cached_file_path = self
+            .app_config
+            .cache_dir_path()?
+            .join("pages")
+            .join(format!("{page_id}.json"));
+        let extracted_content: ExtractedContent = serde_json::from_reader(
+            File::open(&cached_file_path).context("Failed to open cached page file")?,
+        )
+        .context("Failed to read cached page file")?;
 
         debug!(
-            "Successfully extracted content from {}: {} sections, {} chars",
-            url,
+            "Loaded extracted content for page {}: {} sections, {} chars",
+            page_id,
             extracted_content.sections.len(),
             extracted_content.raw_text.len()
         );

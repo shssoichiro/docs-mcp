@@ -18,7 +18,7 @@ use anyhow::Result;
 use std::env;
 use tempfile::TempDir;
 
-use docs_mcp::config::{BrowserConfig, Config, OllamaConfig};
+use docs_mcp::config::{Config, OllamaConfig};
 use docs_mcp::database::lancedb::VectorStore;
 use docs_mcp::database::sqlite::{
     CrawlQueueQueries, CrawlStatus, Database, NewCrawlQueueItem, NewIndexedChunk, NewSite,
@@ -50,7 +50,6 @@ fn create_test_config() -> (Config, TempDir) {
             model,
             batch_size: 5, // Smaller batch size for testing
         },
-        browser: BrowserConfig::default(),
     };
 
     (config, temp_dir)
@@ -58,7 +57,7 @@ fn create_test_config() -> (Config, TempDir) {
 
 /// Create a test database with migration setup
 async fn create_test_database(config: &Config) -> Result<Database> {
-    let database = Database::new(&config.database_path()).await?;
+    let database = Database::new(config.database_path()?).await?;
 
     // Manually run migrations to ensure tables exist
     database.run_migrations().await?;

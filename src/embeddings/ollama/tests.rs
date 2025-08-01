@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::{BrowserConfig, Config, OllamaConfig};
+use crate::config::{Config, OllamaConfig};
 
 #[test]
 fn client_configuration() {
@@ -11,7 +11,6 @@ fn client_configuration() {
             model: "test-model".to_string(),
             batch_size: 128,
         },
-        browser: BrowserConfig::default(),
         base_dir: None,
     };
 

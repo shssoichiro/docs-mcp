@@ -22,7 +22,7 @@ pub struct Database {
 
 impl Database {
     #[inline]
-    pub async fn new(database_url: &str) -> Result<Self> {
+    pub async fn new<P: AsRef<Path>>(database_url: P) -> Result<Self> {
         let options = SqliteConnectOptions::new()
             .filename(database_url)
             .create_if_missing(true)
@@ -70,7 +70,7 @@ impl Database {
             )
         })?;
 
-        Self::new(&db_url).await
+        Self::new(db_url.as_ref()).await
     }
 
     #[inline]

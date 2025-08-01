@@ -82,14 +82,8 @@ fn load_missing_config() {
     let temp_dir = TempDir::new().expect("should create temp dir");
 
     // Create a config with the temp directory as base_dir
-    let config = Config {
-        base_dir: Some(temp_dir.path().to_path_buf()),
-        ..Default::default()
-    };
+    let config = Config::load(Some(temp_dir.path())).expect("config created");
 
-    // Test loading from non-existent config file (should return default)
-    // We can't easily test this without modifying Config::load() to accept a custom path
-    // So instead we test that default config validation works
     assert!(config.validate().is_ok());
     assert_eq!(config.ollama.protocol, "http");
     assert_eq!(config.ollama.host, "localhost");

@@ -4,10 +4,12 @@
 )]
 
 use anyhow::Result;
+use docs_mcp::config::Config;
 use docs_mcp::crawler::robots::fetch_robots_txt;
 use docs_mcp::crawler::{CrawlerConfig, HttpClient, SiteCrawler, extract_links, validate_url};
 use docs_mcp::database::sqlite::{Database, NewSite, SiteQueries};
 use serial_test::serial;
+use tempfile::TempDir;
 use url::Url;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -283,7 +285,12 @@ async fn basic_site_crawling() -> Result<()> {
         ..CrawlerConfig::default()
     };
 
-    let mut crawler = SiteCrawler::new(database.pool().clone(), config);
+    let config_path = TempDir::new()?;
+    let mut crawler = SiteCrawler::new(
+        database.pool().clone(),
+        config,
+        Config::load(Some(config_path.path()))?,
+    );
     let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
     // Verify crawl statistics
@@ -365,7 +372,12 @@ async fn robots_txt_compliance() -> Result<()> {
         ..CrawlerConfig::default()
     };
 
-    let mut crawler = SiteCrawler::new(database.pool().clone(), config);
+    let config_path = TempDir::new()?;
+    let mut crawler = SiteCrawler::new(
+        database.pool().clone(),
+        config,
+        Config::load(Some(config_path.path()))?,
+    );
     let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
     // Verify that the URL was blocked by robots.txt
@@ -422,7 +434,12 @@ async fn error_handling() -> Result<()> {
         ..CrawlerConfig::default()
     };
 
-    let mut crawler = SiteCrawler::new(database.pool().clone(), config);
+    let config_path = TempDir::new()?;
+    let mut crawler = SiteCrawler::new(
+        database.pool().clone(),
+        config,
+        Config::load(Some(config_path.path()))?,
+    );
     let crawl_error = crawler
         .crawl_site(site.id, &base_url, &base_url)
         .await
@@ -504,7 +521,12 @@ async fn content_extraction() -> Result<()> {
         ..CrawlerConfig::default()
     };
 
-    let mut crawler = SiteCrawler::new(database.pool().clone(), config);
+    let config_path = TempDir::new()?;
+    let mut crawler = SiteCrawler::new(
+        database.pool().clone(),
+        config,
+        Config::load(Some(config_path.path()))?,
+    );
     let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
     // Verify content was processed
