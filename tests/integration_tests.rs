@@ -134,6 +134,7 @@ async fn progress_tracking_and_status_reporting() {
         let new_site = NewSite {
             name: name.to_string(),
             base_url: format!("https://{}.com", name.replace(' ', "")),
+            index_url: format!("https://{}.com", name.replace(' ', "")),
             version: "1.0".to_string(),
         };
         let site = SiteQueries::create(database.pool(), new_site)

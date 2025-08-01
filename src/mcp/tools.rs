@@ -141,7 +141,7 @@ impl ToolHandler for SearchDocsHandler {
                         .into_iter()
                         .filter(|site| {
                             site.name.contains(filter_pattern)
-                                || site.base_url.contains(filter_pattern)
+                                || site.index_url.contains(filter_pattern)
                         })
                         .collect();
 
@@ -292,7 +292,7 @@ impl ToolHandler for ListSitesHandler {
                         "id": site.id,
                         "name": site.name,
                         "version": site.version,
-                        "url": site.base_url,
+                        "url": site.index_url,
                         "status": "completed",
                         "indexed_date": site.indexed_date.map(|d| d.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
                         "page_count": site.indexed_pages

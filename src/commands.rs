@@ -82,7 +82,7 @@ pub mod validation {
 
 /// Add a new documentation site for indexing with comprehensive progress display
 #[inline]
-pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
+pub async fn add_site(url: &str, name: Option<String>, base_url: &str) -> Result<()> {
     eprintln!("🚀 Adding new documentation site");
     eprintln!("   URL: {}", url);
 
@@ -93,8 +93,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     use std::io::{self, Write};
     io::stdout().flush().context("Failed to flush stdout")?;
 
-    let parsed_url =
-        validation::validate_documentation_url(&url).context("Invalid URL provided")?;
+    let parsed_url = validation::validate_documentation_url(url).context("Invalid URL provided")?;
 
     if let Some(ref site_name) = name {
         validation::validate_site_name(site_name).context("Invalid site name provided")?;
@@ -135,14 +134,14 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     eprint!("🔍 Checking for existing site... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
-    if let Some(existing_site) = SiteQueries::get_by_base_url(database.pool(), &url).await? {
+    if let Some(existing_site) = SiteQueries::get_by_index_url(database.pool(), url).await? {
         eprintln!("⚠️  Found existing site!");
         eprintln!();
         eprintln!(
             "📚 Site already exists: {} (ID: {})",
             existing_site.name, existing_site.id
         );
-        eprintln!("   URL: {}", existing_site.base_url);
+        eprintln!("   URL: {}", existing_site.index_url);
         eprintln!("   Status: {}", existing_site.status);
 
         if existing_site.progress_percent > 0 {
@@ -174,7 +173,8 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     io::stdout().flush().context("Failed to flush stdout")?;
 
     let new_site = NewSite {
-        base_url: url.clone(),
+        index_url: url.to_string(),
+        base_url: base_url.to_string(),
         name: site_name.clone(),
         version: "1.0".to_string(),
     };
@@ -188,7 +188,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     eprintln!("✅ Site created successfully!");
     eprintln!("   📚 Name: {}", site.name);
     eprintln!("   🆔 ID: {}", site.id);
-    eprintln!("   🌐 URL: {}", site.base_url);
+    eprintln!("   🌐 URL: {}", site.index_url);
     eprintln!();
 
     // Start crawling
@@ -202,7 +202,7 @@ pub async fn add_site(url: String, name: Option<String>) -> Result<()> {
     let crawler_config = CrawlerConfig::default();
     let mut crawler = SiteCrawler::new(database.pool().clone(), crawler_config);
 
-    match crawler.crawl_site(site.id, &url).await {
+    match crawler.crawl_site(site.id, url, base_url).await {
         Ok(stats) => {
             eprintln!("✅ Crawling completed successfully!");
             eprintln!();
@@ -276,7 +276,7 @@ pub async fn list_sites() -> Result<()> {
 
     for site in &sites {
         eprintln!("📚 {} (ID: {})", site.name, site.id);
-        eprintln!("   URL: {}", site.base_url);
+        eprintln!("   URL: {}", site.index_url);
         eprintln!("   Status: {}", site.status);
 
         // Show crawl progress
@@ -382,7 +382,7 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
     let site = site.ok_or_else(|| anyhow::anyhow!("Site not found: {}", site_identifier))?;
 
     eprintln!("📚 Found site: {} (ID: {})", site.name, site.id);
-    eprintln!("   URL: {}", site.base_url);
+    eprintln!("   URL: {}", site.index_url);
     eprintln!("   Status: {}", site.status);
 
     // Get statistics before deletion
@@ -514,7 +514,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
     let site = site.ok_or_else(|| anyhow::anyhow!("Site not found: {}", site_identifier))?;
 
     eprintln!("🔄 Updating site: {} (ID: {})", site.name, site.id);
-    eprintln!("   URL: {}", site.base_url);
+    eprintln!("   URL: {}", site.index_url);
     eprintln!("   Current Status: {}", site.status);
 
     // Get statistics before update
@@ -621,7 +621,10 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
     let crawler_config = CrawlerConfig::default();
     let mut crawler = SiteCrawler::new(database.pool().clone(), crawler_config);
 
-    match crawler.crawl_site(site.id, &site.base_url).await {
+    match crawler
+        .crawl_site(site.id, &site.index_url, &site.base_url)
+        .await
+    {
         Ok(stats) => {
             eprintln!();
             eprintln!("✅ Re-indexing completed successfully!");

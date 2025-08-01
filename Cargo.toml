@@ -41,6 +41,7 @@ url = "2.5"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
 [dev-dependencies]
+serial_test = "3.2.0"
 tempfile = "3.8"
 wiremock = "0.6"
 

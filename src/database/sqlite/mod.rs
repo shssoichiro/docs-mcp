@@ -50,10 +50,10 @@ impl Database {
     pub async fn run_migrations(&self) -> Result<()> {
         info!("Running database migrations");
 
-        sqlx::query(include_str!("migrations/001_initial_schema.sql"))
-            .execute(&self.pool)
+        sqlx::migrate!("src/database/sqlite/migrations")
+            .run(&self.pool)
             .await
-            .context("Failed to run initial schema migration")?;
+            .context("Failed to run schema migration")?;
 
         debug!("Database migrations completed successfully");
         Ok(())

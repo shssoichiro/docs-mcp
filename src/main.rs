@@ -23,11 +23,14 @@ enum Commands {
     },
     /// Add a new documentation site to index
     Add {
-        /// Base URL of the documentation site
+        /// Index URL of the documentation site
         url: String,
         /// Optional name for the site
         #[arg(long)]
         name: Option<String>,
+        /// Override the base URL of the documentation site. Useful for cases where the index URL has additional paths.
+        #[arg(long)]
+        base_url: Option<String>,
     },
     /// List all indexed documentation sites
     List,
@@ -65,8 +68,13 @@ async fn main() -> Result<()> {
                 run_interactive_config()?;
             }
         }
-        Commands::Add { url, name } => {
-            add_site(url, name).await?;
+        Commands::Add {
+            url,
+            name,
+            base_url,
+        } => {
+            let base_url = base_url.as_deref().unwrap_or(url.as_str());
+            add_site(&url, name, base_url).await?;
         }
         Commands::List => {
             list_sites().await?;
@@ -115,7 +123,7 @@ mod tests {
         assert!(cli.is_ok());
 
         if let Ok(parsed) = cli {
-            if let Commands::Add { url, name } = parsed.command {
+            if let Commands::Add { url, name, .. } = parsed.command {
                 assert_eq!(url, "https://example.com");
                 assert_eq!(name, None);
             }
@@ -134,7 +142,7 @@ mod tests {
         assert!(cli.is_ok());
 
         if let Ok(parsed) = cli {
-            if let Commands::Add { url, name } = parsed.command {
+            if let Commands::Add { url, name, .. } = parsed.command {
                 assert_eq!(url, "https://example.com");
                 assert_eq!(name, Some("Example Docs".to_string()));
             }

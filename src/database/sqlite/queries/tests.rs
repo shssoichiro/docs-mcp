@@ -21,6 +21,10 @@ async fn create_test_pool() -> (TempDir, SqlitePool) {
         .execute(&pool)
         .await
         .expect("Failed to run migrations");
+    sqlx::query(include_str!("../migrations/002_add_index_url.sql"))
+        .execute(&pool)
+        .await
+        .expect("Failed to run migrations");
 
     (temp_dir, pool)
 }
@@ -31,6 +35,7 @@ async fn site_crud_operations() {
 
     let new_site = NewSite {
         base_url: "https://example.com".to_string(),
+        index_url: "https://example.com".to_string(),
         name: "Test Site".to_string(),
         version: "1.0".to_string(),
     };
@@ -87,6 +92,7 @@ async fn crawl_queue_operations() {
 
     let new_site = NewSite {
         base_url: "https://example.com".to_string(),
+        index_url: "https://example.com".to_string(),
         name: "Test Site".to_string(),
         version: "1.0".to_string(),
     };
@@ -134,6 +140,7 @@ async fn indexed_chunk_operations() {
 
     let new_site = NewSite {
         base_url: "https://example.com".to_string(),
+        index_url: "https://example.com".to_string(),
         name: "Test Site".to_string(),
         version: "1.0".to_string(),
     };

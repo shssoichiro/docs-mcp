@@ -7,6 +7,7 @@ use anyhow::Result;
 use docs_mcp::crawler::robots::fetch_robots_txt;
 use docs_mcp::crawler::{CrawlerConfig, HttpClient, SiteCrawler, extract_links, validate_url};
 use docs_mcp::database::sqlite::{Database, NewSite, SiteQueries};
+use serial_test::serial;
 use url::Url;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -255,44 +256,7 @@ async fn setup_restricted_mock_site(server: &MockServer) {
 }
 
 #[tokio::test]
-async fn database_operations() -> Result<()> {
-    use sqlx::Connection;
-    use sqlx::sqlite::SqliteConnection;
-
-    // Create a single connection to in-memory database
-    let mut conn = SqliteConnection::connect("sqlite::memory:").await?;
-
-    // Run migration on the connection
-    sqlx::query(include_str!(
-        "../src/database/sqlite/migrations/001_initial_schema.sql"
-    ))
-    .execute(&mut conn)
-    .await?;
-
-    // Test raw insertion first
-    let now = chrono::Utc::now().naive_utc();
-    let result = sqlx::query!(
-        "INSERT INTO sites (base_url, name, version, status, created_date) VALUES (?, ?, ?, 'pending', ?)",
-        "https://example.com/docs/",
-        "Test Documentation",
-        "1.0",
-        now
-    )
-    .execute(&mut conn)
-    .await?;
-
-    let id = result.last_insert_rowid();
-
-    // Test raw retrieval on the same connection
-    let retrieved = sqlx::query!("SELECT * FROM sites WHERE id = ?", id)
-        .fetch_optional(&mut conn)
-        .await?;
-    assert!(retrieved.is_some(), "Should retrieve the inserted site");
-
-    Ok(())
-}
-
-#[tokio::test]
+#[serial]
 async fn basic_site_crawling() -> Result<()> {
     // Start mock server
     let server = MockServer::start().await;
@@ -304,6 +268,7 @@ async fn basic_site_crawling() -> Result<()> {
 
     let new_site = NewSite {
         base_url: base_url.clone(),
+        index_url: base_url.clone(),
         name: "Test Documentation".to_string(),
         version: "1.0".to_string(),
     };
@@ -319,7 +284,7 @@ async fn basic_site_crawling() -> Result<()> {
     };
 
     let mut crawler = SiteCrawler::new(database.pool().clone(), config);
-    let stats = crawler.crawl_site(site.id, &base_url).await?;
+    let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
     // Verify crawl statistics
     assert!(stats.total_urls > 0, "Should have discovered URLs");
@@ -373,6 +338,7 @@ async fn url_validation() -> Result<()> {
 }
 
 #[tokio::test]
+#[serial]
 async fn robots_txt_compliance() -> Result<()> {
     // Start mock server with restricted robots.txt
     let server = MockServer::start().await;
@@ -384,6 +350,7 @@ async fn robots_txt_compliance() -> Result<()> {
 
     let new_site = NewSite {
         base_url: base_url.clone(),
+        index_url: base_url.clone(),
         name: "Restricted Test Site".to_string(),
         version: "1.0".to_string(),
     };
@@ -399,7 +366,7 @@ async fn robots_txt_compliance() -> Result<()> {
     };
 
     let mut crawler = SiteCrawler::new(database.pool().clone(), config);
-    let stats = crawler.crawl_site(site.id, &base_url).await?;
+    let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
     // Verify that the URL was blocked by robots.txt
     assert_eq!(
@@ -415,6 +382,7 @@ async fn robots_txt_compliance() -> Result<()> {
 }
 
 #[tokio::test]
+#[serial]
 async fn error_handling() -> Result<()> {
     // Start mock server
     let server = MockServer::start().await;
@@ -439,6 +407,7 @@ async fn error_handling() -> Result<()> {
 
     let new_site = NewSite {
         base_url: base_url.clone(),
+        index_url: base_url.clone(),
         name: "Error Test Site".to_string(),
         version: "1.0".to_string(),
     };
@@ -454,7 +423,7 @@ async fn error_handling() -> Result<()> {
     };
 
     let mut crawler = SiteCrawler::new(database.pool().clone(), config);
-    let stats = crawler.crawl_site(site.id, &base_url).await?;
+    let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
     // Verify error handling
     assert_eq!(
@@ -470,6 +439,7 @@ async fn error_handling() -> Result<()> {
 }
 
 #[tokio::test]
+#[serial]
 async fn content_extraction() -> Result<()> {
     // Start mock server with a single complex page
     let server = MockServer::start().await;
@@ -524,6 +494,7 @@ async fn content_extraction() -> Result<()> {
 
     let new_site = NewSite {
         base_url: base_url.clone(),
+        index_url: base_url.clone(),
         name: "Content Test Site".to_string(),
         version: "1.0".to_string(),
     };
@@ -538,7 +509,7 @@ async fn content_extraction() -> Result<()> {
     };
 
     let mut crawler = SiteCrawler::new(database.pool().clone(), config);
-    let stats = crawler.crawl_site(site.id, &base_url).await?;
+    let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
     // Verify content was processed
     assert_eq!(
@@ -732,7 +703,7 @@ async fn extract_links_integration() {
         .get(&test_url)
         .await
         .expect("get call should succeed");
-    let links = extract_links(&html, &base_url).expect("extract_links should succeed");
+    let links = extract_links(&html, &base_url, &base_url).expect("extract_links should succeed");
 
     // Should extract only valid internal links
     assert_eq!(links.len(), 2);
@@ -789,7 +760,7 @@ async fn crawl_workflow_with_robots_txt() {
         .get(base_url.as_str())
         .await
         .expect("get call should succeed");
-    let links = extract_links(&html, &base_url).expect("extract_links should succeed");
+    let links = extract_links(&html, &base_url, &base_url).expect("extract_links should succeed");
 
     // 3. Filter links based on robots.txt
     let allowed_links: Vec<_> = links

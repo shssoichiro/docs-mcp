@@ -21,6 +21,7 @@ async fn integration_schema_migration() -> Result<()> {
     .await?;
 
     let expected_tables: HashSet<&'static str> = [
+        "_sqlx_migrations",
         "sites",
         "crawl_queue",
         "indexed_chunks",
@@ -41,6 +42,7 @@ async fn integration_foreign_key_constraints() -> Result<()> {
 
     let new_site = NewSite {
         base_url: "https://example.com".to_string(),
+        index_url: "https://example.com".to_string(),
         name: "Test Site".to_string(),
         version: "1.0".to_string(),
     };
@@ -85,6 +87,7 @@ async fn integration_site_workflow() -> Result<()> {
 
     let new_site = NewSite {
         base_url: "https://docs.example.com".to_string(),
+        index_url: "https://docs.example.com".to_string(),
         name: "Example Docs".to_string(),
         version: "2.0".to_string(),
     };
@@ -200,6 +203,7 @@ async fn integration_batch_operations() -> Result<()> {
 
     let new_site = NewSite {
         base_url: "https://batch.example.com".to_string(),
+        index_url: "https://batch.example.com".to_string(),
         name: "Batch Test".to_string(),
         version: "1.0".to_string(),
     };
@@ -261,6 +265,7 @@ async fn integration_error_handling() -> Result<()> {
 
     let new_site = NewSite {
         base_url: "https://error.example.com".to_string(),
+        index_url: "https://error.example.com".to_string(),
         name: "Error Test".to_string(),
         version: "1.0".to_string(),
     };
@@ -295,6 +300,7 @@ async fn integration_transaction_rollback() -> Result<()> {
 
     let new_site = NewSite {
         base_url: "https://transaction.example.com".to_string(),
+        index_url: "https://transaction.example.com".to_string(),
         name: "Transaction Test".to_string(),
         version: "1.0".to_string(),
     };
@@ -345,6 +351,7 @@ async fn integration_concurrent_access() -> Result<()> {
 
     let new_site = NewSite {
         base_url: "https://concurrent.example.com".to_string(),
+        index_url: "https://concurrent.example.com".to_string(),
         name: "Concurrent Test".to_string(),
         version: "1.0".to_string(),
     };

@@ -188,6 +188,7 @@ async fn indexing_status_detection() -> Result<()> {
     let new_site = NewSite {
         name: "Test Site".to_string(),
         base_url: "https://example.com".to_string(),
+        index_url: "https://example.com".to_string(),
         version: "v1.0".to_string(),
     };
 
@@ -225,6 +226,7 @@ async fn end_to_end_indexing_pipeline() -> Result<()> {
     let new_site = NewSite {
         name: "Test Documentation".to_string(),
         base_url: "https://testdocs.com".to_string(),
+        index_url: "https://testdocs.com".to_string(),
         version: "v1.0".to_string(),
     };
 
@@ -291,6 +293,7 @@ async fn consistency_validation() -> Result<()> {
     let new_site = NewSite {
         name: "Consistency Test Site".to_string(),
         base_url: "https://consistency.com".to_string(),
+        index_url: "https://consistency.com".to_string(),
         version: "v1.0".to_string(),
     };
 
@@ -478,6 +481,7 @@ async fn site_completion_workflow() -> Result<()> {
     let new_site = NewSite {
         name: "Completion Test Site".to_string(),
         base_url: "https://completion.com".to_string(),
+        index_url: "https://completion.com".to_string(),
         version: "v1.0".to_string(),
     };
 

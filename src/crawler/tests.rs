@@ -124,7 +124,8 @@ fn extract_links() {
         </html>
     "#;
 
-    let links = extract_links_impl(html, &base_url).expect("extract_links should succeed");
+    let links =
+        extract_links_impl(html, &base_url, &base_url).expect("extract_links should succeed");
 
     // Should only include links that match the base URL path
     assert_eq!(links.len(), 2);
@@ -178,8 +179,8 @@ fn malformed_html_parsing() {
         "#;
 
     let base_url = Url::parse("https://example.com/").expect("url should parse");
-    let links =
-        extract_links_impl(malformed_html, &base_url).expect("extract_links should succeed");
+    let links = extract_links_impl(malformed_html, &base_url, &base_url)
+        .expect("extract_links should succeed");
 
     // Should still extract valid links despite malformed HTML
     assert_eq!(links.len(), 3);

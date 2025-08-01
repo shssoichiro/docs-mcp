@@ -8,6 +8,7 @@ mod tests;
 use anyhow::{Context, Result, anyhow};
 use indicatif::{ProgressBar, ProgressStyle};
 use scraper::{Html, Selector};
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -218,26 +219,26 @@ pub fn should_crawl_url(url: &Url, base_url: &Url) -> bool {
     let base_path = normalize_path_for_filtering(base_url.path());
     let url_path = url.path();
 
-    url_path.starts_with(&base_path)
+    url_path.starts_with(base_path.as_ref())
 }
 
 /// Normalize a URL path for filtering by removing trailing filename if present
-fn normalize_path_for_filtering(path: &str) -> String {
+fn normalize_path_for_filtering(path: &str) -> Cow<'_, str> {
     if path.ends_with('/') {
-        path.to_string()
+        Cow::Borrowed(path)
     } else {
         // Check if the last segment looks like a filename (contains a dot)
         path.rfind('/').map_or_else(
-            || format!("{}/", path),
+            || Cow::Owned(format!("{}/", path)),
             #[expect(clippy::string_slice, reason = "we know the split point is one byte")]
             |last_slash| {
                 let last_segment = &path[last_slash + 1..];
                 if last_segment.contains('.') && !last_segment.ends_with('/') {
                     // Looks like a filename, use the directory path
-                    path[..=last_slash].to_string()
+                    Cow::Borrowed(&path[..=last_slash])
                 } else {
                     // Not a filename, add trailing slash
-                    format!("{}/", path)
+                    Cow::Owned(format!("{}/", path))
                 }
             },
         )
@@ -246,7 +247,7 @@ fn normalize_path_for_filtering(path: &str) -> String {
 
 /// Extract all links from HTML content using proper HTML parsing
 #[inline]
-pub fn extract_links(html: &str, base_url: &Url) -> Result<Vec<Url>> {
+pub fn extract_links(html: &str, source_url: &Url, base_url: &Url) -> Result<Vec<Url>> {
     let document = Html::parse_document(html);
     let link_selector = Selector::parse("a[href]")
         .map_err(|e| anyhow!("Failed to create CSS selector: {:?}", e))?;
@@ -264,7 +265,7 @@ pub fn extract_links(html: &str, base_url: &Url) -> Result<Vec<Url>> {
                 continue;
             }
 
-            match base_url.join(href) {
+            match source_url.join(href) {
                 Ok(absolute_url) => {
                     if should_crawl_url(&absolute_url, base_url) {
                         links.push(absolute_url);
@@ -284,7 +285,7 @@ pub fn extract_links(html: &str, base_url: &Url) -> Result<Vec<Url>> {
     links.sort_by(|a, b| a.as_str().cmp(b.as_str()));
     links.dedup();
 
-    info!("Extracted {} valid links from {}", links.len(), base_url);
+    info!("Extracted {} valid links from {}", links.len(), source_url);
     Ok(links)
 }
 
@@ -361,11 +362,17 @@ impl SiteCrawler {
 
     /// Crawl a documentation site from the given base URL
     #[inline]
-    pub async fn crawl_site(&mut self, site_id: i64, base_url: &str) -> Result<CrawlStats> {
+    pub async fn crawl_site(
+        &mut self,
+        site_id: i64,
+        index_url: &str,
+        base_url: &str,
+    ) -> Result<CrawlStats> {
         let start_time = Instant::now();
+        let index_url = validate_url(index_url)?;
         let base_url = validate_url(base_url)?;
 
-        info!("Starting crawl for site {} at {}", site_id, base_url);
+        info!("Starting crawl for site {} at {}", site_id, index_url);
 
         // Update site status to indexing
         self.update_site_status(site_id, SiteStatus::Indexing, None)
@@ -384,11 +391,11 @@ impl SiteCrawler {
         };
 
         // Initialize crawl queue with base URL
-        self.init_crawl_queue(site_id, &base_url).await?;
+        self.init_crawl_queue(site_id, &index_url).await?;
 
         // Track discovered URLs to avoid duplicates
         let mut discovered_urls = HashSet::new();
-        discovered_urls.insert(base_url.as_str().to_string());
+        discovered_urls.insert(index_url.as_str().to_string());
 
         let mut stats = CrawlStats {
             total_urls: 1,
@@ -622,7 +629,7 @@ impl SiteCrawler {
         };
 
         // Extract links
-        let links = match extract_links(&html, base_url) {
+        let links = match extract_links(&html, url, base_url) {
             Ok(links) => links,
             Err(e) => {
                 warn!("Failed to extract links from {}: {}", url, e);
@@ -647,14 +654,14 @@ impl SiteCrawler {
     }
 
     /// Initialize the crawl queue with the base URL
-    async fn init_crawl_queue(&self, site_id: i64, base_url: &Url) -> Result<()> {
+    async fn init_crawl_queue(&self, site_id: i64, index_url: &Url) -> Result<()> {
         let new_item = NewCrawlQueueItem {
             site_id,
-            url: base_url.as_str().to_string(),
+            url: index_url.as_str().to_string(),
         };
 
         CrawlQueueQueries::create(&self.db_pool, new_item).await?;
-        info!("Initialized crawl queue with base URL: {}", base_url);
+        info!("Initialized crawl queue with base URL: {}", index_url);
         Ok(())
     }
 

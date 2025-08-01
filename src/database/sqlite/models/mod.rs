@@ -8,6 +8,7 @@ use sqlx::{FromRow, Type};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, FromRow)]
 pub struct Site {
     pub id: i64,
+    pub index_url: String,
     pub base_url: String,
     pub name: String,
     pub version: String,
@@ -44,6 +45,7 @@ impl std::fmt::Display for SiteStatus {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NewSite {
+    pub index_url: String,
     pub base_url: String,
     pub name: String,
     pub version: String,

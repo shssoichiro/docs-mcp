@@ -14,7 +14,8 @@ impl SiteQueries {
     pub async fn create(pool: &SqlitePool, new_site: NewSite) -> Result<Site> {
         let now = Utc::now();
         let id = sqlx::query!(
-            "INSERT INTO sites (base_url, name, version, status, created_date) VALUES (?, ?, ?, 'pending', ?)",
+            "INSERT INTO sites (index_url, base_url, name, version, status, created_date) VALUES (?, ?, ?, ?, 'pending', ?)",
+            new_site.index_url,
             new_site.base_url,
             new_site.name,
             new_site.version,
@@ -36,6 +37,7 @@ impl SiteQueries {
             Site,
             r#"
             SELECT id,
+                   index_url, 
                    base_url,
                    name,
                    version,
@@ -68,6 +70,7 @@ impl SiteQueries {
             Site,
             r#"
             SELECT id,
+                   index_url, 
                    base_url,
                    name,
                    version,
@@ -92,11 +95,12 @@ impl SiteQueries {
     }
 
     #[inline]
-    pub async fn get_by_base_url(pool: &SqlitePool, base_url: &str) -> Result<Option<Site>> {
+    pub async fn get_by_index_url(pool: &SqlitePool, index_url: &str) -> Result<Option<Site>> {
         let result = sqlx::query_as!(
             Site,
             r#"
             SELECT id,
+                   index_url, 
                    base_url, 
                    name, 
                    version, 
@@ -108,13 +112,13 @@ impl SiteQueries {
                    error_message,
                    created_date,
                    last_heartbeat
-            FROM sites WHERE base_url = ?
+            FROM sites WHERE index_url = ?
             "#,
-            base_url
+            index_url
         )
         .fetch_optional(pool)
         .await
-        .context("Failed to get site by base URL")?;
+        .context("Failed to get site by index URL")?;
 
         Ok(result)
     }
@@ -125,6 +129,7 @@ impl SiteQueries {
             Site,
             r#"
             SELECT id,
+                   index_url,
                    base_url, 
                    name, 
                    version, 
@@ -152,6 +157,7 @@ impl SiteQueries {
             Site,
             r#"
             SELECT id,
+                   index_url,
                    base_url, 
                    name, 
                    version, 
@@ -297,6 +303,7 @@ impl SiteQueries {
             Site,
             r#"
             SELECT id,
+                   index_url,
                    base_url, 
                    name, 
                    version, 
@@ -325,6 +332,7 @@ impl SiteQueries {
             Site,
             r#"
             SELECT id,
+                   index_url,
                    base_url, 
                    name, 
                    version, 

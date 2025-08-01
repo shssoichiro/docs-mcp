@@ -22,6 +22,7 @@ fn crawl_status_serialization() {
 fn site_progress_calculation() {
     let site = Site {
         id: 1,
+        index_url: "https://example.com".to_string(),
         base_url: "https://example.com".to_string(),
         name: "Test Site".to_string(),
         version: "1.0".to_string(),
