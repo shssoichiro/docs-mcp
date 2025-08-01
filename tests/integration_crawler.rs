@@ -423,17 +423,13 @@ async fn error_handling() -> Result<()> {
     };
 
     let mut crawler = SiteCrawler::new(database.pool().clone(), config);
-    let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
+    let crawl_error = crawler
+        .crawl_site(site.id, &base_url, &base_url)
+        .await
+        .expect_err("should return an error");
 
     // Verify error handling
-    assert_eq!(
-        stats.successful_crawls, 0,
-        "No crawls should succeed with 404"
-    );
-    assert!(
-        stats.failed_crawls > 0,
-        "Should have failed crawls due to 404"
-    );
+    assert_eq!(crawl_error.to_string(), "All 1 crawl attempts failed");
 
     Ok(())
 }

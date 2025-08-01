@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use docs_mcp::Result;
 use docs_mcp::commands::{add_site, delete_site, list_sites, serve_mcp, show_status, update_site};
 use docs_mcp::config::{Config, run_interactive_config, show_config};
-use docs_mcp::indexer::BackgroundIndexer;
+use docs_mcp::indexer::Indexer;
 
 #[derive(Parser)]
 #[command(name = "docs-mcp")]
@@ -51,8 +51,6 @@ enum Commands {
     Serve,
     /// Show detailed status of the indexing pipeline
     Status,
-    /// Run the indexer, finishing any crawls that were interrupted
-    Index,
 }
 
 #[tokio::main]
@@ -78,7 +76,11 @@ async fn main() -> Result<()> {
             version,
         } => {
             let base_url = base_url.as_deref().unwrap_or(url.as_str());
-            add_site(&url, name, version, base_url).await?;
+            let site = add_site(&url, name, version, base_url).await?;
+            Indexer::new(Config::load()?)
+                .await?
+                .process_site_embeddings(&site)
+                .await?;
         }
         Commands::List => {
             list_sites().await?;
@@ -87,19 +89,17 @@ async fn main() -> Result<()> {
             delete_site(site).await?;
         }
         Commands::Update { site } => {
-            update_site(site).await?;
+            let site = update_site(site).await?;
+            Indexer::new(Config::load()?)
+                .await?
+                .process_site_embeddings(&site)
+                .await?;
         }
         Commands::Serve => {
             serve_mcp().await?;
         }
         Commands::Status => {
             show_status().await?;
-        }
-        Commands::Index => {
-            BackgroundIndexer::new(Config::load()?)
-                .await?
-                .start()
-                .await?;
         }
     }
 

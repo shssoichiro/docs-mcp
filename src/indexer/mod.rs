@@ -6,19 +6,12 @@ pub mod consistency;
 #[cfg(test)]
 mod tests;
 
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
 use anyhow::{Context, Result};
 use chrono::Utc;
-use tokio::fs;
-use tokio::select;
-use tokio::signal;
-use tokio::time::sleep;
+use indicatif::{ProgressBar, ProgressStyle};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::DocsError;
 use crate::config::Config;
 use crate::crawler::extractor::ExtractedContent;
 use crate::database::lancedb::{ChunkMetadata, EmbeddingRecord, VectorStore};
@@ -32,13 +25,11 @@ use crate::embeddings::ollama::OllamaClient;
 pub use consistency::{ConsistencyReport, ConsistencyValidator, SiteConsistencyIssue};
 
 /// Background indexer that processes crawled content into searchable embeddings
-pub struct BackgroundIndexer {
+pub struct Indexer {
     database: Database,
     vector_store: VectorStore,
     ollama_client: OllamaClient,
     chunking_config: ChunkingConfig,
-    pub lock_file_path: PathBuf,
-    heartbeat_interval: Duration,
     batch_size: usize,
 }
 
@@ -88,7 +79,7 @@ impl Default for IndexingPerformanceMetrics {
     }
 }
 
-impl BackgroundIndexer {
+impl Indexer {
     /// Create a new background indexer
     #[inline]
     pub async fn new(config: Config) -> Result<Self> {
@@ -103,260 +94,20 @@ impl BackgroundIndexer {
         let ollama_client =
             OllamaClient::new(&config).context("Failed to initialize Ollama client")?;
 
-        let lock_file_path = config.config_dir_path().join(".indexer.lock");
-
         Ok(Self {
             database,
             vector_store,
             ollama_client,
             chunking_config: ChunkingConfig::default(),
-            lock_file_path,
-            heartbeat_interval: Duration::from_secs(30),
             batch_size: 64,
         })
     }
 
-    /// Start the background indexing process with signal handling
-    #[inline]
-    pub async fn start(&mut self) -> Result<()> {
-        // Check if another indexer is already running
-        if self.is_indexer_running().await? {
-            return Err(DocsError::Database(
-                "Another indexer process is already running".to_string(),
-            )
-            .into());
-        }
-
-        // Create lock file
-        self.create_lock_file().await?;
-
-        info!("Starting background indexer process");
-
-        // Start heartbeat task
-        let heartbeat_handle = self.start_heartbeat_task();
-
-        // Main indexing loop with signal handling
-        let result = self.run_indexing_loop_with_signals().await;
-
-        // Stop heartbeat and cleanup
-        heartbeat_handle.abort();
-        self.cleanup_lock_file().await?;
-
-        result
-    }
-
-    /// Check if an indexer is currently running with enhanced stale detection
-    #[inline]
-    pub async fn is_indexer_running(&self) -> Result<bool> {
-        // First check if lock file exists
-        if !self.lock_file_path.exists() {
-            debug!("No lock file found, indexer not running");
-            return Ok(false);
-        }
-
-        // Read lock file timestamp for additional validation
-        let lock_file_valid = match fs::read_to_string(&self.lock_file_path).await {
-            Ok(content) => {
-                content.trim().parse::<u64>().map_or_else(
-                    |_| {
-                        warn!("Lock file contains invalid timestamp, considering invalid");
-                        false
-                    },
-                    |timestamp| {
-                        let lock_time = SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp);
-                        let now = SystemTime::now();
-
-                        now.duration_since(lock_time).map_or_else(
-                            |_| {
-                                warn!("Lock file timestamp is in the future, considering invalid");
-                                false
-                            },
-                            |elapsed| {
-                                // Lock file should be recent (within 10 minutes)
-                                let stale = elapsed > Duration::from_secs(600);
-                                if stale {
-                                    warn!(
-                                        "Lock file is stale ({}s old), considering process dead",
-                                        elapsed.as_secs()
-                                    );
-                                }
-                                !stale
-                            },
-                        )
-                    },
-                )
-            }
-            Err(e) => {
-                error!("Failed to read lock file: {}", e);
-                false
-            }
-        };
-
-        if !lock_file_valid {
-            info!("Removing stale lock file");
-            let _ = fs::remove_file(&self.lock_file_path).await;
-            return Ok(false);
-        }
-
-        // Check if the process is still alive by examining heartbeat
-        match self.database.get_indexer_heartbeat().await {
-            Ok(heartbeat) => {
-                let now = Utc::now().naive_utc();
-                let elapsed = now
-                    .signed_duration_since(heartbeat)
-                    .num_seconds()
-                    .unsigned_abs();
-
-                // Consider stale if no heartbeat for 2 minutes (60 seconds as mentioned in requirements)
-                let is_alive = elapsed < 60;
-
-                if !is_alive {
-                    warn!(
-                        "Process heartbeat is stale ({}s since last update), cleaning up",
-                        elapsed
-                    );
-                    // Clean up stale lock file
-                    let _ = fs::remove_file(&self.lock_file_path).await;
-                    // Reset heartbeat in database
-                    let _ = self.database.clear_indexer_heartbeat().await;
-                }
-
-                Ok(is_alive)
-            }
-            Err(e) => {
-                error!("Failed to check heartbeat: {}", e);
-                // On database error, assume process might be running to avoid conflicts
-                Ok(true)
-            }
-        }
-    }
-
-    /// Get current indexing status
-    #[inline]
-    pub async fn get_indexing_status(&self) -> Result<IndexingStatus> {
-        // Check if indexer is running
-        if !self.is_indexer_running().await? {
-            return Ok(IndexingStatus::Idle);
-        }
-
-        // Get sites that are currently being indexed
-        let indexing_sites = self
-            .database
-            .get_sites_by_status(SiteStatus::Indexing)
-            .await?;
-
-        if let Some(site) = indexing_sites.first() {
-            // Check if we're in the crawling phase or embedding phase
-            let pending_crawl_items = self
-                .database
-                .get_pending_crawl_items_for_site(site.id)
-                .await?;
-
-            if !pending_crawl_items.is_empty() {
-                return Ok(IndexingStatus::ProcessingSite {
-                    site_id: site.id,
-                    site_name: site.name.clone(),
-                });
-            }
-
-            // Check for chunks waiting for embedding generation
-            let completed_crawl_items = self
-                .database
-                .get_completed_crawl_items_for_site(site.id)
-                .await?;
-
-            let indexed_chunks = self.database.get_chunks_for_site(site.id).await?;
-
-            let remaining_chunks = completed_crawl_items
-                .len()
-                .saturating_sub(indexed_chunks.len());
-
-            if remaining_chunks > 0 {
-                return Ok(IndexingStatus::GeneratingEmbeddings { remaining_chunks });
-            }
-        }
-
-        Ok(IndexingStatus::Idle)
-    }
-
-    /// Main indexing loop with signal handling for graceful shutdown
-    async fn run_indexing_loop_with_signals(&mut self) -> Result<()> {
-        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
-            .context("Failed to register SIGTERM handler")?;
-        let mut sigint = signal::unix::signal(signal::unix::SignalKind::interrupt())
-            .context("Failed to register SIGINT handler")?;
-
-        loop {
-            select! {
-                // Handle SIGTERM (graceful shutdown request)
-                _ = sigterm.recv() => {
-                    info!("Received SIGTERM, initiating graceful shutdown");
-                    return Ok(());
-                }
-                // Handle SIGINT (Ctrl+C)
-                _ = sigint.recv() => {
-                    info!("Received SIGINT, initiating graceful shutdown");
-                    return Ok(());
-                }
-                // Normal indexing operations
-                result = self.process_next_site() => {
-                    match result {
-                        Ok(true) => {
-                            // Successfully processed a site or made progress
-                            sleep(Duration::from_millis(100)).await;
-                        }
-                        Ok(false) => {
-                            // No work to do, exit gracefully
-                            info!("No more work to process, shutting down indexer");
-                            return Ok(());
-                        }
-                        Err(e) => {
-                            error!("Error in indexing loop: {}", e);
-                            sleep(Duration::from_secs(10)).await;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Process the next site that needs indexing
-    async fn process_next_site(&mut self) -> Result<bool> {
-        // Get sites that need indexing (either pending or with completed crawl items)
-        let sites = self.database.get_sites_needing_indexing().await?;
-
-        for site in sites {
-            match site.status {
-                SiteStatus::Pending => {
-                    // Site has been added but crawling hasn't started - skip for now
-                    // Crawling should be handled by the crawler component
-                }
-                SiteStatus::Indexing => {
-                    // Check if crawling is complete for this site
-                    let pending_crawl_items = self
-                        .database
-                        .get_pending_crawl_items_for_site(site.id)
-                        .await?;
-
-                    if !pending_crawl_items.is_empty() {
-                        // Crawling is still in progress - skip for now
-                        continue;
-                    }
-
-                    // Crawling is complete, process embeddings
-                    return self.process_site_embeddings(&site).await.map(|_| true);
-                }
-                SiteStatus::Completed | SiteStatus::Failed => {
-                    // Nothing to do for completed or failed sites
-                }
-            }
-        }
-
-        Ok(false)
-    }
-
     /// Process embeddings for a site where crawling is complete
-    async fn process_site_embeddings(&mut self, site: &Site) -> Result<()> {
+    #[inline]
+    pub async fn process_site_embeddings(&mut self, site: &Site) -> Result<()> {
+        // TODO: Implement per-site multiple instance checking
+
         info!("Processing embeddings for site: {}", site.name);
 
         // Get all completed crawl items that don't have indexed chunks yet
@@ -380,20 +131,35 @@ impl BackgroundIndexer {
             return Ok(());
         }
 
-        info!("Processing {} pages for embeddings", items_to_process.len());
+        eprintln!("Processing {} pages for embeddings", items_to_process.len());
 
         let mut total_chunks_created = 0;
         let mut pages_processed = 0;
 
+        let bar = if console::user_attended_stderr() {
+            ProgressBar::new_spinner().with_style(
+                ProgressStyle::with_template(
+                    "{spinner} [{pos}/{len}] Creating embeddings for {msg}",
+                )
+                .expect("style template is valid"),
+            )
+        } else {
+            ProgressBar::hidden()
+        };
+        bar.set_position(0);
+        bar.set_length(items_to_process.len() as u64);
+
         for crawl_item in items_to_process {
+            bar.set_message(crawl_item.url.clone());
             match self.process_single_page(&crawl_item, site.id).await {
                 Ok(chunks_created) => {
                     total_chunks_created += chunks_created;
                     pages_processed += 1;
+                    bar.set_position(pages_processed);
 
                     // Update site progress
                     let progress_update = SiteUpdate {
-                        indexed_pages: Some(site.indexed_pages + pages_processed),
+                        indexed_pages: Some(site.indexed_pages + pages_processed as i64),
                         ..Default::default()
                     };
                     self.database.update_site(site.id, &progress_update).await?;
@@ -416,8 +182,9 @@ impl BackgroundIndexer {
         if remaining_items.len() <= remaining_chunks.len() {
             self.complete_site_indexing(site).await?;
         }
+        bar.finish_and_clear();
 
-        info!(
+        eprintln!(
             "Processed {} pages, created {} chunks for site: {}",
             pages_processed, total_chunks_created, site.name
         );
@@ -613,69 +380,5 @@ impl BackgroundIndexer {
 
         info!("Database consistency cleanup completed");
         Ok(())
-    }
-
-    /// Start heartbeat task to indicate the indexer is alive
-    fn start_heartbeat_task(&self) -> tokio::task::JoinHandle<()> {
-        let database = self.database.clone();
-        let interval = self.heartbeat_interval;
-
-        tokio::spawn(async move {
-            #[expect(
-                clippy::infinite_loop,
-                reason = "intended to run until handle is aborted"
-            )]
-            loop {
-                if let Err(e) = database.update_indexer_heartbeat().await {
-                    error!("Failed to update indexer heartbeat: {}", e);
-                }
-                sleep(interval).await;
-            }
-        })
-    }
-
-    /// Create lock file to prevent multiple indexers
-    #[doc(hidden)]
-    #[allow(
-        clippy::missing_inline_in_public_items,
-        reason = "only pub for testing purposes"
-    )]
-    pub async fn create_lock_file(&self) -> Result<()> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("current time is later than start of epoch")
-            .as_secs();
-
-        fs::write(&self.lock_file_path, timestamp.to_string())
-            .await
-            .context("Failed to create indexer lock file")?;
-
-        Ok(())
-    }
-
-    /// Remove lock file on shutdown
-    #[doc(hidden)]
-    #[allow(
-        clippy::missing_inline_in_public_items,
-        reason = "only pub for testing purposes"
-    )]
-    pub async fn cleanup_lock_file(&self) -> Result<()> {
-        if self.lock_file_path.exists() {
-            fs::remove_file(&self.lock_file_path)
-                .await
-                .context("Failed to remove indexer lock file")?;
-        }
-        Ok(())
-    }
-}
-
-impl Drop for BackgroundIndexer {
-    #[inline]
-    fn drop(&mut self) {
-        // Best effort cleanup on drop
-        let lock_file_path = self.lock_file_path.clone();
-        tokio::spawn(async move {
-            let _ = fs::remove_file(lock_file_path).await;
-        });
     }
 }

@@ -5,7 +5,7 @@ pub mod robots;
 #[cfg(test)]
 mod tests;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use scraper::{Html, Selector};
 use std::borrow::Cow;
@@ -368,6 +368,8 @@ impl SiteCrawler {
         index_url: &str,
         base_url: &str,
     ) -> Result<CrawlStats> {
+        // TODO: Implement per-site multiple instance checking
+
         let start_time = Instant::now();
         let index_url = validate_url(index_url)?;
         let base_url = validate_url(base_url)?;
@@ -405,10 +407,14 @@ impl SiteCrawler {
             duration: Duration::default(),
         };
 
-        let bar = ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template("{spinner} [{pos}/{len}] Crawling {msg}")
-                .expect("style template is valid"),
-        );
+        let bar = if console::user_attended_stderr() {
+            ProgressBar::new_spinner().with_style(
+                ProgressStyle::with_template("{spinner} [{pos}/{len}] Crawling {msg}")
+                    .expect("style template is valid"),
+            )
+        } else {
+            ProgressBar::hidden()
+        };
         bar.set_position(0);
         bar.set_length(1);
 
@@ -537,22 +543,21 @@ impl SiteCrawler {
         }
 
         stats.duration = start_time.elapsed();
+        bar.finish_and_clear();
 
         // Final site status update
         if stats.failed_crawls == 0 {
-            self.update_site_status(site_id, SiteStatus::Completed, None)
+            self.update_site_status(site_id, SiteStatus::Indexing, None)
                 .await?;
         } else if stats.successful_crawls == 0 {
-            self.update_site_status(
-                site_id,
-                SiteStatus::Failed,
-                Some(format!("All {} crawl attempts failed", stats.failed_crawls)),
-            )
-            .await?;
+            let error_message = format!("All {} crawl attempts failed", stats.failed_crawls);
+            self.update_site_status(site_id, SiteStatus::Failed, Some(error_message.clone()))
+                .await?;
+            bail!("{}", error_message);
         } else {
             self.update_site_status(
                 site_id,
-                SiteStatus::Completed,
+                SiteStatus::Indexing,
                 Some(format!(
                     "{} pages succeeded, {} failed",
                     stats.successful_crawls, stats.failed_crawls
@@ -560,7 +565,6 @@ impl SiteCrawler {
             )
             .await?;
         }
-        bar.finish_and_clear();
 
         info!(
             "Crawl completed for site {}: {} successful, {} failed, {} blocked by robots.txt, took {:?}",

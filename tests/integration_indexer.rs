@@ -17,9 +17,7 @@
 
 use anyhow::Result;
 use std::env;
-use std::time::Duration;
 use tempfile::TempDir;
-use tokio::time::sleep;
 
 use docs_mcp::config::{BrowserConfig, Config, OllamaConfig};
 use docs_mcp::database::lancedb::VectorStore;
@@ -27,7 +25,7 @@ use docs_mcp::database::sqlite::{
     CrawlQueueQueries, CrawlStatus, Database, NewCrawlQueueItem, NewIndexedChunk, NewSite,
     SiteQueries, SiteStatus, SiteUpdate,
 };
-use docs_mcp::indexer::{BackgroundIndexer, IndexingStatus};
+use docs_mcp::indexer::Indexer;
 
 const DEFAULT_OLLAMA_HOST: &str = "localhost";
 const DEFAULT_OLLAMA_PORT: u16 = 11434;
@@ -109,108 +107,12 @@ async fn background_indexer_creation() -> Result<()> {
     let (config, _temp_dir) = create_test_config();
 
     // Create indexer
-    let indexer = BackgroundIndexer::new(config).await;
+    let indexer = Indexer::new(config).await;
 
     assert!(
         indexer.is_ok(),
         "BackgroundIndexer creation should succeed: {:?}",
         indexer.err()
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn indexer_lock_file_mechanism() -> Result<()> {
-    let (config, _temp_dir) = create_test_config();
-    let base_dir = config.base_dir.clone();
-    let indexer = BackgroundIndexer::new(config).await?;
-
-    // Initially no indexer should be running
-    let is_running = indexer.is_indexer_running().await?;
-    assert!(!is_running, "No indexer should be running initially");
-
-    // Use the same config directory for both indexers to share lock file
-    let mut clone_config = create_test_config().0;
-    clone_config.base_dir = base_dir;
-
-    let mut indexer_clone = BackgroundIndexer::new(clone_config).await?;
-    let start_handle = tokio::spawn(async move {
-        // This should create lock file and start heartbeat
-        // Since there's no work to do, it should exit cleanly
-        indexer_clone.start().await
-    });
-
-    // Give it more time to create lock file and start heartbeat
-    sleep(Duration::from_millis(500)).await;
-
-    // Now another indexer should detect the first one is running
-    let is_running = indexer.is_indexer_running().await?;
-
-    if !is_running {
-        // If it's not running, wait a bit more and try again
-        sleep(Duration::from_millis(500)).await;
-        let _is_running_retry = indexer.is_indexer_running().await?;
-
-        // The indexer might finish very quickly if there's no work to do
-        // The test validates that the indexer can be created and started without errors
-    }
-
-    // Wait for the first indexer to complete
-    let result = tokio::time::timeout(Duration::from_secs(5), start_handle).await??;
-    assert!(result.is_ok(), "Indexer should complete successfully");
-
-    // Give it time to clean up lock file
-    sleep(Duration::from_millis(100)).await;
-
-    // Now no indexer should be running
-    let is_running = indexer.is_indexer_running().await?;
-    assert!(!is_running, "No indexer should be running after cleanup");
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn indexing_status_detection() -> Result<()> {
-    let (config, _temp_dir) = create_test_config();
-    let database = create_test_database(&config).await?;
-    let indexer = BackgroundIndexer::new(config).await?;
-
-    // Initially status should be Idle
-    let status = indexer.get_indexing_status().await?;
-    assert_eq!(
-        status,
-        IndexingStatus::Idle,
-        "Initial status should be Idle"
-    );
-
-    // Add a site in "indexing" status to simulate ongoing work
-    let new_site = NewSite {
-        name: "Test Site".to_string(),
-        base_url: "https://example.com".to_string(),
-        index_url: "https://example.com".to_string(),
-        version: "v1.0".to_string(),
-    };
-
-    let site = SiteQueries::create(database.pool(), new_site).await?;
-    let site_id = site.id;
-
-    // Update site to indexing status
-    let update = SiteUpdate {
-        status: Some(SiteStatus::Indexing),
-        ..Default::default()
-    };
-    SiteQueries::update(database.pool(), site_id, update).await?;
-
-    // Add some crawl queue items
-    setup_test_crawl_data(&database, site_id).await?;
-
-    // Without indexer running, status should still be Idle
-    let status = indexer.get_indexing_status().await?;
-    assert_eq!(
-        status,
-        IndexingStatus::Idle,
-        "Status should be Idle when indexer not running"
     );
 
     Ok(())
@@ -287,7 +189,7 @@ async fn end_to_end_indexing_pipeline() -> Result<()> {
 async fn consistency_validation() -> Result<()> {
     let (config, _temp_dir) = create_test_config();
     let database = create_test_database(&config).await?;
-    let mut indexer = BackgroundIndexer::new(config).await?;
+    let mut indexer = Indexer::new(config).await?;
 
     // Add a test site and chunks
     let new_site = NewSite {
@@ -360,7 +262,7 @@ async fn consistency_validation() -> Result<()> {
 #[tokio::test]
 async fn consistency_cleanup_operations() -> Result<()> {
     let (config, _temp_dir) = create_test_config();
-    let mut indexer = BackgroundIndexer::new(config).await?;
+    let mut indexer = Indexer::new(config).await?;
 
     // Create a consistency report with issues to clean up
     let test_report = docs_mcp::indexer::ConsistencyReport {
@@ -406,7 +308,7 @@ async fn indexer_error_handling() -> Result<()> {
     config.ollama.host = "nonexistent-host".to_string();
     config.ollama.port = 65535;
 
-    let indexer_result = BackgroundIndexer::new(config).await;
+    let indexer_result = Indexer::new(config).await;
 
     // Indexer creation might succeed even with invalid Ollama config
     // because the connection is only tested when actually used
@@ -425,49 +327,6 @@ async fn indexer_error_handling() -> Result<()> {
             );
         }
     }
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn multiple_indexer_coordination() -> Result<()> {
-    let (config, _temp_dir) = create_test_config();
-
-    let mut indexer1 = BackgroundIndexer::new(config).await?;
-
-    // Create second indexer with same base directory
-    let mut config2 = create_test_config().0;
-    config2.base_dir = Some(_temp_dir.path().to_path_buf());
-    let mut indexer2 = BackgroundIndexer::new(config2).await?;
-
-    // Start first indexer
-    let handle1 = tokio::spawn(async move { indexer1.start().await });
-
-    // Give first indexer time to create lock file
-    sleep(Duration::from_millis(500)).await;
-
-    // Second indexer should fail to start
-    let result2 = indexer2.start().await;
-
-    // The test validates that only one indexer can run at a time
-    if let Err(e) = result2 {
-        let error_msg = e.to_string();
-        assert!(
-            error_msg.contains("already running") || error_msg.contains("running"),
-            "Error should mention another indexer is running: {}",
-            error_msg
-        );
-    } else {
-        // If the second indexer somehow succeeded, it might be because the first one
-        // finished very quickly. This is acceptable behavior for the test.
-    }
-
-    // Wait for first indexer to complete
-    let result1 = tokio::time::timeout(Duration::from_secs(5), handle1).await??;
-    assert!(
-        result1.is_ok(),
-        "First indexer should complete successfully"
-    );
 
     Ok(())
 }

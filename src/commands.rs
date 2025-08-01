@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use modelcontextprotocol_server::ServerBuilder;
 use modelcontextprotocol_server::transport::StdioTransport;
 use serde_json::from_value;
@@ -8,6 +8,7 @@ use tracing::{error, info, warn};
 
 use crate::config::{Config, get_default_config_dir};
 use crate::crawler::{CrawlerConfig, SiteCrawler};
+use crate::database::Site;
 use crate::database::sqlite::{Database, NewSite, SiteQueries};
 use crate::mcp::tools::{CallToolParams, ToolHandler};
 
@@ -111,7 +112,7 @@ pub async fn add_site(
     name: Option<String>,
     version: Option<String>,
     base_url: &str,
-) -> Result<()> {
+) -> Result<Site> {
     eprintln!("🚀 Adding new documentation site");
     eprintln!("   URL: {}", url);
 
@@ -199,7 +200,7 @@ pub async fn add_site(
             existing_site.id
         );
         eprintln!("💡 Use 'docs-mcp list' to see all indexed sites");
-        return Ok(());
+        return Ok(existing_site);
     }
     eprintln!("✅");
 
@@ -269,6 +270,8 @@ pub async fn add_site(
             eprintln!("💡 The background indexer will now generate embeddings for search");
             eprintln!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
             eprintln!("💡 Use 'docs-mcp serve' to start the MCP server for AI assistants");
+
+            Ok(site)
         }
         Err(e) => {
             error!("Crawl failed: {}", e);
@@ -280,11 +283,9 @@ pub async fn add_site(
                 site.id
             );
             eprintln!("💡 Check the site URL and your internet connection");
-            return Err(e);
+            Err(e)
         }
     }
-
-    Ok(())
 }
 
 /// List all indexed documentation sites with comprehensive information
@@ -523,7 +524,7 @@ pub async fn delete_site(site_identifier: String) -> Result<()> {
 
 /// Update/re-index a documentation site with proper cleanup
 #[inline]
-pub async fn update_site(site_identifier: String) -> Result<()> {
+pub async fn update_site(site_identifier: String) -> Result<Site> {
     // Validate input
     validation::validate_site_identifier(&site_identifier).context("Invalid site identifier")?;
 
@@ -580,8 +581,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
     let input = input.trim().to_lowercase();
 
     if input != "y" && input != "yes" {
-        eprintln!("❌ Update cancelled. No changes were made.");
-        return Ok(());
+        bail!("❌ Update cancelled. No changes were made.");
     }
 
     eprintln!();
@@ -677,6 +677,7 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
             eprintln!();
             eprintln!("💡 The background indexer will generate embeddings for new content");
             eprintln!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
+            Ok(site)
         }
         Err(e) => {
             error!("Re-indexing failed: {}", e);
@@ -684,11 +685,9 @@ pub async fn update_site(site_identifier: String) -> Result<()> {
             eprintln!();
             eprintln!("💡 The site has been reset to pending status");
             eprintln!("💡 You can try running the update command again");
-            return Err(e);
+            Err(e)
         }
     }
-
-    Ok(())
 }
 
 /// Show detailed status of the indexing pipeline
