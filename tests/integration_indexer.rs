@@ -3,10 +3,9 @@
     reason = "integration tests are only compiled in test mode"
 )]
 
-//! Integration tests for the background indexer
+//! Integration tests for the indexer
 //!
 //! These tests verify the complete indexing pipeline including:
-//! - Background process coordination and lock file management
 //! - End-to-end content processing from crawled data to searchable embeddings
 //! - Cross-database consistency validation and cleanup
 //! - Error handling and recovery scenarios

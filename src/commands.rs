@@ -267,7 +267,7 @@ pub async fn add_site(
 
             eprintln!();
             eprintln!("🎉 Site successfully added and crawled!");
-            eprintln!("💡 The background indexer will now generate embeddings for search");
+            eprintln!("💡 The indexer will now generate embeddings for search");
             eprintln!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
             eprintln!("💡 Use 'docs-mcp serve' to start the MCP server for AI assistants");
 
@@ -675,7 +675,7 @@ pub async fn update_site(site_identifier: String) -> Result<Site> {
             }
 
             eprintln!();
-            eprintln!("💡 The background indexer will generate embeddings for new content");
+            eprintln!("💡 The indexer will generate embeddings for new content");
             eprintln!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
             Ok(site)
         }
@@ -798,10 +798,10 @@ pub async fn show_status() -> Result<()> {
     Ok(())
 }
 
-/// Start MCP server and background indexer with stdio transport
+/// Start MCP server
 #[inline]
 pub async fn serve_mcp() -> Result<()> {
-    info!("Starting MCP server with stdio transport and background indexer");
+    info!("Starting MCP server with stdio transport");
 
     // Load configuration
     let config = Config::load().context("Failed to load configuration")?;

@@ -24,7 +24,7 @@ use crate::embeddings::ollama::OllamaClient;
 
 pub use consistency::{ConsistencyReport, ConsistencyValidator, SiteConsistencyIssue};
 
-/// Background indexer that processes crawled content into searchable embeddings
+/// Indexer that processes crawled content into searchable embeddings
 pub struct Indexer {
     database: Database,
     vector_store: VectorStore,
@@ -80,7 +80,7 @@ impl Default for IndexingPerformanceMetrics {
 }
 
 impl Indexer {
-    /// Create a new background indexer
+    /// Create a new indexer
     #[inline]
     pub async fn new(config: Config) -> Result<Self> {
         let database = Database::new(&config.database_path())
