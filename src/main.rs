@@ -112,19 +112,19 @@ async fn main() -> DocsResult<()> {
 }
 
 fn default_config_dir() -> Result<PathBuf, ConfigError> {
-    dirs::home_dir()
-        .map(|home| home.join(".docs-mcp"))
-        .or({
-            #[cfg(windows)]
-            {
-                dirs::data_dir().map(|data| data.join("docs-mcp"))
-            }
-            #[cfg(not(windows))]
-            {
-                None
-            }
-        })
-        .ok_or(ConfigError::DirectoryError)
+    #[cfg(windows)]
+    {
+        dirs::data_dir()
+            .map(|data| data.join("docs-mcp"))
+            .ok_or(ConfigError::DirectoryError)
+    }
+
+    #[cfg(not(windows))]
+    {
+        dirs::home_dir()
+            .map(|home| home.join(".docs-mcp"))
+            .ok_or(ConfigError::DirectoryError)
+    }
 }
 
 #[cfg(test)]

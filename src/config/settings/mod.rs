@@ -80,8 +80,9 @@ impl Config {
         let content = fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read config file: {}", config_path.display()))?;
 
-        let config: Config = toml::from_str(&content)
+        let mut config: Config = toml::from_str(&content)
             .with_context(|| format!("Failed to parse config file: {}", config_path.display()))?;
+        config.base_dir = config_dir.as_ref().to_path_buf();
 
         config
             .validate()

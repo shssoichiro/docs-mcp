@@ -46,11 +46,9 @@ impl VectorStore {
         debug!("Initializing LanceDB at path: {:?}", db_path);
 
         // Ensure the directory exists
-        if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                DocsError::Database(format!("Failed to create vector database directory: {}", e))
-            })?;
-        }
+        std::fs::create_dir_all(&db_path).map_err(|e| {
+            DocsError::Database(format!("Failed to create vector database directory: {}", e))
+        })?;
 
         let uri = format!("file://{}", db_path.display());
 
