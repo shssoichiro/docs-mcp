@@ -133,25 +133,10 @@ fn configure_ollama(ollama: &mut OllamaConfig) -> Result<()> {
         })
         .interact_text()?;
 
-    let batch_size: u32 = Input::new()
-        .with_prompt("Batch size for embedding generation")
-        .default(ollama.batch_size)
-        .validate_with(|input: &u32| -> Result<(), &str> {
-            if *input == 0 {
-                Err("Batch size must be greater than 0")
-            } else if *input > 1000 {
-                Err("Batch size must be 1000 or less")
-            } else {
-                Ok(())
-            }
-        })
-        .interact_text()?;
-
     ollama.set_protocol(protocol)?;
     ollama.set_host(host)?;
     ollama.set_port(port)?;
     ollama.set_model(model)?;
-    ollama.set_batch_size(batch_size)?;
 
     Ok(())
 }
