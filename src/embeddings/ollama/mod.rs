@@ -10,7 +10,6 @@ use url::Url;
 use crate::config::OllamaConfig;
 use crate::embeddings::chunking::ContentChunk;
 
-const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
 const DEFAULT_RETRY_ATTEMPTS: u32 = 3;
 const EXPONENTIAL_BACKOFF_BASE: u64 = 2;
 
@@ -85,7 +84,7 @@ impl OllamaClient {
             .context("Failed to generate Ollama URL from config")?;
 
         let agent = ureq::Agent::config_builder()
-            .timeout_global(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS)))
+            .timeout_global(None)
             .build()
             .into();
 
