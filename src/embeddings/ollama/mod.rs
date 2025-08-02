@@ -41,7 +41,7 @@ struct BatchEmbedRequest {
 
 #[derive(Debug, Serialize)]
 struct EmbedOptions {
-    num_ctx: Option<u32>,
+    num_predict: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -223,7 +223,7 @@ impl OllamaClient {
             model: self.model.clone(),
             input: text.to_string(),
             options: Some(EmbedOptions {
-                num_ctx: Some(self.embedding_dimension),
+                num_predict: Some(self.embedding_dimension),
             }),
         };
 
@@ -330,7 +330,7 @@ impl OllamaClient {
             model: self.model.clone(),
             inputs: texts.to_vec(),
             options: Some(EmbedOptions {
-                num_ctx: Some(self.embedding_dimension),
+                num_predict: Some(self.embedding_dimension),
             }),
         };
 
