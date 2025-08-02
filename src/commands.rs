@@ -271,8 +271,6 @@ pub async fn add_site(
             eprintln!();
             eprintln!("🎉 Site successfully added and crawled!");
             eprintln!("💡 The indexer will now generate embeddings for search");
-            eprintln!("💡 Use 'docs-mcp status' to monitor embedding generation progress");
-            eprintln!("💡 Use 'docs-mcp serve' to start the MCP server for AI assistants");
 
             Ok(site)
         }
