@@ -102,6 +102,7 @@ fn configure_ollama(ollama: &mut OllamaConfig) -> Result<()> {
                 port: 11434, // Use default port for validation
                 model: "test".to_string(),
                 batch_size: 32,
+                embedding_dimension: None,
             };
             temp_config.validate()?;
             Ok(())

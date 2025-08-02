@@ -22,6 +22,8 @@ pub struct OllamaConfig {
     pub port: u16,
     pub model: String,
     pub batch_size: u32,
+    #[serde(default)]
+    pub embedding_dimension: Option<u32>,
 }
 
 impl Default for OllamaConfig {
@@ -33,6 +35,7 @@ impl Default for OllamaConfig {
             port: 11434,
             model: "nomic-embed-text:latest".to_string(),
             batch_size: 64,
+            embedding_dimension: None,
         }
     }
 }
@@ -57,6 +60,8 @@ pub enum ConfigError {
     InvalidWindowDimensions(u32, u32),
     #[error("Invalid protocol: {0} (must be 'http' or 'https')")]
     InvalidProtocol(String),
+    #[error("Invalid embedding dimension: {0} (must be between 64 and 4096)")]
+    InvalidEmbeddingDimension(u32),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("TOML parsing error: {0}")]
@@ -157,6 +162,9 @@ impl OllamaConfig {
             return Err(ConfigError::InvalidProtocol(self.protocol.clone()));
         }
 
+        let url_str = format!("{}://{}:{}", self.protocol, self.host, self.port);
+        Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))?;
+
         if self.port == 0 {
             return Err(ConfigError::InvalidPort(self.port));
         }
@@ -169,8 +177,11 @@ impl OllamaConfig {
             return Err(ConfigError::InvalidBatchSize(self.batch_size));
         }
 
-        let url_str = format!("{}://{}:{}", self.protocol, self.host, self.port);
-        Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))?;
+        if let Some(dimension) = self.embedding_dimension {
+            if !(64..=4096).contains(&dimension) {
+                return Err(ConfigError::InvalidEmbeddingDimension(dimension));
+            }
+        }
 
         Ok(())
     }
@@ -225,6 +236,17 @@ impl OllamaConfig {
             return Err(ConfigError::InvalidBatchSize(batch_size));
         }
         self.batch_size = batch_size;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn set_embedding_dimension(&mut self, dimension: Option<u32>) -> Result<(), ConfigError> {
+        if let Some(dimension) = dimension {
+            if !(64..=4096).contains(&dimension) {
+                return Err(ConfigError::InvalidEmbeddingDimension(dimension));
+            }
+        }
+        self.embedding_dimension = dimension;
         Ok(())
     }
 }

@@ -34,6 +34,7 @@ mod integration_tests {
                 port: 80,
                 model: "test".to_string(),
                 batch_size: 1,
+                embedding_dimension: None,
             },
             base_dir: temp_dir.path().to_path_buf(),
         };
@@ -50,6 +51,7 @@ mod integration_tests {
             port: 1,
             model: "test".to_string(),
             batch_size: 1,
+            embedding_dimension: None,
         };
 
         assert!(config.set_port(1).is_ok());
@@ -65,6 +67,7 @@ mod integration_tests {
             port: 11434,
             model: "test".to_string(),
             batch_size: 1,
+            embedding_dimension: None,
         };
 
         assert!(config.set_batch_size(1).is_ok());
@@ -96,6 +99,7 @@ mod integration_tests {
                     port,
                     model: "test".to_string(),
                     batch_size: 32,
+                    embedding_dimension: None,
                 },
                 base_dir: temp_dir.path().to_path_buf(),
             };
@@ -113,6 +117,7 @@ mod integration_tests {
             port: 11434,
             model: "valid-model".to_string(),
             batch_size: 32,
+            embedding_dimension: None,
         };
 
         assert!(config.set_model("valid-model".to_string()).is_ok());

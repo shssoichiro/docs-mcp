@@ -11,6 +11,7 @@ use crate::config::OllamaConfig;
 use crate::embeddings::chunking::ContentChunk;
 
 const DEFAULT_RETRY_ATTEMPTS: u32 = 3;
+const DEFAULT_EMBEDDING_DIMENSION: u32 = 768; // Standard embedding dimension
 const EXPONENTIAL_BACKOFF_BASE: u64 = 2;
 
 #[derive(Debug, Clone)]
@@ -20,12 +21,14 @@ pub struct OllamaClient {
     batch_size: u32,
     agent: ureq::Agent,
     retry_attempts: u32,
+    embedding_dimension: u32,
 }
 
 #[derive(Debug, Serialize)]
 struct EmbedRequest {
     model: String,
     input: String,
+    options: Option<EmbedOptions>,
 }
 
 #[derive(Debug, Serialize)]
@@ -33,6 +36,13 @@ struct BatchEmbedRequest {
     model: String,
     #[serde(rename = "input")]
     inputs: Vec<String>,
+    options: Option<EmbedOptions>,
+}
+
+#[derive(Debug, Serialize)]
+struct EmbedOptions {
+    #[serde(rename = "embedding_size")]
+    embedding_size: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,6 +104,9 @@ impl OllamaClient {
             model: config.model,
             agent,
             retry_attempts: DEFAULT_RETRY_ATTEMPTS,
+            embedding_dimension: config
+                .embedding_dimension
+                .unwrap_or(DEFAULT_EMBEDDING_DIMENSION),
         })
     }
 
@@ -210,6 +223,9 @@ impl OllamaClient {
         let request = EmbedRequest {
             model: self.model.clone(),
             input: text.to_string(),
+            options: Some(EmbedOptions {
+                embedding_size: Some(self.embedding_dimension),
+            }),
         };
 
         let url = self
@@ -314,6 +330,9 @@ impl OllamaClient {
         let request = BatchEmbedRequest {
             model: self.model.clone(),
             inputs: texts.to_vec(),
+            options: Some(EmbedOptions {
+                embedding_size: Some(self.embedding_dimension),
+            }),
         };
 
         let url = self

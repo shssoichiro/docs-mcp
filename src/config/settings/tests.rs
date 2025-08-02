@@ -44,6 +44,7 @@ fn setter_validation() {
         port: 11434,
         model: "test-model".to_string(),
         batch_size: 32,
+        embedding_dimension: None,
     };
 
     assert!(config.set_protocol("https".to_string()).is_ok());
@@ -95,6 +96,7 @@ fn protocol_validation() {
         port: 11434,
         model: "test-model".to_string(),
         batch_size: 32,
+        embedding_dimension: None,
     };
 
     // Valid protocols

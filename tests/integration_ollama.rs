@@ -31,6 +31,7 @@ fn create_integration_test_client() -> OllamaClient {
         port,
         model,
         batch_size: 5, // Smaller batch size for testing
+        embedding_dimension: None,
     };
 
     OllamaClient::new(config)
@@ -409,6 +410,7 @@ fn real_ollama_error_recovery() {
         port: 11434,
         model: "non-existent-model-12345".to_string(),
         batch_size: 5,
+        embedding_dimension: None,
     };
 
     let client = OllamaClient::new(config)

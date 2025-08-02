@@ -49,6 +49,7 @@ fn create_test_config() -> (Config, TempDir) {
             port,
             model,
             batch_size: 5, // Smaller batch size for testing
+            embedding_dimension: None,
         },
     };
 

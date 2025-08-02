@@ -11,6 +11,7 @@ async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
             port: 11434,
             model: "nomic-embed-text:latest".to_string(),
             batch_size: 32,
+            embedding_dimension: None,
         },
         base_dir: temp_dir.path().to_path_buf(),
     };
