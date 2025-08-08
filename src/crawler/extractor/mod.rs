@@ -96,7 +96,7 @@ fn extract_title(document: &Html) -> Result<String> {
     for selector_str in &title_selectors {
         if let Ok(selector) = Selector::parse(selector_str) {
             if let Some(element) = document.select(&selector).next() {
-                let title = clean_text(&element.text().collect::<String>());
+                let title = extract_clean_text(element);
                 if !title.is_empty() {
                     debug!(
                         "Extracted title using selector '{}': '{}'",
@@ -131,7 +131,7 @@ fn extract_sections(document: &Html, config: &ExtractionConfig) -> Result<Vec<Co
                     if let Some(level) = level_char.to_digit(10) {
                         let level = level as u8;
                         if level <= config.max_heading_level {
-                            let heading_text = clean_text(&element_ref.text().collect::<String>());
+                            let heading_text = extract_clean_text(element_ref);
                             if !heading_text.is_empty() {
                                 update_heading_stack(&mut heading_stack, level, heading_text);
                             }
@@ -310,6 +310,43 @@ fn extract_raw_text(document: &Html, config: &ExtractionConfig) -> Result<String
     let mut content = String::new();
     extract_text_recursive(main_content, &mut content, config);
     Ok(clean_text(&content))
+}
+
+/// Extract text content from an element while excluding certain unwanted elements
+fn extract_clean_text(element: ElementRef) -> String {
+    let mut text_parts = Vec::new();
+    extract_text_excluding_elements(
+        element,
+        &mut text_parts,
+        &["button", "script", "style", "noscript"],
+    );
+    clean_text(&text_parts.join(" "))
+}
+
+/// Recursively extract text content while excluding specific element types
+fn extract_text_excluding_elements(
+    element: ElementRef,
+    text_parts: &mut Vec<String>,
+    excluded_tags: &[&str],
+) {
+    for child in element.children() {
+        if let Some(child_element) = ElementRef::wrap(child) {
+            let tag_name = child_element.value().name();
+
+            // Skip excluded elements entirely
+            if excluded_tags.contains(&tag_name) {
+                continue;
+            }
+
+            // Recursively process child elements
+            extract_text_excluding_elements(child_element, text_parts, excluded_tags);
+        } else if let Some(text_node) = child.value().as_text() {
+            let text = text_node.trim();
+            if !text.is_empty() {
+                text_parts.push(text.to_string());
+            }
+        }
+    }
 }
 
 /// Clean and normalize text content

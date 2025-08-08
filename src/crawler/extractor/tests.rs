@@ -141,3 +141,34 @@ fn malformed_html() {
     assert_eq!(content.title, "Broken Page");
     assert!(!content.raw_text.is_empty());
 }
+
+#[test]
+fn heading_with_button_content() {
+    let html = r#"
+            <html>
+                <body>
+                    <h1>Struct <span class="struct">Any</span><button id="copy-path" title="Copy item path to clipboard" class="">Copy item path</button></h1>
+                    <p>This is content after the heading.</p>
+                </body>
+            </html>
+        "#;
+
+    let config = ExtractionConfig::default();
+    let result = extract_content(html, &config).expect("extract_content should succeed");
+
+    // The title should only include "Struct Any", not the button text
+    assert_eq!(result.title, "Struct Any");
+
+    // Check that sections also properly exclude button content from headings
+    let heading_with_button = result
+        .sections
+        .iter()
+        .find(|s| s.heading_path.contains("Struct Any"));
+    assert!(heading_with_button.is_some());
+    assert!(
+        !heading_with_button
+            .expect("Should find section with 'Struct Any'")
+            .heading_path
+            .contains("Copy item path")
+    );
+}
