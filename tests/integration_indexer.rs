@@ -24,6 +24,7 @@ use docs_mcp::database::sqlite::{
     CrawlQueueQueries, CrawlStatus, Database, NewCrawlQueueItem, NewIndexedChunk, NewSite,
     SiteQueries, SiteStatus, SiteUpdate,
 };
+use docs_mcp::embeddings::chunking::ChunkingConfig;
 use docs_mcp::indexer::Indexer;
 
 const DEFAULT_OLLAMA_HOST: &str = "localhost";
@@ -51,6 +52,7 @@ fn create_test_config() -> (Config, TempDir) {
             batch_size: 5, // Smaller batch size for testing
             embedding_dimension: None,
         },
+        chunking: ChunkingConfig::default(),
     };
 
     (config, temp_dir)

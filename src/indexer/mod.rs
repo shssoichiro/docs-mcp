@@ -101,7 +101,7 @@ impl Indexer {
             database,
             vector_store,
             ollama_client,
-            chunking_config: ChunkingConfig::default(),
+            chunking_config: config.chunking,
             app_config: config,
             batch_size: 64,
         })

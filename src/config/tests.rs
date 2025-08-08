@@ -1,4 +1,5 @@
 use super::*;
+use crate::embeddings::chunking::ChunkingConfig;
 use tempfile::TempDir;
 
 #[cfg(test)]
@@ -36,6 +37,7 @@ mod integration_tests {
                 batch_size: 1,
                 embedding_dimension: None,
             },
+            chunking: ChunkingConfig::default(),
             base_dir: temp_dir.path().to_path_buf(),
         };
 
@@ -101,6 +103,7 @@ mod integration_tests {
                     batch_size: 32,
                     embedding_dimension: None,
                 },
+                chunking: ChunkingConfig::default(),
                 base_dir: temp_dir.path().to_path_buf(),
             };
 

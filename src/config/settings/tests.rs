@@ -1,4 +1,5 @@
 use super::*;
+use crate::embeddings::chunking::ChunkingConfig;
 use tempfile::TempDir;
 
 #[test]
@@ -108,4 +109,136 @@ fn protocol_validation() {
     assert!(config.set_protocol("ws".to_string()).is_err());
     assert!(config.set_protocol(String::new()).is_err());
     assert!(config.set_protocol("HTTP".to_string()).is_err()); // case sensitive
+}
+
+#[test]
+fn chunking_config_validation() {
+    // Valid default config
+    let config = Config {
+        ollama: OllamaConfig::default(),
+        chunking: ChunkingConfig::default(),
+        base_dir: PathBuf::from("/tmp"),
+    };
+    assert!(config.validate().is_ok());
+
+    // Invalid target chunk size - too small
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.target_chunk_size = 50;
+    assert!(invalid_config.validate().is_err());
+
+    // Invalid target chunk size - too large
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.target_chunk_size = 3000;
+    assert!(invalid_config.validate().is_err());
+
+    // Invalid max chunk size - too small
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.max_chunk_size = 150;
+    assert!(invalid_config.validate().is_err());
+
+    // Invalid max chunk size - too large
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.max_chunk_size = 5000;
+    assert!(invalid_config.validate().is_err());
+
+    // Invalid min chunk size - too small
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.min_chunk_size = 20;
+    assert!(invalid_config.validate().is_err());
+
+    // Invalid min chunk size - too large
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.min_chunk_size = 1500;
+    assert!(invalid_config.validate().is_err());
+
+    // Invalid overlap size - too large
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.overlap_size = 600;
+    assert!(invalid_config.validate().is_err());
+
+    // Invalid relationship: max <= target
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.target_chunk_size = 800;
+    invalid_config.chunking.max_chunk_size = 800;
+    assert!(invalid_config.validate().is_err());
+
+    // Invalid relationship: target <= min
+    let mut invalid_config = config.clone();
+    invalid_config.chunking.target_chunk_size = 200;
+    invalid_config.chunking.min_chunk_size = 200;
+    assert!(invalid_config.validate().is_err());
+
+    // Valid custom config
+    let mut valid_config = config;
+    valid_config.chunking.target_chunk_size = 500;
+    valid_config.chunking.max_chunk_size = 800;
+    valid_config.chunking.min_chunk_size = 100;
+    valid_config.chunking.overlap_size = 50;
+    assert!(valid_config.validate().is_ok());
+}
+
+#[test]
+fn config_toml_serialization() {
+    let temp_dir = TempDir::new().expect("should create temp dir");
+    let config = Config {
+        ollama: OllamaConfig::default(),
+        chunking: ChunkingConfig::default(),
+        base_dir: temp_dir.path().to_path_buf(),
+    };
+
+    // Should save successfully
+    assert!(config.save().is_ok());
+
+    // Should load and match original
+    let loaded_config = Config::load(temp_dir.path()).expect("should load config");
+    assert_eq!(loaded_config.ollama, config.ollama);
+    assert_eq!(loaded_config.chunking, config.chunking);
+}
+
+#[test]
+fn config_toml_partial_chunking_config() {
+    let temp_dir = TempDir::new().expect("should create temp dir");
+    let config_path = temp_dir.path().join("config.toml");
+
+    // Write partial config (missing chunking section)
+    let partial_toml = r#"
+[ollama]
+protocol = "http"
+host = "localhost"
+port = 11434
+model = "nomic-embed-text:latest"
+batch_size = 64
+"#;
+    std::fs::write(&config_path, partial_toml).expect("should write partial config");
+
+    // Should load successfully with chunking defaults
+    let loaded_config = Config::load(temp_dir.path()).expect("should load partial config");
+    assert_eq!(loaded_config.chunking, ChunkingConfig::default());
+
+    // Write config with custom chunking
+    let custom_toml = r#"
+[ollama]
+protocol = "http"
+host = "localhost"
+port = 11434
+model = "nomic-embed-text:latest"
+batch_size = 64
+
+[chunking]
+target_chunk_size = 500
+max_chunk_size = 800
+min_chunk_size = 100
+overlap_size = 50
+preserve_code_blocks = false
+sentence_boundary_splitting = false
+"#;
+    std::fs::write(&config_path, custom_toml).expect("should write custom config");
+
+    let loaded_config = Config::load(temp_dir.path()).expect("should load custom config");
+    assert_eq!(loaded_config.chunking.target_chunk_size, 500);
+    assert_eq!(loaded_config.chunking.max_chunk_size, 800);
+    assert_eq!(loaded_config.chunking.min_chunk_size, 100);
+    assert_eq!(loaded_config.chunking.overlap_size, 50);
+    assert!(!loaded_config.chunking.preserve_code_blocks);
+    assert!(!loaded_config.chunking.sentence_boundary_splitting);
 }

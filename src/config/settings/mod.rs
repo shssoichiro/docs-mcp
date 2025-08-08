@@ -8,9 +8,13 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 use url::Url;
 
+use crate::embeddings::chunking::ChunkingConfig;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Config {
     pub ollama: OllamaConfig,
+    #[serde(default)]
+    pub chunking: ChunkingConfig,
     #[serde(skip)]
     pub base_dir: PathBuf,
 }
@@ -62,6 +66,18 @@ pub enum ConfigError {
     InvalidProtocol(String),
     #[error("Invalid embedding dimension: {0} (must be between 64 and 4096)")]
     InvalidEmbeddingDimension(u32),
+    #[error("Invalid target chunk size: {0} (must be between 100 and 2048)")]
+    InvalidTargetChunkSize(usize),
+    #[error("Invalid max chunk size: {0} (must be between 200 and 4096)")]
+    InvalidMaxChunkSize(usize),
+    #[error("Invalid min chunk size: {0} (must be between 50 and 1024)")]
+    InvalidMinChunkSize(usize),
+    #[error("Invalid overlap size: {0} (must be between 0 and 512)")]
+    InvalidOverlapSize(usize),
+    #[error("Max chunk size ({0}) must be greater than target chunk size ({1})")]
+    MaxChunkSizeTooSmall(usize, usize),
+    #[error("Target chunk size ({0}) must be greater than min chunk size ({1})")]
+    TargetChunkSizeTooSmall(usize, usize),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("TOML parsing error: {0}")]
@@ -78,6 +94,7 @@ impl Config {
         if !config_path.exists() {
             return Ok(Self {
                 ollama: OllamaConfig::default(),
+                chunking: ChunkingConfig::default(),
                 base_dir: config_dir.as_ref().to_path_buf(),
             });
         }
@@ -128,6 +145,48 @@ impl Config {
     #[inline]
     pub fn validate(&self) -> Result<(), ConfigError> {
         self.ollama.validate()?;
+        self.validate_chunking_config()?;
+        Ok(())
+    }
+
+    #[inline]
+    fn validate_chunking_config(&self) -> Result<(), ConfigError> {
+        let config = &self.chunking;
+
+        // Validate individual bounds
+        if !(100..=2048).contains(&config.target_chunk_size) {
+            return Err(ConfigError::InvalidTargetChunkSize(
+                config.target_chunk_size,
+            ));
+        }
+
+        if !(200..=4096).contains(&config.max_chunk_size) {
+            return Err(ConfigError::InvalidMaxChunkSize(config.max_chunk_size));
+        }
+
+        if !(50..=1024).contains(&config.min_chunk_size) {
+            return Err(ConfigError::InvalidMinChunkSize(config.min_chunk_size));
+        }
+
+        if config.overlap_size > 512 {
+            return Err(ConfigError::InvalidOverlapSize(config.overlap_size));
+        }
+
+        // Validate relationships between sizes
+        if config.max_chunk_size <= config.target_chunk_size {
+            return Err(ConfigError::MaxChunkSizeTooSmall(
+                config.max_chunk_size,
+                config.target_chunk_size,
+            ));
+        }
+
+        if config.target_chunk_size <= config.min_chunk_size {
+            return Err(ConfigError::TargetChunkSizeTooSmall(
+                config.target_chunk_size,
+                config.min_chunk_size,
+            ));
+        }
+
         Ok(())
     }
 

@@ -2,6 +2,7 @@
 mod tests;
 
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::crawler::extractor::{ContentSection, ExtractedContent};
@@ -22,7 +23,7 @@ pub struct ContentChunk {
 }
 
 /// Configuration for content chunking
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct ChunkingConfig {
     /// Target chunk size in tokens
     pub target_chunk_size: usize,
@@ -42,10 +43,10 @@ impl Default for ChunkingConfig {
     #[inline]
     fn default() -> Self {
         Self {
-            target_chunk_size: 650,
-            max_chunk_size: 1000,
-            min_chunk_size: 100,
-            overlap_size: 50,
+            target_chunk_size: 640,
+            max_chunk_size: 1024,
+            min_chunk_size: 160,
+            overlap_size: 80,
             preserve_code_blocks: true,
             sentence_boundary_splitting: true,
         }

@@ -7,6 +7,7 @@
 use docs_mcp::{
     config::OllamaConfig,
     database::lancedb::{ChunkMetadata, EmbeddingRecord, VectorStore},
+    embeddings::chunking::ChunkingConfig,
 };
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -18,6 +19,7 @@ fn create_test_config() -> (Config, TempDir) {
     let config = Config {
         base_dir: temp_dir.path().to_path_buf(),
         ollama: OllamaConfig::default(),
+        chunking: ChunkingConfig::default(),
     };
     (config, temp_dir)
 }

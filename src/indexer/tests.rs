@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::OllamaConfig;
+use crate::embeddings::chunking::ChunkingConfig;
 use tempfile::TempDir;
 
 async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
@@ -13,6 +14,7 @@ async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
             batch_size: 32,
             embedding_dimension: None,
         },
+        chunking: ChunkingConfig::default(),
         base_dir: temp_dir.path().to_path_buf(),
     };
 

@@ -1,4 +1,5 @@
 use crate::config::OllamaConfig;
+use crate::embeddings::chunking::ChunkingConfig;
 
 use super::*;
 use tempfile::TempDir;
@@ -8,6 +9,7 @@ fn create_test_config() -> (Config, TempDir) {
     let config = Config {
         base_dir: temp_dir.path().to_path_buf(),
         ollama: OllamaConfig::default(),
+        chunking: ChunkingConfig::default(),
     };
     (config, temp_dir)
 }
