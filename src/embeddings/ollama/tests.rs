@@ -9,7 +9,7 @@ fn client_configuration() {
         port: 1234,
         model: "test-model".to_string(),
         batch_size: 128,
-        embedding_dimension: None,
+        embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
     };
     let client = OllamaClient::new(config).expect("Failed to create client");
 

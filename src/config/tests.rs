@@ -4,6 +4,8 @@ use tempfile::TempDir;
 
 #[cfg(test)]
 mod integration_tests {
+    use crate::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
+
     use super::*;
 
     #[test]
@@ -35,7 +37,7 @@ mod integration_tests {
                 port: 80,
                 model: "test".to_string(),
                 batch_size: 1,
-                embedding_dimension: None,
+                embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
             },
             chunking: ChunkingConfig::default(),
             base_dir: temp_dir.path().to_path_buf(),
@@ -53,7 +55,7 @@ mod integration_tests {
             port: 1,
             model: "test".to_string(),
             batch_size: 1,
-            embedding_dimension: None,
+            embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
         };
 
         assert!(config.set_port(1).is_ok());
@@ -69,7 +71,7 @@ mod integration_tests {
             port: 11434,
             model: "test".to_string(),
             batch_size: 1,
-            embedding_dimension: None,
+            embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
         };
 
         assert!(config.set_batch_size(1).is_ok());
@@ -101,7 +103,7 @@ mod integration_tests {
                     port,
                     model: "test".to_string(),
                     batch_size: 32,
-                    embedding_dimension: None,
+                    embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
                 },
                 chunking: ChunkingConfig::default(),
                 base_dir: temp_dir.path().to_path_buf(),
@@ -120,7 +122,7 @@ mod integration_tests {
             port: 11434,
             model: "valid-model".to_string(),
             batch_size: 32,
-            embedding_dimension: None,
+            embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
         };
 
         assert!(config.set_model("valid-model".to_string()).is_ok());

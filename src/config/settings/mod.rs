@@ -9,6 +9,7 @@ use thiserror::Error;
 use url::Url;
 
 use crate::embeddings::chunking::ChunkingConfig;
+use crate::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Config {
@@ -20,14 +21,14 @@ pub struct Config {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct OllamaConfig {
     pub protocol: String,
     pub host: String,
     pub port: u16,
     pub model: String,
     pub batch_size: u32,
-    #[serde(default)]
-    pub embedding_dimension: Option<u32>,
+    pub embedding_dimension: u32,
 }
 
 impl Default for OllamaConfig {
@@ -38,8 +39,8 @@ impl Default for OllamaConfig {
             host: "localhost".to_string(),
             port: 11434,
             model: "nomic-embed-text:latest".to_string(),
-            batch_size: 64,
-            embedding_dimension: None,
+            batch_size: 16,
+            embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
         }
     }
 }
@@ -236,10 +237,10 @@ impl OllamaConfig {
             return Err(ConfigError::InvalidBatchSize(self.batch_size));
         }
 
-        if let Some(dimension) = self.embedding_dimension {
-            if !(64..=4096).contains(&dimension) {
-                return Err(ConfigError::InvalidEmbeddingDimension(dimension));
-            }
+        if !(64..=4096).contains(&self.embedding_dimension) {
+            return Err(ConfigError::InvalidEmbeddingDimension(
+                self.embedding_dimension,
+            ));
         }
 
         Ok(())
@@ -299,11 +300,9 @@ impl OllamaConfig {
     }
 
     #[inline]
-    pub fn set_embedding_dimension(&mut self, dimension: Option<u32>) -> Result<(), ConfigError> {
-        if let Some(dimension) = dimension {
-            if !(64..=4096).contains(&dimension) {
-                return Err(ConfigError::InvalidEmbeddingDimension(dimension));
-            }
+    pub fn set_embedding_dimension(&mut self, dimension: u32) -> Result<(), ConfigError> {
+        if !(64..=4096).contains(&dimension) {
+            return Err(ConfigError::InvalidEmbeddingDimension(dimension));
         }
         self.embedding_dimension = dimension;
         Ok(())

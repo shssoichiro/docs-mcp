@@ -8,7 +8,7 @@
 
 use docs_mcp::config::OllamaConfig;
 use docs_mcp::embeddings::chunking::{ContentChunk, estimate_token_count};
-use docs_mcp::embeddings::ollama::OllamaClient;
+use docs_mcp::embeddings::ollama::{DEFAULT_EMBEDDING_DIMENSION, OllamaClient};
 use std::env;
 use std::time::Duration;
 use tracing::{debug, info};
@@ -31,7 +31,7 @@ fn create_integration_test_client() -> OllamaClient {
         port,
         model,
         batch_size: 5, // Smaller batch size for testing
-        embedding_dimension: None,
+        embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
     };
 
     OllamaClient::new(config)
@@ -410,7 +410,7 @@ fn real_ollama_error_recovery() {
         port: 11434,
         model: "non-existent-model-12345".to_string(),
         batch_size: 5,
-        embedding_dimension: None,
+        embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
     };
 
     let client = OllamaClient::new(config)

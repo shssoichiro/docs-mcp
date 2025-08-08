@@ -24,6 +24,7 @@ pub struct ContentChunk {
 
 /// Configuration for content chunking
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct ChunkingConfig {
     /// Target chunk size in tokens
     pub target_chunk_size: usize,

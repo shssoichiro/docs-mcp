@@ -1,6 +1,7 @@
 use super::*;
 use crate::config::OllamaConfig;
 use crate::embeddings::chunking::ChunkingConfig;
+use crate::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
 use tempfile::TempDir;
 
 async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
@@ -12,7 +13,7 @@ async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
             port: 11434,
             model: "nomic-embed-text:latest".to_string(),
             batch_size: 32,
-            embedding_dimension: None,
+            embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
         },
         chunking: ChunkingConfig::default(),
         base_dir: temp_dir.path().to_path_buf(),

@@ -2,6 +2,7 @@
 mod tests;
 
 use super::{ChunkMetadata, EmbeddingRecord};
+use crate::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
 use crate::{DocsError, config::Config};
 use arrow::array::{
     Array, FixedSizeListArray, Float32Array, RecordBatchIterator, StringArray, UInt32Array,
@@ -120,7 +121,7 @@ impl VectorStore {
                         "Could not detect vector dimension from existing table: {}",
                         e
                     );
-                    self.vector_dimension = Some(768); // Default fallback
+                    self.vector_dimension = Some(DEFAULT_EMBEDDING_DIMENSION as usize); // Default fallback
                 }
             }
             return Ok(());
@@ -132,7 +133,7 @@ impl VectorStore {
 
         // Create a minimal placeholder schema - the actual schema will be created
         // when we know the vector dimensions from the first batch of data
-        let schema = self.create_schema(768); // Default to 768 for nomic-embed-text
+        let schema = self.create_schema(DEFAULT_EMBEDDING_DIMENSION as usize);
 
         self.connection
             .create_empty_table(&self.table_name, schema)
@@ -140,8 +141,11 @@ impl VectorStore {
             .await
             .map_err(|e| DocsError::Database(format!("Failed to create table: {}", e)))?;
 
-        self.vector_dimension = Some(768);
-        info!("Embeddings table created successfully with 768 dimensions");
+        self.vector_dimension = Some(DEFAULT_EMBEDDING_DIMENSION as usize);
+        info!(
+            "Embeddings table created successfully with {} dimensions",
+            DEFAULT_EMBEDDING_DIMENSION
+        );
         Ok(())
     }
 

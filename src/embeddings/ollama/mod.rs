@@ -10,8 +10,8 @@ use url::Url;
 use crate::config::OllamaConfig;
 use crate::embeddings::chunking::ContentChunk;
 
+pub const DEFAULT_EMBEDDING_DIMENSION: u32 = 768; // Standard embedding dimension
 const DEFAULT_RETRY_ATTEMPTS: u32 = 3;
-const DEFAULT_EMBEDDING_DIMENSION: u32 = 768; // Standard embedding dimension
 const EXPONENTIAL_BACKOFF_BASE: u64 = 2;
 
 #[derive(Debug, Clone)]
@@ -103,9 +103,7 @@ impl OllamaClient {
             model: config.model,
             agent,
             retry_attempts: DEFAULT_RETRY_ATTEMPTS,
-            embedding_dimension: config
-                .embedding_dimension
-                .unwrap_or(DEFAULT_EMBEDDING_DIMENSION),
+            embedding_dimension: config.embedding_dimension,
         })
     }
 

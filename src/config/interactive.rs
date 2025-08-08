@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Confirm, Input, Select};
 
+use crate::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
+
 use super::{Config, ConfigError, OllamaConfig};
 
 #[inline]
@@ -101,8 +103,8 @@ fn configure_ollama(ollama: &mut OllamaConfig) -> Result<()> {
                 host: input.clone(),
                 port: 11434, // Use default port for validation
                 model: "test".to_string(),
-                batch_size: 32,
-                embedding_dimension: None,
+                batch_size: 16,
+                embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
             };
             temp_config.validate()?;
             Ok(())

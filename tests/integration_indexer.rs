@@ -15,6 +15,7 @@
 //! - nomic-embed-text:latest model available in Ollama
 
 use anyhow::Result;
+use docs_mcp::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
 use std::env;
 use tempfile::TempDir;
 
@@ -50,7 +51,7 @@ fn create_test_config() -> (Config, TempDir) {
             port,
             model,
             batch_size: 5, // Smaller batch size for testing
-            embedding_dimension: None,
+            embedding_dimension: DEFAULT_EMBEDDING_DIMENSION,
         },
         chunking: ChunkingConfig::default(),
     };
