@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 #[cfg(test)]
 mod integration_tests {
-    use crate::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
+    use crate::{config::settings::OllamaConfig, embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION};
 
     use super::*;
 

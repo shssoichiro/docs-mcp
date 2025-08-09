@@ -111,20 +111,6 @@ fn heading_path_preservation() {
 }
 
 #[test]
-fn contextual_chunk() {
-    let content = "This is some content";
-    let page_title = "Documentation";
-    let heading_path = "Section > Subsection";
-
-    let chunk = create_contextual_chunk(content, page_title, heading_path, 0);
-
-    assert!(chunk.content.contains(page_title));
-    assert!(chunk.content.contains("Section > Subsection"));
-    assert!(chunk.content.contains(content));
-    assert_eq!(chunk.chunk_index, 0);
-}
-
-#[test]
 fn split_with_code_preservation() {
     let content =
         "Some text\n\n```rust\nfn main() {\n    println!(\"Hello\");\n}\n```\n\nMore text";

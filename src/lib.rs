@@ -1,4 +1,16 @@
+pub(crate) mod commands;
+pub(crate) mod config;
+pub(crate) mod crawler;
+pub(crate) mod database;
+pub(crate) mod embeddings;
+pub(crate) mod indexer;
+pub(crate) mod mcp;
+
 use thiserror::Error;
+
+pub use self::commands::{add_site, delete_site, list_sites, serve_mcp, show_status, update_site};
+pub use self::config::{Config, ConfigError, run_interactive_config, show_config};
+pub use self::indexer::Indexer;
 
 pub type Result<T> = std::result::Result<T, DocsError>;
 
@@ -28,11 +40,3 @@ pub enum DocsError {
     #[error("Other error: {0}")]
     Other(#[from] anyhow::Error),
 }
-
-pub mod commands;
-pub mod config;
-pub mod crawler;
-pub mod database;
-pub mod embeddings;
-pub mod indexer;
-pub mod mcp;

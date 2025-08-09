@@ -3,6 +3,3 @@
 
 pub mod lancedb;
 pub mod sqlite;
-
-pub use lancedb::*;
-pub use sqlite::*;

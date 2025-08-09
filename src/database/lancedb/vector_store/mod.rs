@@ -27,6 +27,7 @@ pub struct VectorStore {
 
 /// Search result from vector similarity search
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SearchResult {
     pub chunk_metadata: ChunkMetadata,
     pub similarity_score: f32,
@@ -41,7 +42,6 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<Self, DocsError>` - New VectorStore instance or error
-    #[inline]
     pub async fn new(config: &Config) -> Result<Self, DocsError> {
         let db_path = config.vector_database_path()?;
         debug!("Initializing LanceDB at path: {:?}", db_path);
@@ -201,18 +201,6 @@ impl VectorStore {
         ]))
     }
 
-    /// Store a single embedding with its metadata
-    ///
-    /// # Arguments
-    /// * `record` - Embedding record to store
-    ///
-    /// # Returns
-    /// * `Result<(), DocsError>` - Success or error
-    #[inline]
-    pub async fn store_embedding(&mut self, record: EmbeddingRecord) -> Result<(), DocsError> {
-        self.store_embeddings_batch(vec![record]).await
-    }
-
     /// Store multiple embeddings in a batch
     ///
     /// # Arguments
@@ -220,7 +208,6 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<(), DocsError>` - Success or error
-    #[inline]
     pub async fn store_embeddings_batch(
         &mut self,
         records: Vec<EmbeddingRecord>,
@@ -363,7 +350,6 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<Vec<SearchResult>, DocsError>` - Search results or error
-    #[inline]
     pub async fn search_similar(
         &self,
         query_vector: &[f32],
@@ -534,8 +520,7 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<u64, DocsError>` - Number of deleted records or error
-    #[inline]
-    pub async fn delete_site_embeddings(&mut self, site_id: &str) -> Result<u64, DocsError> {
+    pub async fn delete_site_embeddings(&self, site_id: &str) -> Result<u64, DocsError> {
         debug!("Deleting embeddings for site: {}", site_id);
 
         let table = self
@@ -559,7 +544,7 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<u64, DocsError>` - Total count or error
-    #[inline]
+    #[allow(dead_code)]
     pub async fn count_embeddings(&self) -> Result<u64, DocsError> {
         let table = self
             .connection
@@ -580,8 +565,7 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<(), DocsError>` - Success or error
-    #[inline]
-    pub async fn optimize(&mut self) -> Result<(), DocsError> {
+    pub async fn optimize(&self) -> Result<(), DocsError> {
         debug!("Optimizing vector database");
 
         let table = self
@@ -604,8 +588,8 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<(), DocsError>` - Success or error
-    #[inline]
-    pub async fn create_vector_index(&mut self) -> Result<(), DocsError> {
+    #[allow(dead_code)]
+    pub async fn create_vector_index(&self) -> Result<(), DocsError> {
         debug!("Creating vector index for improved search performance");
 
         let table = self
@@ -709,7 +693,7 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<bool, DocsError>` - True if database is healthy, false if corrupted
-    #[inline]
+    #[allow(dead_code)]
     pub async fn validate_integrity(&self) -> Result<bool, DocsError> {
         debug!("Validating database integrity");
 
@@ -751,7 +735,7 @@ impl VectorStore {
     ///
     /// # Returns
     /// * `Result<(), DocsError>` - Success or error
-    #[inline]
+    #[allow(dead_code)]
     pub async fn repair_database(&mut self) -> Result<(), DocsError> {
         info!("Starting database repair");
 
@@ -770,9 +754,8 @@ impl VectorStore {
     }
 
     /// Delete a single embedding by vector ID (placeholder implementation)
-    #[inline]
     #[expect(clippy::unused_async, reason = "not yet implemented")]
-    pub async fn delete_embedding(&mut self, vector_id: &str) -> Result<bool, DocsError> {
+    pub async fn delete_embedding(&self, vector_id: &str) -> Result<bool, DocsError> {
         debug!("Deleting embedding with vector_id: {}", vector_id);
 
         // TODO: Implement single embedding deletion by vector_id
@@ -787,9 +770,8 @@ impl VectorStore {
     }
 
     /// List all vector IDs in the database (placeholder implementation)
-    #[inline]
     #[expect(clippy::unused_async, reason = "not yet implemented")]
-    pub async fn list_all_vector_ids(&mut self) -> Result<Vec<String>, DocsError> {
+    pub async fn list_all_vector_ids(&self) -> Result<Vec<String>, DocsError> {
         debug!("Listing all vector IDs");
 
         // TODO: Implement listing all vector IDs

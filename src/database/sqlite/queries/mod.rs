@@ -5,12 +5,10 @@ use super::models::*;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use sqlx::SqlitePool;
-use tracing::{debug, warn};
 
 pub struct SiteQueries;
 
 impl SiteQueries {
-    #[inline]
     pub async fn create(pool: &SqlitePool, new_site: NewSite) -> Result<Site> {
         let now = Utc::now();
         let id = sqlx::query!(
@@ -31,7 +29,6 @@ impl SiteQueries {
             .ok_or_else(|| anyhow::anyhow!("Failed to retrieve created site"))
     }
 
-    #[inline]
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Site>> {
         let result = sqlx::query_as!(
             Site,
@@ -60,7 +57,7 @@ impl SiteQueries {
         Ok(result)
     }
 
-    #[inline]
+    #[allow(dead_code)]
     pub async fn get_by_name_and_version(
         pool: &SqlitePool,
         name: &str,
@@ -94,7 +91,6 @@ impl SiteQueries {
         Ok(result)
     }
 
-    #[inline]
     pub async fn get_by_index_url(pool: &SqlitePool, index_url: &str) -> Result<Option<Site>> {
         let result = sqlx::query_as!(
             Site,
@@ -123,7 +119,6 @@ impl SiteQueries {
         Ok(result)
     }
 
-    #[inline]
     pub async fn list_all(pool: &SqlitePool) -> Result<Vec<Site>> {
         let sites = sqlx::query_as!(
             Site,
@@ -151,7 +146,7 @@ impl SiteQueries {
         Ok(sites)
     }
 
-    #[inline]
+    #[allow(dead_code)]
     pub async fn list_completed(pool: &SqlitePool) -> Result<Vec<Site>> {
         let sites = sqlx::query_as!(
             Site,
@@ -179,7 +174,6 @@ impl SiteQueries {
         Ok(sites)
     }
 
-    #[inline]
     pub async fn update(pool: &SqlitePool, id: i64, update: SiteUpdate) -> Result<Option<Site>> {
         let mut query_parts = Vec::new();
         let mut query_values = Vec::new();
@@ -242,7 +236,6 @@ impl SiteQueries {
         Self::get_by_id(pool, id).await
     }
 
-    #[inline]
     pub async fn delete(pool: &SqlitePool, id: i64) -> Result<bool> {
         let result = sqlx::query!("DELETE FROM sites WHERE id = ?", id)
             .execute(pool)
@@ -252,7 +245,6 @@ impl SiteQueries {
         Ok(result.rows_affected() > 0)
     }
 
-    #[inline]
     pub async fn get_statistics(pool: &SqlitePool, site_id: i64) -> Result<Option<SiteStatistics>> {
         let Some(site) = Self::get_by_id(pool, site_id).await? else {
             return Ok(None);
@@ -290,7 +282,6 @@ impl SiteQueries {
         }))
     }
 
-    #[inline]
     pub async fn get_sites_by_status(pool: &SqlitePool, status: SiteStatus) -> Result<Vec<Site>> {
         let status_str = match status {
             SiteStatus::Pending => "pending",
@@ -325,39 +316,10 @@ impl SiteQueries {
 
         Ok(sites)
     }
-
-    #[inline]
-    pub async fn get_sites_needing_indexing(pool: &SqlitePool) -> Result<Vec<Site>> {
-        let sites = sqlx::query_as!(
-            Site,
-            r#"
-            SELECT id,
-                   index_url,
-                   base_url, 
-                   name, 
-                   version, 
-                   indexed_date,
-                   status as "status: SiteStatus",
-                   progress_percent,
-                   total_pages,
-                   indexed_pages,
-                   error_message,
-                   created_date,
-                   last_heartbeat
-            FROM sites 
-            WHERE status IN ('pending', 'indexing')
-            ORDER BY created_date ASC
-            "#
-        )
-        .fetch_all(pool)
-        .await
-        .context("Failed to get sites needing indexing")?;
-
-        Ok(sites)
-    }
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct QueueStats {
     pub total: i64,
     pub pending: i64,
@@ -369,7 +331,6 @@ pub struct QueueStats {
 pub struct CrawlQueueQueries;
 
 impl CrawlQueueQueries {
-    #[inline]
     pub async fn add_url(pool: &SqlitePool, new_item: NewCrawlQueueItem) -> Result<CrawlQueueItem> {
         let now = Utc::now();
         let id = sqlx::query!(
@@ -392,59 +353,6 @@ impl CrawlQueueQueries {
             .ok_or_else(|| anyhow::anyhow!("Failed to retrieve created crawl queue item"))
     }
 
-    #[inline]
-    pub async fn add_urls_batch(
-        pool: &SqlitePool,
-        site_id: i64,
-        urls: Vec<String>,
-    ) -> Result<usize> {
-        let mut transaction = pool
-            .begin()
-            .await
-            .context("Failed to begin transaction for batch URL insert")?;
-
-        let mut inserted_count = 0;
-        let now = Utc::now();
-
-        for url in urls {
-            let result = sqlx::query(
-                r#"
-                INSERT INTO crawl_queue (site_id, url, status, created_date)
-                VALUES (?, ?, 'pending', ?)
-                ON CONFLICT(site_id, url) DO NOTHING
-                "#,
-            )
-            .bind(site_id)
-            .bind(&url)
-            .bind(now)
-            .execute(&mut *transaction)
-            .await;
-
-            match result {
-                Ok(query_result) => {
-                    if query_result.rows_affected() > 0 {
-                        inserted_count += 1;
-                    }
-                }
-                Err(e) => {
-                    warn!("Failed to insert URL {}: {}", url, e);
-                }
-            }
-        }
-
-        transaction
-            .commit()
-            .await
-            .context("Failed to commit batch URL insert transaction")?;
-
-        debug!(
-            "Inserted {} URLs into crawl queue for site {}",
-            inserted_count, site_id
-        );
-        Ok(inserted_count)
-    }
-
-    #[inline]
     pub async fn get_next_pending(
         pool: &SqlitePool,
         site_id: i64,
@@ -475,7 +383,6 @@ impl CrawlQueueQueries {
         Ok(result)
     }
 
-    #[inline]
     pub async fn update_status(
         pool: &SqlitePool,
         id: i64,
@@ -528,7 +435,6 @@ impl CrawlQueueQueries {
         Self::get_by_id(pool, id).await
     }
 
-    #[inline]
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<CrawlQueueItem>> {
         let result = sqlx::query_as!(
             CrawlQueueItem,
@@ -551,26 +457,11 @@ impl CrawlQueueQueries {
         Ok(result)
     }
 
-    #[inline]
-    pub async fn delete_completed_for_site(pool: &SqlitePool, site_id: i64) -> Result<usize> {
-        let result = sqlx::query!(
-            "DELETE FROM crawl_queue WHERE site_id = ? AND status = 'completed'",
-            site_id
-        )
-        .execute(pool)
-        .await
-        .context("Failed to delete completed crawl queue items")?;
-
-        Ok(result.rows_affected() as usize)
-    }
-
-    #[inline]
     pub async fn create(pool: &SqlitePool, new_item: NewCrawlQueueItem) -> Result<CrawlQueueItem> {
         // This is an alias for add_url for consistency with other create methods
         Self::add_url(pool, new_item).await
     }
 
-    #[inline]
     pub async fn update(
         pool: &SqlitePool,
         id: i64,
@@ -580,7 +471,6 @@ impl CrawlQueueQueries {
         Self::update_status(pool, id, update).await
     }
 
-    #[inline]
     pub async fn increment_retry_count(pool: &SqlitePool, id: i64) -> Result<()> {
         sqlx::query!(
             "UPDATE crawl_queue SET retry_count = retry_count + 1 WHERE id = ?",
@@ -593,7 +483,6 @@ impl CrawlQueueQueries {
         Ok(())
     }
 
-    #[inline]
     pub async fn get_stats(pool: &SqlitePool, site_id: i64) -> Result<QueueStats> {
         let stats = sqlx::query!(
             r#"
@@ -621,35 +510,6 @@ impl CrawlQueueQueries {
         })
     }
 
-    #[inline]
-    pub async fn get_pending_for_site(
-        pool: &SqlitePool,
-        site_id: i64,
-    ) -> Result<Vec<CrawlQueueItem>> {
-        let items = sqlx::query_as!(
-            CrawlQueueItem,
-            r#"
-            SELECT id,
-                   site_id,
-                   url, 
-                   status as "status: CrawlStatus",
-                   retry_count,
-                   error_message, 
-                   created_date
-            FROM crawl_queue 
-            WHERE site_id = ? AND status = 'pending'
-            ORDER BY created_date ASC
-            "#,
-            site_id
-        )
-        .fetch_all(pool)
-        .await
-        .context("Failed to get pending crawl items for site")?;
-
-        Ok(items)
-    }
-
-    #[inline]
     pub async fn get_completed_for_site(
         pool: &SqlitePool,
         site_id: i64,
@@ -681,7 +541,6 @@ impl CrawlQueueQueries {
 pub struct IndexedChunkQueries;
 
 impl IndexedChunkQueries {
-    #[inline]
     pub async fn create(pool: &SqlitePool, new_chunk: NewIndexedChunk) -> Result<IndexedChunk> {
         let now = Utc::now();
         let id = sqlx::query!(
@@ -708,66 +567,6 @@ impl IndexedChunkQueries {
             .ok_or_else(|| anyhow::anyhow!("Failed to retrieve created chunk"))
     }
 
-    #[inline]
-    pub async fn create_batch(
-        pool: &SqlitePool,
-        chunks: Vec<NewIndexedChunk>,
-    ) -> Result<Vec<IndexedChunk>> {
-        if chunks.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let mut transaction = pool
-            .begin()
-            .await
-            .context("Failed to begin transaction for batch chunk insert")?;
-
-        let mut created_chunks = Vec::new();
-        let now = Utc::now().naive_utc();
-
-        for chunk in chunks {
-            let id = sqlx::query(
-                r#"
-                INSERT INTO indexed_chunks (site_id, url, page_title, heading_path, chunk_content, chunk_index, vector_id, indexed_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                "#
-            )
-            .bind(chunk.site_id)
-            .bind(&chunk.url)
-            .bind(&chunk.page_title)
-            .bind(&chunk.heading_path)
-            .bind(&chunk.chunk_content)
-            .bind(chunk.chunk_index)
-            .bind(&chunk.vector_id)
-            .bind(now)
-            .execute(&mut *transaction)
-            .await
-            .context("Failed to create indexed chunk in batch")?
-            .last_insert_rowid();
-
-            created_chunks.push(IndexedChunk {
-                id,
-                site_id: chunk.site_id,
-                url: chunk.url,
-                page_title: chunk.page_title,
-                heading_path: chunk.heading_path,
-                chunk_content: chunk.chunk_content,
-                chunk_index: chunk.chunk_index,
-                vector_id: chunk.vector_id,
-                indexed_date: now,
-            });
-        }
-
-        transaction
-            .commit()
-            .await
-            .context("Failed to commit batch chunk insert transaction")?;
-
-        debug!("Created {} indexed chunks", created_chunks.len());
-        Ok(created_chunks)
-    }
-
-    #[inline]
     pub async fn get_by_vector_id(
         pool: &SqlitePool,
         vector_id: &str,
@@ -795,7 +594,6 @@ impl IndexedChunkQueries {
         Ok(result)
     }
 
-    #[inline]
     pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<IndexedChunk>> {
         let result = sqlx::query_as!(
             IndexedChunk,
@@ -820,7 +618,6 @@ impl IndexedChunkQueries {
         Ok(result)
     }
 
-    #[inline]
     pub async fn list_by_site(pool: &SqlitePool, site_id: i64) -> Result<Vec<IndexedChunk>> {
         let chunks = sqlx::query_as!(
             IndexedChunk,
@@ -845,17 +642,7 @@ impl IndexedChunkQueries {
         Ok(chunks)
     }
 
-    #[inline]
-    pub async fn delete_by_site(pool: &SqlitePool, site_id: i64) -> Result<usize> {
-        let result = sqlx::query!("DELETE FROM indexed_chunks WHERE site_id = ?", site_id)
-            .execute(pool)
-            .await
-            .context("Failed to delete indexed chunks by site")?;
-
-        Ok(result.rows_affected() as usize)
-    }
-
-    #[inline]
+    #[cfg(test)]
     pub async fn count_by_site(pool: &SqlitePool, site_id: i64) -> Result<i64> {
         let count = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM indexed_chunks WHERE site_id = ?",

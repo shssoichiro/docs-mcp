@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use docs_mcp::commands::{add_site, delete_site, list_sites, serve_mcp, show_status, update_site};
-use docs_mcp::config::{Config, ConfigError, run_interactive_config, show_config};
-use docs_mcp::indexer::Indexer;
+use docs_mcp::Indexer;
+use docs_mcp::{Config, ConfigError, run_interactive_config, show_config};
 use docs_mcp::{DocsError, Result as DocsResult};
+use docs_mcp::{add_site, delete_site, list_sites, serve_mcp, show_status, update_site};
 
 #[derive(Parser)]
 #[command(name = "docs-mcp")]

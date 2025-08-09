@@ -8,7 +8,7 @@ use tracing::debug;
 use crate::crawler::extractor::{ContentSection, ExtractedContent};
 
 /// Represents a chunk of content ready for embedding
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContentChunk {
     /// The content text
     pub content: String,
@@ -41,7 +41,6 @@ pub struct ChunkingConfig {
 }
 
 impl Default for ChunkingConfig {
-    #[inline]
     fn default() -> Self {
         Self {
             target_chunk_size: 640,
@@ -55,7 +54,6 @@ impl Default for ChunkingConfig {
 }
 
 /// Chunk extracted content into embedding-ready pieces
-#[inline]
 pub fn chunk_content(
     content: &ExtractedContent,
     config: &ChunkingConfig,
@@ -435,7 +433,6 @@ fn extract_overlap_text(content: &str, overlap_tokens: usize) -> String {
 
 /// Estimate token count using a simple heuristic
 /// This is a rough approximation - actual tokenization would be more accurate
-#[inline]
 pub fn estimate_token_count(text: &str) -> usize {
     // Rough heuristic: 1 token ≈ 0.75 words for English text
     // Add extra tokens for punctuation and special characters
@@ -448,34 +445,4 @@ pub fn estimate_token_count(text: &str) -> usize {
 /// Check if text contains code blocks
 fn contains_code_block(text: &str) -> bool {
     text.contains("```") || text.lines().any(|line| line.starts_with("    "))
-}
-
-/// Create a chunk with proper context for a page
-#[inline]
-pub fn create_contextual_chunk(
-    content: &str,
-    page_title: &str,
-    heading_path: &str,
-    chunk_index: usize,
-) -> ContentChunk {
-    let has_code_blocks = contains_code_block(content);
-
-    // Create contextual content with page title and heading path
-    let contextual_content = if heading_path != page_title {
-        format!(
-            "Page: {}\nSection: {}\n\n{}",
-            page_title, heading_path, content
-        )
-    } else {
-        format!("Page: {}\n\n{}", page_title, content)
-    };
-
-    let token_count = estimate_token_count(&contextual_content);
-    ContentChunk {
-        content: contextual_content,
-        heading_path: heading_path.to_string(),
-        chunk_index,
-        token_count,
-        has_code_blocks,
-    }
 }

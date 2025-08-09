@@ -1,5 +1,4 @@
-use crate::config::OllamaConfig;
-use crate::embeddings::chunking::ChunkingConfig;
+use crate::{config::settings::OllamaConfig, embeddings::chunking::ChunkingConfig};
 
 use super::*;
 use tempfile::TempDir;
@@ -63,7 +62,7 @@ async fn store_single_embedding() {
         .expect("should create vector store");
 
     let record = create_test_embedding_record("test_1", "site_1");
-    let result = store.store_embedding(record).await;
+    let result = store.store_embeddings_batch(vec![record]).await;
 
     assert!(
         result.is_ok(),
@@ -251,7 +250,7 @@ async fn optimize_database() {
     // Store some data first
     let record = create_test_embedding_record("test_1", "site_1");
     store
-        .store_embedding(record)
+        .store_embeddings_batch(vec![record])
         .await
         .expect("should store embedding successfully");
 

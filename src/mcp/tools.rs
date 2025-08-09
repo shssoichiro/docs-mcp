@@ -3,8 +3,8 @@
 //! This module provides the tool registration and discovery system,
 //! along with concrete tool implementations for documentation search.
 
-use crate::database::lancedb::VectorStore;
-use crate::database::sqlite::Database as SqliteDB;
+use crate::database::lancedb::vector_store::VectorStore;
+use crate::database::sqlite::{Database as SqliteDB, models::SiteStatus};
 use crate::embeddings::ollama::OllamaClient;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
@@ -41,7 +41,6 @@ pub struct ListSitesHandler {
 
 impl SearchDocsHandler {
     /// Create a new search docs handler
-    #[inline]
     pub fn new(
         sqlite_db: Arc<SqliteDB>,
         vector_store: Arc<VectorStore>,
@@ -55,7 +54,6 @@ impl SearchDocsHandler {
     }
 
     /// Create the search_docs tool definition
-    #[inline]
     pub fn tool_definition() -> Tool {
         Tool {
             name: "search_docs".to_string(),
@@ -90,7 +88,6 @@ impl SearchDocsHandler {
 
 #[async_trait]
 impl ToolHandler for SearchDocsHandler {
-    #[inline]
     async fn handle(&self, params: CallToolParams) -> Result<ToolCallResult> {
         let args = params.arguments.unwrap_or_default();
 
@@ -248,13 +245,11 @@ impl ToolHandler for SearchDocsHandler {
 
 impl ListSitesHandler {
     /// Create a new list sites handler
-    #[inline]
     pub fn new(sqlite_db: Arc<SqliteDB>) -> Self {
         Self { sqlite_db }
     }
 
     /// Create the list_sites tool definition
-    #[inline]
     pub fn tool_definition() -> Tool {
         Tool {
             name: "list_sites".to_string(),
@@ -271,7 +266,6 @@ impl ListSitesHandler {
 
 #[async_trait]
 impl ToolHandler for ListSitesHandler {
-    #[inline]
     async fn handle(&self, _params: CallToolParams) -> Result<ToolCallResult> {
         debug!("Listing documentation sites");
 
@@ -280,9 +274,7 @@ impl ToolHandler for ListSitesHandler {
                 // Filter to only show completed sites to MCP clients (as per SPEC.md)
                 let completed_sites: Vec<_> = sites
                     .into_iter()
-                    .filter(|site| {
-                        matches!(site.status, crate::database::sqlite::SiteStatus::Completed)
-                    })
+                    .filter(|site| matches!(site.status, SiteStatus::Completed))
                     .collect();
 
                 let mut site_list = Vec::new();
