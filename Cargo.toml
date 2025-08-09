@@ -10,7 +10,7 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1.0"
-arrow = "55.2" # Intentionally held back until lancedb upgrade
+arrow = "56.0" # Intentionally held back until lancedb upgrade
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
