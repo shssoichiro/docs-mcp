@@ -3,7 +3,7 @@ mod tests;
 
 use super::node::Node;
 use super::utilities::repeat;
-use super::{CodeBlockStyle, HeadingStyle, LinkReferenceStyle, LinkStyle, TurndownOptions};
+use super::{CodeBlockStyle, HeadingStyle, LinkStyle, TurndownOptions};
 use fancy_regex::Regex;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -32,13 +32,10 @@ impl Filter {
     }
 }
 
-pub type AppendFn = Rc<dyn Fn(&TurndownOptions) -> String>;
-
 pub struct Rule {
     pub filter: Filter,
     pub replacement: ReplacementFn,
     pub references: RefCell<Vec<String>>,
-    pub append: Option<AppendFn>,
     pub reference_counter: RefCell<usize>,
 }
 
@@ -48,29 +45,8 @@ impl Rule {
             filter,
             replacement,
             references: RefCell::new(Vec::new()),
-            append: None,
             reference_counter: RefCell::new(0),
         }
-    }
-
-    pub fn with_append(filter: Filter, replacement: ReplacementFn, append: AppendFn) -> Self {
-        Rule {
-            filter,
-            replacement,
-            references: RefCell::new(Vec::new()),
-            append: Some(append),
-            reference_counter: RefCell::new(0),
-        }
-    }
-
-    pub fn add_reference(&self, reference: String) {
-        self.references.borrow_mut().push(reference);
-    }
-
-    pub fn next_reference_id(&self) -> usize {
-        let mut counter = self.reference_counter.borrow_mut();
-        *counter += 1;
-        *counter
     }
 
     pub fn clear_references(&self) {
@@ -410,7 +386,7 @@ impl Rules {
         // Reference link rule with append function
         rules.insert(
             "referenceLink".to_string(),
-            Rule::with_append(
+            Rule::new(
                 Filter::Function(Rc::new(
                     |node: &Rc<RefCell<Node>>, options: &TurndownOptions| {
                         let node_borrow = node.borrow();
@@ -426,10 +402,6 @@ impl Rules {
                         Cow::Owned(format!("[{}]", content))
                     },
                 ),
-                Rc::new(|_options: &TurndownOptions| {
-                    // The actual append logic is handled in Rules::get_references
-                    String::new()
-                }),
             ),
         );
 
@@ -563,93 +535,6 @@ impl Rules {
 
     pub fn get(&self, name: &str) -> Option<&Rule> {
         self.rules.get(name)
-    }
-
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut Rule> {
-        self.rules.get_mut(name)
-    }
-
-    pub fn insert(&mut self, name: String, rule: Rule) {
-        self.rules.insert(name, rule);
-    }
-
-    pub fn keep(&mut self, filter: Filter, options: &TurndownOptions) {
-        self.rules.insert(
-            format!("keep_{}", self.rules.len()),
-            Rule::new(filter, Rc::clone(&options.keep_replacement)),
-        );
-    }
-
-    pub fn remove(&mut self, filter: Filter) {
-        self.rules.insert(
-            format!("remove_{}", self.rules.len()),
-            Rule::new(filter, Rc::new(|_, _, _| Cow::Borrowed(""))),
-        );
-    }
-
-    /// Apply a rule and manage references if it's a reference-aware rule
-    pub fn apply_rule<'a>(
-        &mut self,
-        rule_name: &str,
-        content: &'a str,
-        node: &Rc<RefCell<Node>>,
-        options: &TurndownOptions,
-    ) -> Cow<'a, str> {
-        if let Some(rule) = self.rules.get_mut(rule_name) {
-            let result = (rule.replacement)(content, node, options);
-
-            // Special handling for reference link rule
-            if rule_name == "referenceLink" {
-                self.handle_reference_link(content, node, options)
-            } else {
-                result
-            }
-        } else {
-            Cow::Borrowed(content)
-        }
-    }
-
-    fn handle_reference_link<'a>(
-        &mut self,
-        content: &'a str,
-        node: &Rc<RefCell<Node>>,
-        options: &TurndownOptions,
-    ) -> Cow<'a, str> {
-        let node_borrow = node.borrow();
-        let href = node_borrow.get_attribute("href").unwrap_or_default();
-        let title = node_borrow
-            .get_attribute("title")
-            .map(|t| clean_attribute(Some(&t)))
-            .filter(|t| !t.is_empty())
-            .map(|t| format!(" \"{}\"", t))
-            .unwrap_or_default();
-
-        self.rules.get_mut("referenceLink").map_or_else(
-            || Cow::Borrowed(content),
-            |rule| {
-                let (replacement, reference) = match options.link_reference_style {
-                    LinkReferenceStyle::Collapsed => {
-                        let replacement = format!("[{}][]", content);
-                        let reference = format!("[{}]: {}{}", content, href, title);
-                        (replacement, reference)
-                    }
-                    LinkReferenceStyle::Shortcut => {
-                        let replacement = format!("[{}]", content);
-                        let reference = format!("[{}]: {}{}", content, href, title);
-                        (replacement, reference)
-                    }
-                    LinkReferenceStyle::Full => {
-                        let id = rule.next_reference_id();
-                        let replacement = format!("[{}][{}]", content, id);
-                        let reference = format!("[{}]: {}{}", id, href, title);
-                        (replacement, reference)
-                    }
-                };
-
-                rule.add_reference(reference);
-                Cow::Owned(replacement)
-            },
-        )
     }
 
     /// Get all accumulated references and optionally clear them

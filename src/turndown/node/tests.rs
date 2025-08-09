@@ -34,29 +34,6 @@ fn is_code() {
 }
 
 #[test]
-fn is_blank() {
-    // Empty text node
-    let empty_text = Node::new(NodeType::Text, "#text".to_string(), Some("   ".to_string()));
-    assert!(Node::is_blank(&empty_text));
-
-    // Non-empty text node
-    let text_node = Node::new(
-        NodeType::Text,
-        "#text".to_string(),
-        Some("Hello".to_string()),
-    );
-    assert!(!Node::is_blank(&text_node));
-
-    // Void element
-    let img_node = Node::new(NodeType::Element, "IMG".to_string(), None);
-    assert!(!Node::is_blank(&img_node));
-
-    // Meaningful when blank element
-    let a_node = Node::new(NodeType::Element, "A".to_string(), None);
-    assert!(!Node::is_blank(&a_node));
-}
-
-#[test]
 fn edge_whitespace() {
     // Helper function to create expected EdgeWhitespace like JS test
     fn ews(

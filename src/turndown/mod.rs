@@ -1,5 +1,3 @@
-#![allow(dead_code, reason = "idk maybe we'll need it later xdd")]
-
 mod collapse_whitespace;
 mod node;
 mod root_node;
@@ -8,7 +6,6 @@ mod utilities;
 
 pub use self::node::{Node, NodeType};
 use self::root_node::RootNode;
-use self::rules::ReplacementFn;
 pub use self::rules::{Filter, Rule, Rules};
 
 use self::utilities::{trim_leading_newlines, trim_trailing_newlines};
@@ -37,13 +34,6 @@ pub enum LinkStyle {
     Referenced,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LinkReferenceStyle {
-    Full,
-    Collapsed,
-    Shortcut,
-}
-
 pub struct TurndownOptions {
     pub br: &'static str,
     pub heading_style: HeadingStyle,
@@ -52,13 +42,9 @@ pub struct TurndownOptions {
     pub fence: &'static str,
     pub hr: &'static str,
     pub link_style: LinkStyle,
-    pub link_reference_style: LinkReferenceStyle,
     pub em_delimiter: &'static str,
     pub strong_delimiter: &'static str,
     pub preformatted_code: bool,
-    pub blank_replacement: ReplacementFn,
-    pub keep_replacement: ReplacementFn,
-    pub default_replacement: ReplacementFn,
 }
 
 impl Default for TurndownOptions {
@@ -71,36 +57,9 @@ impl Default for TurndownOptions {
             fence: "```",
             hr: "* * *",
             link_style: LinkStyle::Inlined,
-            link_reference_style: LinkReferenceStyle::Full,
             em_delimiter: "_",
             strong_delimiter: "**",
             preformatted_code: false,
-            blank_replacement: Rc::new(|_content, node, _opts| {
-                if node.borrow().is_block.borrow().unwrap_or(false) {
-                    Cow::Borrowed("\n\n")
-                } else {
-                    Cow::Borrowed("")
-                }
-            }),
-            keep_replacement: Rc::new(|_content, node, _opts| {
-                let node = node.borrow();
-                if node.is_block.borrow().unwrap_or(false) {
-                    Cow::Owned(format!(
-                        "\n\n{}\n\n",
-                        node.data.borrow().as_deref().unwrap_or("")
-                    ))
-                } else {
-                    Cow::Owned(node.data.borrow().as_deref().unwrap_or("").to_string())
-                }
-            }),
-            default_replacement: Rc::new(|content, node, _opts| {
-                let node = node.borrow();
-                if node.is_block.borrow().unwrap_or(false) {
-                    Cow::Owned(format!("\n\n{}\n\n", content))
-                } else {
-                    Cow::Borrowed(content)
-                }
-            }),
         }
     }
 }
@@ -181,24 +140,6 @@ impl TurndownService {
         self
     }
 
-    pub fn use_plugin<F>(&mut self, plugin: F) -> &mut Self
-    where
-        F: FnOnce(&mut TurndownService),
-    {
-        plugin(self);
-        self
-    }
-
-    pub fn use_plugins<F>(&mut self, plugins: Vec<F>) -> &mut Self
-    where
-        F: FnOnce(&mut TurndownService),
-    {
-        for plugin in plugins {
-            plugin(self);
-        }
-        self
-    }
-
     pub fn escape(&self, string: &str) -> String {
         self.escape_patterns
             .iter()
@@ -218,7 +159,7 @@ impl TurndownService {
             let node_borrow = child.borrow();
             let node_data = node_borrow.data.borrow();
             let replacement = match node_borrow.node_type {
-                NodeType::Text | NodeType::CDataSection => {
+                NodeType::Text => {
                     let text_data = node_data.as_deref().unwrap_or("");
 
                     if Node::is_code(child) {

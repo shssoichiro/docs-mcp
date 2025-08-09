@@ -2,9 +2,7 @@
 mod tests;
 
 use super::TurndownOptions;
-use super::utilities::{
-    has_meaningful_when_blank, has_void, is_block, is_meaningful_when_blank, is_void,
-};
+use super::utilities::is_block;
 use fancy_regex::Regex;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -14,7 +12,6 @@ use std::rc::{Rc, Weak};
 pub enum NodeType {
     Element = 1,
     Text = 3,
-    CDataSection = 4,
 }
 
 #[derive(Debug)]
@@ -31,7 +28,6 @@ pub struct Node {
     // Cache computed values
     pub is_block: RefCell<Option<bool>>,
     pub is_code: RefCell<Option<bool>>,
-    pub is_blank: RefCell<Option<bool>>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +60,6 @@ impl Node {
             children: RefCell::new(Vec::new()),
             is_block: RefCell::new(None),
             is_code: RefCell::new(None),
-            is_blank: RefCell::new(None),
         }))
     }
 
@@ -86,16 +81,11 @@ impl Node {
             children: RefCell::new(Vec::new()),
             is_block: RefCell::new(None),
             is_code: RefCell::new(None),
-            is_blank: RefCell::new(None),
         }))
     }
 
     pub fn get_attribute(&self, name: &str) -> Option<String> {
         self.attributes.borrow().get(name).cloned()
-    }
-
-    pub fn set_attribute(&self, name: String, value: String) {
-        self.attributes.borrow_mut().insert(name, value);
     }
 
     /// Check if this node (as an Rc<RefCell<Node>>) is the last element child of its parent
@@ -120,7 +110,7 @@ impl Node {
     /// Get text content from this node and all its children
     pub fn text_content(&self) -> String {
         match self.node_type {
-            NodeType::Text | NodeType::CDataSection => self
+            NodeType::Text => self
                 .data
                 .borrow()
                 .as_ref()
@@ -166,57 +156,6 @@ impl Node {
 
         *node.borrow().is_code.borrow_mut() = Some(result);
         result
-    }
-
-    /// Check if this node is blank (cached)
-    pub fn is_blank(node: &Rc<RefCell<Node>>) -> bool {
-        if let Some(cached) = *node.borrow().is_blank.borrow() {
-            return cached;
-        }
-
-        let result = Self::compute_is_blank(node);
-        *node.borrow().is_blank.borrow_mut() = Some(result);
-        result
-    }
-
-    fn compute_is_blank(node: &Rc<RefCell<Node>>) -> bool {
-        let node_borrow = node.borrow();
-
-        // Check if node is void
-        if is_void(&node_borrow.node_name) {
-            return false;
-        }
-
-        // Check if node is meaningful when blank
-        if is_meaningful_when_blank(&node_borrow.node_name) {
-            return false;
-        }
-
-        // Check if text content is only whitespace
-        let text_content = node_borrow.text_content();
-        let whitespace_regex = Regex::new(r"^\s*$").expect("valid regex");
-        if !whitespace_regex.is_match(&text_content).unwrap_or(false) {
-            return false;
-        }
-
-        // Check if has void elements
-        let child_names: Vec<String> = node_borrow
-            .children
-            .borrow()
-            .iter()
-            .map(|child| child.borrow().node_name.clone())
-            .collect();
-        let child_name_refs: Vec<&str> = child_names.iter().map(|s| s.as_str()).collect();
-        if has_void(&child_name_refs) {
-            return false;
-        }
-
-        // Check if has meaningful when blank elements
-        if has_meaningful_when_blank(&child_name_refs) {
-            return false;
-        }
-
-        true
     }
 
     /// Get flanking whitespace for this node
@@ -324,7 +263,6 @@ fn is_flanked_by_whitespace(
                     false
                 }
             }
-            _ => false,
         }
     })
 }

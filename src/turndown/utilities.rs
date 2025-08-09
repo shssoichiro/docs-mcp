@@ -75,28 +75,6 @@ pub fn is_void(node_name: &str) -> bool {
     is_element(node_name, VOID_ELEMENTS)
 }
 
-pub fn has_void(element_names: &[&str]) -> bool {
-    has_element(element_names, VOID_ELEMENTS)
-}
-
-const MEANINGFUL_WHEN_BLANK_ELEMENTS: &[&str] = &[
-    "A", "TABLE", "THEAD", "TBODY", "TFOOT", "TH", "TD", "IFRAME", "SCRIPT", "AUDIO", "VIDEO",
-];
-
-pub fn is_meaningful_when_blank(node_name: &str) -> bool {
-    is_element(node_name, MEANINGFUL_WHEN_BLANK_ELEMENTS)
-}
-
-pub fn has_meaningful_when_blank(element_names: &[&str]) -> bool {
-    has_element(element_names, MEANINGFUL_WHEN_BLANK_ELEMENTS)
-}
-
 fn is_element(node_name: &str, tag_names: &[&str]) -> bool {
     tag_names.contains(&node_name)
-}
-
-fn has_element(element_names: &[&str], tag_names: &[&str]) -> bool {
-    tag_names
-        .iter()
-        .any(|tag_name| element_names.contains(tag_name))
 }

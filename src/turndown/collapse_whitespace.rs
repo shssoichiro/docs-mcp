@@ -73,7 +73,7 @@ where
         let node_type = current_node.borrow().node_type.clone();
 
         match node_type {
-            NodeType::Text | NodeType::CDataSection => {
+            NodeType::Text => {
                 let mut text = current_node
                     .borrow()
                     .data
