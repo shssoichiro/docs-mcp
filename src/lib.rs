@@ -41,3 +41,15 @@ pub enum DocsError {
     #[error("Other error: {0}")]
     Other(#[from] anyhow::Error),
 }
+
+#[cfg(feature = "bench")]
+pub mod internal {
+    pub use crate::commands::*;
+    pub use crate::config::*;
+    pub use crate::crawler::*;
+    pub use crate::database::*;
+    pub use crate::embeddings::*;
+    pub use crate::indexer::*;
+    pub use crate::mcp::*;
+    pub use crate::turndown::*;
+}

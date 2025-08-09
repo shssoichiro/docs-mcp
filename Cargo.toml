@@ -21,6 +21,7 @@ fancy-regex = "0.16"
 futures = "0.3"
 headless_chrome = "1.0"
 indicatif = "0.18.0"
+itertools = "0.14.0"
 lancedb = "0.21"
 modelcontextprotocol-server = "0.1.5"
 pulldown-cmark = { version = "0.13.0", features = ["simd"] }
@@ -43,9 +44,23 @@ url = { version = "2.5", features = ["serde"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
 [dev-dependencies]
+criterion = "0.7.0"
 serial_test = "3.2.0"
 tempfile = "3.8"
 wiremock = "0.6"
+
+[features]
+bench = []
+
+[[bench]]
+name = "chunking"
+harness = false
+required-features = ["bench"]
+
+[[bench]]
+name = "extraction"
+harness = false
+required-features = ["bench"]
 
 [profile.dev.package.fancy-regex]
 opt-level = 2

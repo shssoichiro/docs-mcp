@@ -188,13 +188,13 @@ impl Indexer {
                 .context("Failed to generate embeddings")?;
 
             // Store embeddings and create indexed chunk records
-            for (chunk, embedding_result) in batch.iter().zip(embedding_results.iter()) {
+            for (chunk, embedding_result) in batch.into_iter().zip(embedding_results.into_iter()) {
                 let vector_id = Uuid::new_v4().to_string();
 
                 // Create embedding record for LanceDB
                 let embedding_record = EmbeddingRecord {
                     id: vector_id.clone(),
-                    vector: embedding_result.embedding.clone(),
+                    vector: embedding_result.embedding,
                     metadata: ChunkMetadata {
                         chunk_id: vector_id.clone(),
                         site_id: site_id.to_string(),
@@ -219,10 +219,10 @@ impl Indexer {
                     site_id,
                     url: crawl_item.url.clone(),
                     page_title: Some(extracted_content.title.clone()),
-                    heading_path: Some(chunk.heading_path.clone()),
-                    chunk_content: chunk.content.clone(),
+                    heading_path: Some(chunk.heading_path),
+                    chunk_content: chunk.content,
                     chunk_index: chunk.chunk_index as i64,
-                    vector_id: vector_id.clone(),
+                    vector_id,
                 };
 
                 self.database

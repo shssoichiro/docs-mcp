@@ -5,6 +5,7 @@ use crate::turndown::{
     CodeBlockStyle, Filter, HeadingStyle, Rule, TurndownOptions, TurndownService,
 };
 use anyhow::Result;
+use itertools::Itertools;
 use pulldown_cmark::HeadingLevel;
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use scraper::{Html, Selector};
@@ -73,11 +74,11 @@ pub fn extract_content(html: &str) -> Result<ExtractedContent> {
     );
 
     let document = Html::parse_document(html);
-    let clean_document = clean_content(document);
+    let clean_document = clean_content(&document);
     let markdown = turndown.turndown(&clean_document.html())?;
 
     // Extract page title from first heading
-    let title = extract_title_from_markdown(&markdown);
+    let title = extract_title(&document, &markdown);
 
     // Extract main content sections
     let sections = extract_sections(&markdown)?;
@@ -245,6 +246,23 @@ fn heading_level_to_u8(level: HeadingLevel) -> u8 {
     }
 }
 
+/// Extract the page title from HTML document
+fn extract_title(document: &Html, markdown: &str) -> String {
+    // Try the HTML Title element first
+    if let Ok(selector) = Selector::parse("title") {
+        if let Some(element) = document.select(&selector).next() {
+            let title = element.text().map(|t| t.trim()).join(" ");
+            if !title.is_empty() {
+                debug!("Extracted title from <title> tag: '{}'", title);
+                return title;
+            }
+        }
+    }
+
+    // Parse from markdown instead
+    extract_title_from_markdown(markdown)
+}
+
 /// Extract page title from markdown (uses first heading or falls back to default)
 fn extract_title_from_markdown(markdown: &str) -> String {
     let parser = Parser::new(markdown);
@@ -295,7 +313,7 @@ fn extract_title_from_markdown(markdown: &str) -> String {
         }
     }
 
-    "Untitled Document".to_string()
+    "Untitled Page".to_string()
 }
 
 /// Update the heading stack with a new heading
@@ -320,7 +338,7 @@ fn build_heading_path(stack: &[(u8, String)]) -> String {
     }
 }
 
-fn clean_content(document: Html) -> Html {
+fn clean_content(document: &Html) -> Html {
     // Create selectors for unwanted elements
     let unwanted_selector = Selector::parse(
         ".advertisement, .ads, .sidebar, .menu, .navigation, .anchor, a.src.rightside",
@@ -360,7 +378,7 @@ fn clean_content(document: Html) -> Html {
 
     // If neither main content nor body found, return the original document
     // after removing unwanted elements
-    let mut cleaned_doc = document;
+    let mut cleaned_doc = document.clone();
     remove_unwanted_elements(&mut cleaned_doc, &unwanted_selector);
     cleaned_doc
 }

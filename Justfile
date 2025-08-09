@@ -7,5 +7,6 @@ lcov:
 
 precommit:
     cargo fmt
-    cargo clippy --tests --benches -- -D warnings
+    cargo clippy --tests -- -D warnings
+    cargo check --benches --features bench
     cargo test
