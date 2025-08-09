@@ -1,0 +1,330 @@
+#[cfg(test)]
+mod tests;
+
+use super::TurndownOptions;
+use super::utilities::{
+    has_meaningful_when_blank, has_void, is_block, is_meaningful_when_blank, is_void,
+};
+use fancy_regex::Regex;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::{Rc, Weak};
+
+#[derive(Debug, Clone)]
+pub enum NodeType {
+    Element = 1,
+    Text = 3,
+    CDataSection = 4,
+}
+
+#[derive(Debug)]
+pub struct Node {
+    pub node_type: NodeType,
+    pub node_name: String,
+    pub data: RefCell<Option<String>>,
+    pub attributes: RefCell<HashMap<String, String>>,
+    pub parent: RefCell<Weak<RefCell<Node>>>,
+    pub first_child: RefCell<Option<Rc<RefCell<Node>>>>,
+    pub next_sibling: RefCell<Option<Rc<RefCell<Node>>>>,
+    pub previous_sibling: RefCell<Option<Rc<RefCell<Node>>>>,
+    pub children: RefCell<Vec<Rc<RefCell<Node>>>>,
+    // Cache computed values
+    pub is_block: RefCell<Option<bool>>,
+    pub is_code: RefCell<Option<bool>>,
+    pub is_blank: RefCell<Option<bool>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FlankingWhitespace {
+    pub leading: String,
+    pub trailing: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct EdgeWhitespace {
+    pub leading: String,
+    pub leading_ascii: String,
+    pub leading_non_ascii: String,
+    pub trailing: String,
+    pub trailing_non_ascii: String,
+    pub trailing_ascii: String,
+}
+
+impl Node {
+    pub fn new(node_type: NodeType, node_name: String, data: Option<String>) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Node {
+            node_type,
+            node_name,
+            data: RefCell::new(data),
+            attributes: RefCell::new(HashMap::new()),
+            parent: RefCell::new(Weak::new()),
+            first_child: RefCell::new(None),
+            next_sibling: RefCell::new(None),
+            previous_sibling: RefCell::new(None),
+            children: RefCell::new(Vec::new()),
+            is_block: RefCell::new(None),
+            is_code: RefCell::new(None),
+            is_blank: RefCell::new(None),
+        }))
+    }
+
+    pub fn with_attributes(
+        node_type: NodeType,
+        node_name: String,
+        data: Option<String>,
+        attributes: HashMap<String, String>,
+    ) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Node {
+            node_type,
+            node_name,
+            data: RefCell::new(data),
+            attributes: RefCell::new(attributes),
+            parent: RefCell::new(Weak::new()),
+            first_child: RefCell::new(None),
+            next_sibling: RefCell::new(None),
+            previous_sibling: RefCell::new(None),
+            children: RefCell::new(Vec::new()),
+            is_block: RefCell::new(None),
+            is_code: RefCell::new(None),
+            is_blank: RefCell::new(None),
+        }))
+    }
+
+    pub fn get_attribute(&self, name: &str) -> Option<String> {
+        self.attributes.borrow().get(name).cloned()
+    }
+
+    pub fn set_attribute(&self, name: String, value: String) {
+        self.attributes.borrow_mut().insert(name, value);
+    }
+
+    /// Check if this node (as an Rc<RefCell<Node>>) is the last element child of its parent
+    pub fn is_last_element_child_of_parent(node: &Rc<RefCell<Node>>) -> bool {
+        let Some(parent) = node.borrow().parent.borrow().upgrade() else {
+            return false;
+        };
+
+        // Get all element children (not text nodes) of the parent
+        let parent_children = parent.borrow().children.borrow().clone();
+        let element_children: Vec<_> = parent_children
+            .iter()
+            .filter(|child| matches!(child.borrow().node_type, NodeType::Element))
+            .collect();
+
+        // Check if this node is the last element child
+        element_children
+            .last()
+            .is_some_and(|last_element| Rc::ptr_eq(last_element, node))
+    }
+
+    /// Get text content from this node and all its children
+    pub fn text_content(&self) -> String {
+        match self.node_type {
+            NodeType::Text | NodeType::CDataSection => self
+                .data
+                .borrow()
+                .as_ref()
+                .unwrap_or(&String::new())
+                .clone(),
+            NodeType::Element => {
+                let children = self.children.borrow();
+                children
+                    .iter()
+                    .map(|child| child.borrow().text_content())
+                    .collect::<String>()
+            }
+        }
+    }
+
+    /// Check if this node is a block element (cached)
+    pub fn is_block(&self) -> bool {
+        if let Some(cached) = *self.is_block.borrow() {
+            return cached;
+        }
+
+        let result = is_block(&self.node_name);
+        *self.is_block.borrow_mut() = Some(result);
+        result
+    }
+
+    /// Check if this node is code or has a parent that is code (cached)
+    pub fn is_code(node: &Rc<RefCell<Node>>) -> bool {
+        if let Some(cached) = *node.borrow().is_code.borrow() {
+            return cached;
+        }
+
+        let result = {
+            let node_borrow = node.borrow();
+            if node_borrow.node_name == "CODE" {
+                true
+            } else if let Some(parent) = node_borrow.parent.borrow().upgrade() {
+                Self::is_code(&parent)
+            } else {
+                false
+            }
+        };
+
+        *node.borrow().is_code.borrow_mut() = Some(result);
+        result
+    }
+
+    /// Check if this node is blank (cached)
+    pub fn is_blank(node: &Rc<RefCell<Node>>) -> bool {
+        if let Some(cached) = *node.borrow().is_blank.borrow() {
+            return cached;
+        }
+
+        let result = Self::compute_is_blank(node);
+        *node.borrow().is_blank.borrow_mut() = Some(result);
+        result
+    }
+
+    fn compute_is_blank(node: &Rc<RefCell<Node>>) -> bool {
+        let node_borrow = node.borrow();
+
+        // Check if node is void
+        if is_void(&node_borrow.node_name) {
+            return false;
+        }
+
+        // Check if node is meaningful when blank
+        if is_meaningful_when_blank(&node_borrow.node_name) {
+            return false;
+        }
+
+        // Check if text content is only whitespace
+        let text_content = node_borrow.text_content();
+        let whitespace_regex = Regex::new(r"^\s*$").expect("valid regex");
+        if !whitespace_regex.is_match(&text_content).unwrap_or(false) {
+            return false;
+        }
+
+        // Check if has void elements
+        let child_names: Vec<String> = node_borrow
+            .children
+            .borrow()
+            .iter()
+            .map(|child| child.borrow().node_name.clone())
+            .collect();
+        let child_name_refs: Vec<&str> = child_names.iter().map(|s| s.as_str()).collect();
+        if has_void(&child_name_refs) {
+            return false;
+        }
+
+        // Check if has meaningful when blank elements
+        if has_meaningful_when_blank(&child_name_refs) {
+            return false;
+        }
+
+        true
+    }
+
+    /// Get flanking whitespace for this node
+    pub fn flanking_whitespace(
+        node: &Rc<RefCell<Node>>,
+        options: &TurndownOptions,
+    ) -> FlankingWhitespace {
+        let node_borrow = node.borrow();
+
+        if node_borrow.is_block() || (options.preformatted_code && Self::is_code(node)) {
+            return FlankingWhitespace {
+                leading: String::new(),
+                trailing: String::new(),
+            };
+        }
+
+        let text_content = node_borrow.text_content();
+        let mut edges = edge_whitespace(&text_content);
+
+        // abandon leading ASCII WS if left-flanked by ASCII WS
+        if !edges.leading_ascii.is_empty() && is_flanked_by_whitespace("left", node, options) {
+            edges.leading = edges.leading_non_ascii;
+        }
+
+        // abandon trailing ASCII WS if right-flanked by ASCII WS
+        if !edges.trailing_ascii.is_empty() && is_flanked_by_whitespace("right", node, options) {
+            edges.trailing = edges.trailing_non_ascii;
+        }
+
+        FlankingWhitespace {
+            leading: edges.leading,
+            trailing: edges.trailing,
+        }
+    }
+}
+
+/// Extract edge whitespace from a string
+fn edge_whitespace(string: &str) -> EdgeWhitespace {
+    let regex = Regex::new(r"^(([ \t\r\n]*)(\s*))(?:(?=\S)[\s\S]*\S)?((\s*?)([ \t\r\n]*))$")
+        .expect("valid regex");
+
+    if let Ok(Some(captures)) = regex.captures(string) {
+        EdgeWhitespace {
+            leading: captures
+                .get(1)
+                .map_or(String::new(), |m| m.as_str().to_string()),
+            leading_ascii: captures
+                .get(2)
+                .map_or(String::new(), |m| m.as_str().to_string()),
+            leading_non_ascii: captures
+                .get(3)
+                .map_or(String::new(), |m| m.as_str().to_string()),
+            trailing: captures
+                .get(4)
+                .map_or(String::new(), |m| m.as_str().to_string()),
+            trailing_non_ascii: captures
+                .get(5)
+                .map_or(String::new(), |m| m.as_str().to_string()),
+            trailing_ascii: captures
+                .get(6)
+                .map_or(String::new(), |m| m.as_str().to_string()),
+        }
+    } else {
+        // For whitespace-only strings, leading contains the whole string
+        EdgeWhitespace {
+            leading: string.to_string(),
+            leading_ascii: string.to_string(),
+            leading_non_ascii: String::new(),
+            trailing: String::new(),
+            trailing_non_ascii: String::new(),
+            trailing_ascii: String::new(),
+        }
+    }
+}
+
+/// Check if a node is flanked by whitespace on the given side
+fn is_flanked_by_whitespace(
+    side: &str,
+    node: &Rc<RefCell<Node>>,
+    options: &TurndownOptions,
+) -> bool {
+    let (sibling, regex_pattern) = if side == "left" {
+        (node.borrow().previous_sibling.borrow().clone(), r" $")
+    } else {
+        (node.borrow().next_sibling.borrow().clone(), r"^ ")
+    };
+
+    let regex = Regex::new(regex_pattern).expect("valid regex");
+
+    sibling.is_some_and(|sibling_node| {
+        let sibling_borrow = sibling_node.borrow();
+        match sibling_borrow.node_type {
+            NodeType::Text => sibling_borrow
+                .data
+                .borrow()
+                .as_ref()
+                .is_some_and(|text| regex.is_match(text).unwrap_or(false)),
+            NodeType::Element => {
+                if options.preformatted_code && sibling_borrow.node_name == "CODE" {
+                    false
+                } else if !sibling_borrow.is_block() {
+                    let text_content = sibling_borrow.text_content();
+                    regex.is_match(&text_content).unwrap_or(false)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    })
+}

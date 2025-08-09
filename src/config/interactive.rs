@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use console::style;
 use dialoguer::{Confirm, Input, Select};
 
-use crate::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
+use crate::{config::settings::OllamaConfig, embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION};
 
-use super::{Config, ConfigError, OllamaConfig};
+use super::{Config, ConfigError};
 
 #[inline]
 pub fn run_interactive_config(mut config: Config) -> Result<()> {

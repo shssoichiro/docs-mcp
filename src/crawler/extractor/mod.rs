@@ -1,7 +1,15 @@
-use anyhow::{Result, anyhow};
-use scraper::{ElementRef, Html, Selector};
+#[cfg(test)]
+mod tests;
+
+use crate::turndown::{
+    CodeBlockStyle, Filter, HeadingStyle, Rule, TurndownOptions, TurndownService,
+};
+use anyhow::Result;
+use pulldown_cmark::HeadingLevel;
+use pulldown_cmark::{Event, Parser, Tag, TagEnd};
+use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{borrow::Cow, rc::Rc};
 use tracing::debug;
 
 /// Represents a content section with its heading hierarchy
@@ -28,179 +36,266 @@ pub struct ExtractedContent {
     pub raw_text: String,
 }
 
-/// Configuration for content extraction
-#[derive(Debug, Clone)]
-pub struct ExtractionConfig {
-    /// Whether to preserve code blocks during extraction
-    pub preserve_code_blocks: bool,
-    /// Whether to include navigation elements
-    pub include_navigation: bool,
-    /// Whether to include footer content
-    pub include_footer: bool,
-    /// Maximum heading level to consider (1-6)
-    pub max_heading_level: u8,
-}
-
-impl Default for ExtractionConfig {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            preserve_code_blocks: true,
-            include_navigation: false,
-            include_footer: false,
-            max_heading_level: 6,
-        }
-    }
-}
-
 /// Extract structured content from HTML document
-#[inline]
-pub fn extract_content(html: &str, config: &ExtractionConfig) -> Result<ExtractedContent> {
-    let document = Html::parse_document(html);
+pub fn extract_content(html: &str) -> Result<ExtractedContent> {
+    let opts = TurndownOptions {
+        heading_style: HeadingStyle::Atx,
+        code_block_style: CodeBlockStyle::Fenced,
+        bullet_list_marker: "-",
+        ..TurndownOptions::default()
+    };
+    let mut turndown = TurndownService::new(Some(opts));
+    turndown.add_rule(
+        "remove_scripts",
+        Rule::new(
+            Filter::TagNames(vec![
+                "script",
+                "iframe",
+                "style",
+                "nav",
+                "navbar",
+                "header",
+                "footer",
+                "aside",
+                "button",
+                "rustdoc-search",
+                "rostdoc-toolbar",
+            ]),
+            Rc::new(|_, _, _| Cow::Borrowed("")),
+        ),
+    );
+    turndown.add_rule(
+        "clean_code_blocks",
+        Rule::new(
+            Filter::TagName("pre"),
+            Rc::new(|content, _, _| Cow::Owned(format!("\n```\n{}\n```\n", content))),
+        ),
+    );
 
-    // Extract page title
-    let title = extract_title(&document)?;
+    let document = Html::parse_document(html);
+    let clean_document = clean_content(document);
+    let markdown = turndown.turndown(&clean_document.html())?;
+
+    // Extract page title from first heading
+    let title = extract_title_from_markdown(&markdown);
 
     // Extract main content sections
-    let sections = extract_sections(&document, config)?;
-
-    // Extract raw text as fallback
-    let raw_text = extract_raw_text(&document, config)?;
+    let sections = extract_sections(&markdown)?;
 
     debug!(
         "Extracted content: title='{}', {} sections, {} chars raw text",
         title,
         sections.len(),
-        raw_text.len()
+        markdown.len()
     );
 
     Ok(ExtractedContent {
         title,
         sections,
-        raw_text,
+        raw_text: markdown,
     })
 }
 
-/// Extract the page title from HTML document
-fn extract_title(document: &Html) -> Result<String> {
-    // Try multiple selectors for title extraction
-    let title_selectors = [
-        "title",
-        "h1",
-        "[data-title]",
-        ".page-title",
-        ".title",
-        "#title",
-    ];
-
-    for selector_str in &title_selectors {
-        if let Ok(selector) = Selector::parse(selector_str) {
-            if let Some(element) = document.select(&selector).next() {
-                let title = extract_clean_text(element);
-                if !title.is_empty() {
-                    debug!(
-                        "Extracted title using selector '{}': '{}'",
-                        selector_str, title
-                    );
-                    return Ok(title);
-                }
-            }
-        }
-    }
-
-    // Fallback to a generic title
-    Ok("Untitled".to_string())
-}
-
-/// Extract content sections organized by heading hierarchy
-fn extract_sections(document: &Html, config: &ExtractionConfig) -> Result<Vec<ContentSection>> {
+/// Extract content sections organized by heading hierarchy from markdown
+fn extract_sections(markdown: &str) -> Result<Vec<ContentSection>> {
     let mut sections = Vec::new();
     let mut heading_stack: Vec<(u8, String)> = Vec::new();
 
-    // Find the main content area
-    let content_root = find_main_content(document);
+    let parser = Parser::new(markdown);
+    let mut current_content = String::new();
+    let mut current_heading_text = String::new();
+    let mut in_heading = false;
+    let mut in_code_block = false;
+    let mut has_code_blocks = false;
 
-    // Process all elements in document order
-    for element in content_root.descendants() {
-        if let Some(element_ref) = ElementRef::wrap(element) {
-            let tag_name = element_ref.value().name();
+    for event in parser {
+        match event {
+            Event::Start(tag) => match tag {
+                Tag::Heading { .. } => {
+                    // Save any pending content before processing new heading
+                    if !current_content.trim().is_empty() {
+                        let heading_path = build_heading_path(&heading_stack);
+                        sections.push(ContentSection {
+                            heading_path,
+                            content: current_content.trim().to_string(),
+                            heading_level: heading_stack.last().map(|(level, _)| *level),
+                            has_code_blocks,
+                        });
+                        current_content.clear();
+                        has_code_blocks = false;
+                    }
 
-            // Handle headings
-            if tag_name.starts_with('h') && tag_name.len() == 2 {
-                if let Some(level_char) = tag_name.chars().nth(1) {
-                    if let Some(level) = level_char.to_digit(10) {
-                        let level = level as u8;
-                        if level <= config.max_heading_level {
-                            let heading_text = extract_clean_text(element_ref);
-                            if !heading_text.is_empty() {
-                                update_heading_stack(&mut heading_stack, level, heading_text);
-                            }
-                        }
+                    in_heading = true;
+                    current_heading_text.clear();
+                }
+                Tag::CodeBlock(_) => {
+                    in_code_block = true;
+                    has_code_blocks = true;
+                    current_content.push_str("```\n");
+                }
+                Tag::Paragraph => {
+                    // Add some spacing for paragraph separation
+                    if !current_content.is_empty() && !current_content.ends_with("\n\n") {
+                        current_content.push('\n');
                     }
                 }
-            }
-
-            // Handle content elements
-            if is_content_element(tag_name) {
-                let content = extract_element_content(element_ref, config)?;
-                if !content.trim().is_empty() {
-                    let heading_path = build_heading_path(&heading_stack);
-                    let has_code_blocks = contains_code_blocks(element_ref);
-
-                    sections.push(ContentSection {
-                        heading_path,
-                        content,
-                        heading_level: heading_stack.last().map(|(level, _)| *level),
-                        has_code_blocks,
-                    });
+                Tag::List(_) => {
+                    if !current_content.is_empty() && !current_content.ends_with("\n") {
+                        current_content.push('\n');
+                    }
+                }
+                Tag::Item => {
+                    current_content.push_str("• ");
+                }
+                _ => {}
+            },
+            Event::End(tag_end) => match tag_end {
+                TagEnd::Heading(level) => {
+                    if in_heading {
+                        let heading_level = heading_level_to_u8(level);
+                        if !current_heading_text.trim().is_empty() {
+                            update_heading_stack(
+                                &mut heading_stack,
+                                heading_level,
+                                current_heading_text.trim().to_string(),
+                            );
+                        }
+                        in_heading = false;
+                    }
+                }
+                TagEnd::CodeBlock => {
+                    if in_code_block {
+                        current_content.push_str("```\n");
+                        in_code_block = false;
+                    }
+                }
+                TagEnd::Paragraph => {
+                    current_content.push('\n');
+                }
+                TagEnd::Item => {
+                    current_content.push('\n');
+                }
+                _ => {}
+            },
+            Event::Text(text) => {
+                if in_heading {
+                    current_heading_text.push_str(&text);
+                } else {
+                    current_content.push_str(&text);
                 }
             }
+            Event::Code(code) => {
+                if in_heading {
+                    current_heading_text.push_str(&code);
+                } else {
+                    current_content.push('`');
+                    current_content.push_str(&code);
+                    current_content.push('`');
+                    has_code_blocks = true;
+                }
+            }
+            Event::SoftBreak | Event::HardBreak => {
+                if in_heading {
+                    current_heading_text.push(' ');
+                } else {
+                    current_content.push('\n');
+                }
+            }
+            Event::Html(html) => {
+                // Handle inline HTML if needed
+                current_content.push_str(&html);
+            }
+            _ => {}
         }
     }
 
+    // Add any remaining content as the last section
+    if !current_content.trim().is_empty() {
+        let heading_path = build_heading_path(&heading_stack);
+        sections.push(ContentSection {
+            heading_path,
+            content: current_content.trim().to_string(),
+            heading_level: heading_stack.last().map(|(level, _)| *level),
+            has_code_blocks,
+        });
+    }
+
     // If no sections found, create a single section with all content
-    if sections.is_empty() {
-        let content = extract_raw_text(document, config)?;
-        if !content.trim().is_empty() {
-            sections.push(ContentSection {
-                heading_path: "Main Content".to_string(),
-                content,
-                heading_level: None,
-                has_code_blocks: false,
-            });
-        }
+    if sections.is_empty() && !markdown.trim().is_empty() {
+        sections.push(ContentSection {
+            heading_path: "Main Content".to_string(),
+            content: markdown.trim().to_string(),
+            heading_level: None,
+            has_code_blocks: markdown.contains("```") || markdown.contains('`'),
+        });
     }
 
     Ok(sections)
 }
 
-/// Find the main content area of the document
-fn find_main_content(document: &Html) -> ElementRef<'_> {
-    // Try common main content selectors
-    let main_selectors = [
-        "main",
-        "[role=\"main\"]",
-        ".content",
-        ".main-content",
-        "#content",
-        "#main",
-        ".documentation",
-        ".docs",
-        "article",
-        ".article-content",
-    ];
+/// Convert pulldown-cmark HeadingLevel to u8
+fn heading_level_to_u8(level: HeadingLevel) -> u8 {
+    match level {
+        HeadingLevel::H1 => 1,
+        HeadingLevel::H2 => 2,
+        HeadingLevel::H3 => 3,
+        HeadingLevel::H4 => 4,
+        HeadingLevel::H5 => 5,
+        HeadingLevel::H6 => 6,
+    }
+}
 
-    for selector_str in &main_selectors {
-        if let Ok(selector) = Selector::parse(selector_str) {
-            if let Some(element) = document.select(&selector).next() {
-                debug!("Found main content using selector: {}", selector_str);
-                return element;
+/// Extract page title from markdown (uses first heading or falls back to default)
+fn extract_title_from_markdown(markdown: &str) -> String {
+    let parser = Parser::new(markdown);
+    let mut in_heading = false;
+    let mut title = String::new();
+
+    for event in parser {
+        match event {
+            Event::Start(Tag::Heading {
+                level: HeadingLevel::H1,
+                ..
+            }) => {
+                in_heading = true;
             }
+            Event::End(TagEnd::Heading(HeadingLevel::H1)) => {
+                if !title.trim().is_empty() {
+                    return title.trim().to_string();
+                }
+                in_heading = false;
+            }
+            Event::Text(text) if in_heading => {
+                title.push_str(&text);
+            }
+            _ => {}
         }
     }
 
-    // Fallback to document root
-    document.root_element()
+    // If no H1 found, try any heading
+    let parser = Parser::new(markdown);
+    let mut in_any_heading = false;
+    let mut any_title = String::new();
+
+    for event in parser {
+        match event {
+            Event::Start(Tag::Heading { .. }) => {
+                in_any_heading = true;
+            }
+            Event::End(TagEnd::Heading(_)) => {
+                if !any_title.trim().is_empty() {
+                    return any_title.trim().to_string();
+                }
+                in_any_heading = false;
+            }
+            Event::Text(text) if in_any_heading => {
+                any_title.push_str(&text);
+            }
+            _ => {}
+        }
+    }
+
+    "Untitled Document".to_string()
 }
 
 /// Update the heading stack with a new heading
@@ -225,179 +320,63 @@ fn build_heading_path(stack: &[(u8, String)]) -> String {
     }
 }
 
-/// Check if an element contains code blocks
-fn contains_code_blocks(element: ElementRef) -> bool {
-    let code_selector = Selector::parse("pre, code, .highlight, .code-block, .language-")
-        .expect("Valid CSS selector");
-
-    element.select(&code_selector).next().is_some()
-}
-
-/// Check if a tag represents a content element
-fn is_content_element(tag_name: &str) -> bool {
-    matches!(
-        tag_name,
-        "p" | "div" | "section" | "article" | "blockquote" | "li" | "dd" | "dt" | "pre"
+fn clean_content(document: Html) -> Html {
+    // Create selectors for unwanted elements
+    let unwanted_selector = Selector::parse(
+        ".advertisement, .ads, .sidebar, .menu, .navigation, .anchor, a.src.rightside",
     )
-}
+    .expect("valid selector");
 
-/// Extract content from a specific element
-fn extract_element_content(element: ElementRef, config: &ExtractionConfig) -> Result<String> {
-    let tag_name = element.value().name();
+    // Create selector for main content areas
+    let main_content_selector =
+        Selector::parse("main, article, .content, .main-content, #content, #main")
+            .expect("valid selector");
 
-    // Handle code blocks specially if preservation is enabled
-    if config.preserve_code_blocks && (tag_name == "pre" || tag_name == "code") {
-        return Ok(format!(
-            "```\n{}\n```",
-            element.text().collect::<String>().trim()
-        ));
+    // Create selector for body as fallback
+    let body_selector = Selector::parse("body").expect("valid selector");
+
+    // First, try to find main content area
+    if let Some(main_element) = document.select(&main_content_selector).next() {
+        // Clone the main element and create a new document
+        let main_html = main_element.html();
+        let mut cleaned_doc = Html::parse_fragment(&main_html);
+
+        // Remove unwanted elements from the main content
+        remove_unwanted_elements(&mut cleaned_doc, &unwanted_selector);
+
+        return cleaned_doc;
     }
 
-    // Extract text content with some structure preservation
-    let mut content = String::new();
-    extract_text_recursive(element, &mut content, config);
+    // Fallback to body if no main content found
+    if let Some(body_element) = document.select(&body_selector).next() {
+        let body_html = body_element.html();
+        let mut cleaned_doc = Html::parse_fragment(&body_html);
 
-    Ok(clean_text(&content))
+        // Remove unwanted elements from the body
+        remove_unwanted_elements(&mut cleaned_doc, &unwanted_selector);
+
+        return cleaned_doc;
+    }
+
+    // If neither main content nor body found, return the original document
+    // after removing unwanted elements
+    let mut cleaned_doc = document;
+    remove_unwanted_elements(&mut cleaned_doc, &unwanted_selector);
+    cleaned_doc
 }
 
-/// Recursively extract text content from an element
-fn extract_text_recursive(element: ElementRef, content: &mut String, config: &ExtractionConfig) {
-    for child in element.children() {
-        if let Some(child_element) = ElementRef::wrap(child) {
-            let tag_name = child_element.value().name();
+// Helper function to remove unwanted elements from an HTML document
+fn remove_unwanted_elements(document: &mut Html, unwanted_selector: &scraper::Selector) {
+    // Collect all unwanted element node IDs first to avoid borrowing issues
+    let unwanted_node_ids: Vec<_> = document
+        .select(unwanted_selector)
+        .map(|element| element.id())
+        .collect();
 
-            match tag_name {
-                // Skip certain elements
-                "script" | "style" | "noscript" => {}
-                "nav" if !config.include_navigation => {}
-                "footer" if !config.include_footer => {}
-
-                // Handle code blocks
-                "pre" | "code" if config.preserve_code_blocks => {
-                    content.push_str("```\n");
-                    content.push_str(child_element.text().collect::<String>().trim());
-                    content.push_str("\n```\n");
-                }
-
-                // Handle lists
-                "li" => {
-                    content.push_str("• ");
-                    extract_text_recursive(child_element, content, config);
-                    content.push('\n');
-                }
-
-                // Handle line breaks
-                "br" => content.push('\n'),
-
-                // Handle paragraphs and block elements
-                "p" | "div" | "section" | "article" | "blockquote" => {
-                    extract_text_recursive(child_element, content, config);
-                    content.push_str("\n\n");
-                }
-
-                // Handle other elements recursively
-                _ => extract_text_recursive(child_element, content, config),
-            }
-        } else if let Some(text_node) = child.value().as_text() {
-            content.push_str(text_node);
+    // Remove each unwanted element
+    for node_id in unwanted_node_ids {
+        if let Some(mut node) = document.tree.get_mut(node_id) {
+            node.detach();
         }
     }
 }
-
-/// Extract raw text content from the entire document
-fn extract_raw_text(document: &Html, config: &ExtractionConfig) -> Result<String> {
-    let main_content = find_main_content(document);
-    let mut content = String::new();
-    extract_text_recursive(main_content, &mut content, config);
-    Ok(clean_text(&content))
-}
-
-/// Extract text content from an element while excluding certain unwanted elements
-fn extract_clean_text(element: ElementRef) -> String {
-    let mut text_parts = Vec::new();
-    extract_text_excluding_elements(
-        element,
-        &mut text_parts,
-        &["button", "script", "style", "noscript"],
-    );
-    clean_text(&text_parts.join(" "))
-}
-
-/// Recursively extract text content while excluding specific element types
-fn extract_text_excluding_elements(
-    element: ElementRef,
-    text_parts: &mut Vec<String>,
-    excluded_tags: &[&str],
-) {
-    for child in element.children() {
-        if let Some(child_element) = ElementRef::wrap(child) {
-            let tag_name = child_element.value().name();
-
-            // Skip excluded elements entirely
-            if excluded_tags.contains(&tag_name) {
-                continue;
-            }
-
-            // Recursively process child elements
-            extract_text_excluding_elements(child_element, text_parts, excluded_tags);
-        } else if let Some(text_node) = child.value().as_text() {
-            let text = text_node.trim();
-            if !text.is_empty() {
-                text_parts.push(text.to_string());
-            }
-        }
-    }
-}
-
-/// Clean and normalize text content
-fn clean_text(text: &str) -> String {
-    text
-        // Normalize whitespace
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        // Remove excessive newlines
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n")
-        // Normalize Unicode
-        .chars()
-        .collect::<String>()
-        .trim()
-        .to_string()
-}
-
-/// Extract metadata from HTML document
-#[inline]
-pub fn extract_metadata(html: &str) -> Result<HashMap<String, String>> {
-    let document = Html::parse_document(html);
-    let mut metadata = HashMap::new();
-
-    // Extract meta tags
-    let meta_selector =
-        Selector::parse("meta").map_err(|e| anyhow!("Failed to create meta selector: {:?}", e))?;
-
-    for element in document.select(&meta_selector) {
-        if let (Some(name), Some(content)) = (
-            element
-                .value()
-                .attr("name")
-                .or_else(|| element.value().attr("property")),
-            element.value().attr("content"),
-        ) {
-            metadata.insert(name.to_string(), content.to_string());
-        }
-    }
-
-    // Extract title
-    if let Ok(title) = extract_title(&document) {
-        metadata.insert("title".to_string(), title);
-    }
-
-    Ok(metadata)
-}
-
-#[cfg(test)]
-mod tests;

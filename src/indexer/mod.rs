@@ -16,15 +16,15 @@ use uuid::Uuid;
 
 use crate::config::Config;
 use crate::crawler::extractor::ExtractedContent;
-use crate::database::lancedb::{ChunkMetadata, EmbeddingRecord, VectorStore};
+use crate::database::lancedb::vector_store::VectorStore;
+use crate::database::lancedb::{ChunkMetadata, EmbeddingRecord};
 use crate::database::sqlite::Database;
 use crate::database::sqlite::models::{
     CrawlQueueItem, NewIndexedChunk, Site, SiteStatus, SiteUpdate,
 };
 use crate::embeddings::chunking::{ChunkingConfig, ContentChunk, chunk_content};
 use crate::embeddings::ollama::OllamaClient;
-
-pub use consistency::{ConsistencyReport, ConsistencyValidator, SiteConsistencyIssue};
+use crate::indexer::consistency::{ConsistencyReport, ConsistencyValidator};
 
 /// Indexer that processes crawled content into searchable embeddings
 pub struct Indexer {
@@ -34,52 +34,6 @@ pub struct Indexer {
     chunking_config: ChunkingConfig,
     app_config: Config,
     batch_size: usize,
-}
-
-/// Statistics about indexing progress
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IndexingStats {
-    pub sites_processed: usize,
-    pub pages_processed: usize,
-    pub chunks_created: usize,
-    pub embeddings_generated: usize,
-    pub errors_encountered: usize,
-}
-
-/// Status of the indexing process
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum IndexingStatus {
-    Idle,
-    ProcessingSite { site_id: i64, site_name: String },
-    GeneratingEmbeddings { remaining_chunks: usize },
-    Failed { error: String },
-}
-
-/// Performance metrics for the indexing system
-#[derive(Debug, Clone, PartialEq)]
-pub struct IndexingPerformanceMetrics {
-    pub total_sites_processed: usize,
-    pub total_pages_processed: usize,
-    pub total_chunks_created: usize,
-    pub average_processing_time_per_site: std::time::Duration,
-    pub pages_per_minute: f64,
-    pub chunks_per_minute: f64,
-    pub database_size_mb: f64,
-}
-
-impl Default for IndexingPerformanceMetrics {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            total_sites_processed: 0,
-            total_pages_processed: 0,
-            total_chunks_created: 0,
-            average_processing_time_per_site: std::time::Duration::ZERO,
-            pages_per_minute: 0.0,
-            chunks_per_minute: 0.0,
-            database_size_mb: 0.0,
-        }
-    }
 }
 
 impl Indexer {
@@ -288,7 +242,7 @@ impl Indexer {
     }
 
     /// Complete indexing for a site
-    async fn complete_site_indexing(&mut self, site: &Site) -> Result<()> {
+    async fn complete_site_indexing(&self, site: &Site) -> Result<()> {
         info!("Completing indexing for site: {}", site.name);
 
         let update = SiteUpdate {
@@ -341,7 +295,7 @@ impl Indexer {
     pub async fn validate_consistency(&mut self) -> Result<ConsistencyReport> {
         info!("Running database consistency validation");
 
-        let mut validator = ConsistencyValidator::new(&self.database, &mut self.vector_store);
+        let validator = ConsistencyValidator::new(&self.database, &mut self.vector_store);
 
         validator.validate_consistency().await
     }
@@ -356,7 +310,7 @@ impl Indexer {
 
         info!("Cleaning up database inconsistencies");
 
-        let mut validator = ConsistencyValidator::new(&self.database, &mut self.vector_store);
+        let validator = ConsistencyValidator::new(&self.database, &mut self.vector_store);
 
         // Clean up orphaned embeddings
         if !report.orphaned_in_lancedb.is_empty() {

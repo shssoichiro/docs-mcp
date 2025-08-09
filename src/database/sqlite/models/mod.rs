@@ -32,7 +32,6 @@ pub enum SiteStatus {
 }
 
 impl std::fmt::Display for SiteStatus {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             SiteStatus::Pending => write!(f, "Pending"),
@@ -83,7 +82,6 @@ pub enum CrawlStatus {
 }
 
 impl std::fmt::Display for CrawlStatus {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             CrawlStatus::Pending => write!(f, "Pending"),
@@ -140,17 +138,14 @@ pub struct SiteStatistics {
 }
 
 impl Site {
-    #[inline]
     pub fn is_completed(&self) -> bool {
         self.status == SiteStatus::Completed
     }
 
-    #[inline]
     pub fn is_indexing(&self) -> bool {
         self.status == SiteStatus::Indexing
     }
 
-    #[inline]
     pub fn is_failed(&self) -> bool {
         self.status == SiteStatus::Failed
     }

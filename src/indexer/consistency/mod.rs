@@ -9,8 +9,9 @@ use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, info, warn};
 
 use crate::DocsError;
-use crate::database::lancedb::VectorStore;
+use crate::database::lancedb::vector_store::VectorStore;
 use crate::database::sqlite::Database;
+use crate::database::sqlite::models::{IndexedChunk, SiteStatus};
 
 /// Consistency check results between SQLite and LanceDB
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,7 +49,6 @@ pub struct ConsistencyValidator<'a> {
 
 impl<'a> ConsistencyValidator<'a> {
     /// Create a new consistency validator
-    #[inline]
     pub fn new(database: &'a Database, vector_store: &'a mut VectorStore) -> Self {
         Self {
             database,
@@ -57,8 +57,7 @@ impl<'a> ConsistencyValidator<'a> {
     }
 
     /// Perform a full consistency check between SQLite and LanceDB
-    #[inline]
-    pub async fn validate_consistency(&mut self) -> Result<ConsistencyReport> {
+    pub async fn validate_consistency(&self) -> Result<ConsistencyReport> {
         info!("Starting cross-database consistency validation");
 
         // Get all indexed chunks from SQLite
@@ -115,8 +114,7 @@ impl<'a> ConsistencyValidator<'a> {
     }
 
     /// Clean up orphaned embeddings in LanceDB that don't have corresponding SQLite records
-    #[inline]
-    pub async fn cleanup_orphaned_embeddings(&mut self, vector_ids: &[String]) -> Result<usize> {
+    pub async fn cleanup_orphaned_embeddings(&self, vector_ids: &[String]) -> Result<usize> {
         if vector_ids.is_empty() {
             return Ok(0);
         }
@@ -150,8 +148,7 @@ impl<'a> ConsistencyValidator<'a> {
     }
 
     /// Regenerate missing embeddings for SQLite chunks that don't have LanceDB entries
-    #[inline]
-    pub async fn regenerate_missing_embeddings(&mut self, vector_ids: &[String]) -> Result<usize> {
+    pub async fn regenerate_missing_embeddings(&self, vector_ids: &[String]) -> Result<usize> {
         if vector_ids.is_empty() {
             return Ok(0);
         }
@@ -181,7 +178,7 @@ impl<'a> ConsistencyValidator<'a> {
     async fn get_all_sqlite_chunks(&self) -> Result<Vec<(String, (i64, String))>> {
         let sites = self
             .database
-            .get_sites_by_status(crate::database::sqlite::SiteStatus::Completed)
+            .get_sites_by_status(SiteStatus::Completed)
             .await?;
         let mut all_chunks = Vec::new();
 
@@ -196,7 +193,7 @@ impl<'a> ConsistencyValidator<'a> {
     }
 
     /// Get all vector IDs from LanceDB
-    async fn get_all_lancedb_vector_ids(&mut self) -> Result<Vec<String>> {
+    async fn get_all_lancedb_vector_ids(&self) -> Result<Vec<String>> {
         self.vector_store
             .list_all_vector_ids()
             .await
@@ -260,10 +257,7 @@ impl<'a> ConsistencyValidator<'a> {
     }
 
     /// Get a chunk from SQLite by vector ID
-    async fn get_chunk_by_vector_id(
-        &self,
-        vector_id: &str,
-    ) -> Result<crate::database::sqlite::IndexedChunk> {
+    async fn get_chunk_by_vector_id(&self, vector_id: &str) -> Result<IndexedChunk> {
         let chunk = self.database.get_chunk_by_vector_id(vector_id).await?;
         chunk.ok_or_else(|| {
             DocsError::Database(format!("Chunk with vector_id {} not found", vector_id)).into()
@@ -301,7 +295,6 @@ impl<'a> ConsistencyValidator<'a> {
 /// Utility functions for consistency validation
 impl ConsistencyReport {
     /// Get a human-readable summary of the consistency report
-    #[inline]
     pub fn summary(&self) -> String {
         if self.is_consistent {
             format!(
@@ -319,7 +312,6 @@ impl ConsistencyReport {
     }
 
     /// Get the total number of consistency issues
-    #[inline]
     pub fn total_issues(&self) -> usize {
         self.missing_in_lancedb.len() + self.orphaned_in_lancedb.len()
     }

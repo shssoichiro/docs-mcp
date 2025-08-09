@@ -1,3 +1,8 @@
+use crate::database::sqlite::{
+    models::{CrawlQueueUpdate, CrawlStatus, NewCrawlQueueItem, NewIndexedChunk, NewSite},
+    queries::{CrawlQueueQueries, IndexedChunkQueries, SiteQueries},
+};
+
 use super::*;
 use anyhow::Result;
 use chrono::Utc;
@@ -102,8 +107,16 @@ async fn integration_site_workflow() -> Result<()> {
         "https://docs.example.com/api".to_string(),
     ];
 
-    let inserted_count = CrawlQueueQueries::add_urls_batch(database.pool(), site.id, urls).await?;
-    assert_eq!(inserted_count, 3);
+    for url in urls {
+        CrawlQueueQueries::add_url(
+            database.pool(),
+            NewCrawlQueueItem {
+                site_id: site.id,
+                url,
+            },
+        )
+        .await?;
+    }
 
     let update = SiteUpdate {
         status: Some(SiteStatus::Indexing),
@@ -198,61 +211,6 @@ async fn integration_site_workflow() -> Result<()> {
 }
 
 #[tokio::test]
-async fn integration_batch_operations() -> Result<()> {
-    let (_temp_dir, database) = create_test_database().await?;
-
-    let new_site = NewSite {
-        base_url: "https://batch.example.com".to_string(),
-        index_url: "https://batch.example.com".to_string(),
-        name: "Batch Test".to_string(),
-        version: "1.0".to_string(),
-    };
-
-    let site = SiteQueries::create(database.pool(), new_site).await?;
-
-    let batch_urls: Vec<String> = (1..=10)
-        .map(|i| format!("https://batch.example.com/page{}", i))
-        .collect();
-
-    let inserted_count =
-        CrawlQueueQueries::add_urls_batch(database.pool(), site.id, batch_urls.clone()).await?;
-    assert_eq!(inserted_count, 10);
-
-    let duplicate_inserted =
-        CrawlQueueQueries::add_urls_batch(database.pool(), site.id, batch_urls).await?;
-    assert_eq!(duplicate_inserted, 0);
-
-    let batch_chunks: Vec<NewIndexedChunk> = (1..=5)
-        .map(|i| NewIndexedChunk {
-            site_id: site.id,
-            url: format!("https://batch.example.com/page{}", i),
-            page_title: Some(format!("Batch Page {}", i)),
-            heading_path: Some(format!("Batch Page {} > Content", i)),
-            chunk_content: format!("Batch content for page {}", i),
-            chunk_index: 0,
-            vector_id: format!("batch-vector-{}", i),
-        })
-        .collect();
-
-    let created_chunks = IndexedChunkQueries::create_batch(database.pool(), batch_chunks).await?;
-    assert_eq!(created_chunks.len(), 5);
-
-    let chunks_by_site = IndexedChunkQueries::list_by_site(database.pool(), site.id).await?;
-    assert_eq!(chunks_by_site.len(), 5);
-
-    let chunk_count = IndexedChunkQueries::count_by_site(database.pool(), site.id).await?;
-    assert_eq!(chunk_count, 5);
-
-    let deleted_chunk_count = IndexedChunkQueries::delete_by_site(database.pool(), site.id).await?;
-    assert_eq!(deleted_chunk_count, 5);
-
-    let final_chunk_count = IndexedChunkQueries::count_by_site(database.pool(), site.id).await?;
-    assert_eq!(final_chunk_count, 0);
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn integration_error_handling() -> Result<()> {
     let (_temp_dir, database) = create_test_database().await?;
 
@@ -290,57 +248,6 @@ async fn integration_error_handling() -> Result<()> {
         failed_site.error_message,
         Some("Test error message".to_string())
     );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn integration_transaction_rollback() -> Result<()> {
-    let (_temp_dir, database) = create_test_database().await?;
-
-    let new_site = NewSite {
-        base_url: "https://transaction.example.com".to_string(),
-        index_url: "https://transaction.example.com".to_string(),
-        name: "Transaction Test".to_string(),
-        version: "1.0".to_string(),
-    };
-
-    let site = SiteQueries::create(database.pool(), new_site).await?;
-
-    let mut transaction = database.begin_transaction().await?;
-
-    let new_chunk = NewIndexedChunk {
-        site_id: site.id,
-        url: "https://transaction.example.com/page1".to_string(),
-        page_title: Some("Transaction Page".to_string()),
-        heading_path: Some("Transaction Page > Content".to_string()),
-        chunk_content: "Transaction content".to_string(),
-        chunk_index: 0,
-        vector_id: "transaction-vector".to_string(),
-    };
-
-    sqlx::query(
-        r#"
-        INSERT INTO indexed_chunks (site_id, url, page_title, heading_path, chunk_content, chunk_index, vector_id, indexed_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        "#
-    )
-    .bind(new_chunk.site_id)
-    .bind(&new_chunk.url)
-    .bind(&new_chunk.page_title)
-    .bind(&new_chunk.heading_path)
-    .bind(&new_chunk.chunk_content)
-    .bind(new_chunk.chunk_index)
-    .bind(&new_chunk.vector_id)
-    .bind(Utc::now())
-    .execute(&mut *transaction)
-    .await?;
-
-    transaction.rollback().await?;
-
-    let chunk_after_rollback =
-        IndexedChunkQueries::get_by_vector_id(database.pool(), "transaction-vector").await?;
-    assert!(chunk_after_rollback.is_none());
 
     Ok(())
 }

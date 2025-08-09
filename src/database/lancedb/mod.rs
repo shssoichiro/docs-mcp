@@ -1,12 +1,10 @@
 // LanceDB vector database module
 // Handles vector storage and similarity search for embeddings
 
-pub mod vector_store;
-
 #[cfg(test)]
 mod tests;
 
-pub use vector_store::*;
+pub mod vector_store;
 
 use serde::{Deserialize, Serialize};
 

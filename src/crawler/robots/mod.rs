@@ -26,7 +26,6 @@ struct UserAgentRules {
 
 impl RobotsTxt {
     /// Parse robots.txt content
-    #[inline]
     pub fn parse(content: &str) -> Self {
         let mut rules: HashMap<String, UserAgentRules> = HashMap::new();
         let mut default_rules = UserAgentRules::default();
@@ -101,7 +100,6 @@ impl RobotsTxt {
     }
 
     /// Check if a URL is allowed to be crawled by the given user agent
-    #[inline]
     pub fn is_allowed(&self, url: &Url, user_agent: &str) -> bool {
         let path = url.path();
         let user_agent_lower = user_agent.to_lowercase();
@@ -153,7 +151,6 @@ impl RobotsTxt {
     }
 
     /// Get the robots.txt URL for a given base URL
-    #[inline]
     pub fn robots_url(base_url: &Url) -> Result<Url> {
         let mut robots_url = base_url.clone();
         robots_url.set_path("/robots.txt");
@@ -198,7 +195,6 @@ fn path_matches_pattern(path: &str, pattern: &str) -> bool {
 }
 
 /// Fetch and parse robots.txt for a given URL
-#[inline]
 pub async fn fetch_robots_txt(
     http_client: &mut crate::crawler::HttpClient,
     base_url: &Url,

@@ -7,8 +7,7 @@ use std::time::Duration;
 use tracing::{debug, error, info, warn};
 use url::Url;
 
-use crate::config::OllamaConfig;
-use crate::embeddings::chunking::ContentChunk;
+use crate::{config::settings::OllamaConfig, embeddings::chunking::ContentChunk};
 
 pub const DEFAULT_EMBEDDING_DIMENSION: u32 = 768; // Standard embedding dimension
 const DEFAULT_RETRY_ATTEMPTS: u32 = 3;
@@ -52,28 +51,11 @@ struct BatchEmbedResponse {
 #[derive(Debug, Deserialize)]
 pub struct ModelInfo {
     pub name: String,
-    pub size: Option<u64>,
-    pub digest: Option<String>,
-    pub details: Option<ModelDetails>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ModelDetails {
-    pub format: Option<String>,
-    pub family: Option<String>,
-    pub families: Option<Vec<String>>,
-    pub parameter_size: Option<String>,
-    pub quantization_level: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct ModelsResponse {
     models: Vec<ModelInfo>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ErrorResponse {
-    pub error: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -86,7 +68,6 @@ pub struct EmbeddingResult {
 }
 
 impl OllamaClient {
-    #[inline]
     pub fn new(config: OllamaConfig) -> Result<Self> {
         let base_url = config
             .ollama_url()
@@ -107,7 +88,7 @@ impl OllamaClient {
         })
     }
 
-    #[inline]
+    #[cfg(test)]
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.agent = ureq::Agent::config_builder()
             .timeout_global(Some(timeout))
@@ -116,14 +97,13 @@ impl OllamaClient {
         self
     }
 
-    #[inline]
+    #[cfg(test)]
     pub fn with_retry_attempts(mut self, attempts: u32) -> Self {
         self.retry_attempts = attempts;
         self
     }
 
     /// Test connection to Ollama server and verify model availability
-    #[inline]
     pub fn health_check(&self) -> Result<()> {
         debug!("Performing health check for Ollama at {}", self.base_url);
 
@@ -141,7 +121,6 @@ impl OllamaClient {
     }
 
     /// Ping the Ollama server to check if it's responsive
-    #[inline]
     pub fn ping(&self) -> Result<()> {
         let url = self
             .base_url
@@ -163,7 +142,6 @@ impl OllamaClient {
     }
 
     /// Validate that the configured model is available
-    #[inline]
     pub fn validate_model(&self) -> Result<()> {
         debug!("Validating model: {}", self.model);
 
@@ -187,7 +165,6 @@ impl OllamaClient {
     }
 
     /// List all available models
-    #[inline]
     pub fn list_models(&self) -> Result<Vec<ModelInfo>> {
         let url = self
             .base_url
@@ -213,7 +190,6 @@ impl OllamaClient {
     }
 
     /// Generate embeddings for a single text input
-    #[inline]
     pub fn generate_embedding(&self, text: &str) -> Result<EmbeddingResult> {
         debug!("Generating embedding for text (length: {})", text.len());
 
@@ -267,7 +243,6 @@ impl OllamaClient {
     }
 
     /// Generate embeddings for multiple text inputs using batch processing
-    #[inline]
     pub fn generate_embeddings_batch(&self, texts: &[String]) -> Result<Vec<EmbeddingResult>> {
         if texts.is_empty() {
             return Ok(Vec::new());
@@ -291,7 +266,6 @@ impl OllamaClient {
     }
 
     /// Generate embeddings for ContentChunk objects
-    #[inline]
     pub fn generate_chunk_embeddings(
         &self,
         chunks: &[ContentChunk],

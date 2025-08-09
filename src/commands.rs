@@ -8,8 +8,10 @@ use tracing::{error, info, warn};
 
 use crate::config::Config;
 use crate::crawler::{CrawlerConfig, SiteCrawler};
-use crate::database::Site;
-use crate::database::sqlite::{Database, NewSite, SiteQueries};
+use crate::database::lancedb::vector_store::VectorStore;
+use crate::database::sqlite::Database;
+use crate::database::sqlite::models::{NewSite, Site, SiteStatus, SiteUpdate};
+use crate::database::sqlite::queries::SiteQueries;
 use crate::mcp::tools::{CallToolParams, ToolHandler};
 
 /// Validation functions for CLI commands
@@ -18,7 +20,6 @@ pub mod validation {
     use url::Url;
 
     /// Validate that a site identifier is either a valid ID or a non-empty name
-    #[inline]
     pub fn validate_site_identifier(identifier: &str) -> Result<()> {
         if identifier.trim().is_empty() {
             return Err(anyhow!("Site identifier cannot be empty"));
@@ -35,7 +36,6 @@ pub mod validation {
     }
 
     /// Validate URL format and accessibility
-    #[inline]
     pub fn validate_documentation_url(url: &str) -> Result<Url> {
         if url.trim().is_empty() {
             return Err(anyhow!("URL cannot be empty"));
@@ -60,7 +60,6 @@ pub mod validation {
     }
 
     /// Validate site name format
-    #[inline]
     pub fn validate_site_name(name: &str) -> Result<()> {
         let name = name.trim();
 
@@ -84,7 +83,6 @@ pub mod validation {
     ///
     /// No need to be strict, as this could be semver or it could be a git hash
     /// or possibly some arbitrary identifier like Jessie.
-    #[inline]
     pub fn validate_site_version(version: &str) -> Result<()> {
         let version = version.trim();
 
@@ -461,7 +459,7 @@ pub async fn delete_site(site_identifier: String, config: &Config) -> Result<()>
     eprintln!("🗑️  Deleting site and all associated data...");
 
     // Initialize vector store for cleanup
-    let mut vector_store = crate::database::lancedb::VectorStore::new(config)
+    let vector_store = VectorStore::new(config)
         .await
         .context("Failed to initialize vector store")?;
 
@@ -585,7 +583,7 @@ pub async fn update_site(site_identifier: String, config: &Config) -> Result<Sit
     eprintln!("🧹 Preparing for re-indexing...");
 
     // Initialize vector store for cleanup
-    let mut vector_store = crate::database::lancedb::VectorStore::new(config)
+    let vector_store = VectorStore::new(config)
         .await
         .context("Failed to initialize vector store")?;
 
@@ -626,8 +624,8 @@ pub async fn update_site(site_identifier: String, config: &Config) -> Result<Sit
     eprint!("   Resetting site status... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
-    let update = crate::database::sqlite::SiteUpdate {
-        status: Some(crate::database::sqlite::SiteStatus::Pending),
+    let update = SiteUpdate {
+        status: Some(SiteStatus::Pending),
         progress_percent: Some(0),
         total_pages: Some(0),
         indexed_pages: Some(0),
@@ -732,7 +730,7 @@ pub async fn show_status(config: &Config) -> Result<()> {
 
     // Vector database status
     eprintln!("🔍 Vector Database Status:");
-    match crate::database::lancedb::VectorStore::new(config).await {
+    match VectorStore::new(config).await {
         Ok(_store) => {
             eprintln!("   ✅ LanceDB: Connected");
         }
@@ -759,7 +757,7 @@ pub async fn show_status(config: &Config) -> Result<()> {
                     let failed_sites = sites.iter().filter(|s| s.is_failed()).count();
                     let pending_sites = sites
                         .iter()
-                        .filter(|s| s.status == crate::database::sqlite::SiteStatus::Pending)
+                        .filter(|s| s.status == SiteStatus::Pending)
                         .count();
 
                     eprintln!("   📊 Total Sites: {}", total_sites);
@@ -837,7 +835,7 @@ pub async fn serve_mcp(config: &Config) -> Result<()> {
     );
 
     let vector_store = std::sync::Arc::new(
-        crate::database::lancedb::VectorStore::new(config)
+        VectorStore::new(config)
             .await
             .context("Failed to initialize vector store")?,
     );

@@ -32,7 +32,6 @@ pub struct OllamaConfig {
 }
 
 impl Default for OllamaConfig {
-    #[inline]
     fn default() -> Self {
         Self {
             protocol: "http".to_string(),
@@ -150,7 +149,6 @@ impl Config {
         Ok(())
     }
 
-    #[inline]
     fn validate_chunking_config(&self) -> Result<(), ConfigError> {
         let config = &self.chunking;
 
@@ -216,7 +214,6 @@ impl Config {
 }
 
 impl OllamaConfig {
-    #[inline]
     pub fn validate(&self) -> Result<(), ConfigError> {
         if self.protocol != "http" && self.protocol != "https" {
             return Err(ConfigError::InvalidProtocol(self.protocol.clone()));
@@ -246,13 +243,11 @@ impl OllamaConfig {
         Ok(())
     }
 
-    #[inline]
     pub fn ollama_url(&self) -> Result<Url, ConfigError> {
         let url_str = format!("{}://{}:{}", self.protocol, self.host, self.port);
         Url::parse(&url_str).map_err(|_| ConfigError::InvalidUrl(url_str))
     }
 
-    #[inline]
     pub fn set_protocol(&mut self, protocol: String) -> Result<(), ConfigError> {
         if protocol != "http" && protocol != "https" {
             return Err(ConfigError::InvalidProtocol(protocol));
@@ -261,7 +256,6 @@ impl OllamaConfig {
         Ok(())
     }
 
-    #[inline]
     pub fn set_host(&mut self, host: String) -> Result<(), ConfigError> {
         let temp_config = OllamaConfig {
             host: host.clone(),
@@ -272,7 +266,6 @@ impl OllamaConfig {
         Ok(())
     }
 
-    #[inline]
     pub fn set_port(&mut self, port: u16) -> Result<(), ConfigError> {
         if port == 0 {
             return Err(ConfigError::InvalidPort(port));
@@ -281,7 +274,6 @@ impl OllamaConfig {
         Ok(())
     }
 
-    #[inline]
     pub fn set_model(&mut self, model: String) -> Result<(), ConfigError> {
         if model.trim().is_empty() {
             return Err(ConfigError::InvalidModel(model));
@@ -290,7 +282,6 @@ impl OllamaConfig {
         Ok(())
     }
 
-    #[inline]
     pub fn set_batch_size(&mut self, batch_size: u32) -> Result<(), ConfigError> {
         if batch_size == 0 || batch_size > 1000 {
             return Err(ConfigError::InvalidBatchSize(batch_size));
@@ -299,7 +290,6 @@ impl OllamaConfig {
         Ok(())
     }
 
-    #[inline]
     pub fn set_embedding_dimension(&mut self, dimension: u32) -> Result<(), ConfigError> {
         if !(64..=4096).contains(&dimension) {
             return Err(ConfigError::InvalidEmbeddingDimension(dimension));

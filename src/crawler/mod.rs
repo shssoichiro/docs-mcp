@@ -1,9 +1,9 @@
+#[cfg(test)]
+mod tests;
+
 pub mod browser;
 pub mod extractor;
 pub mod robots;
-
-#[cfg(test)]
-mod tests;
 
 use anyhow::{Context, Result, anyhow, bail};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -19,13 +19,14 @@ use ureq::Agent;
 use url::Url;
 
 use self::browser::{BrowserClient, BrowserConfig};
-use self::extractor::{ExtractionConfig, extract_content};
+use self::extractor::extract_content;
 use self::robots::{RobotsTxt, fetch_robots_txt};
 use crate::config::Config;
-use crate::database::sqlite::{
-    CrawlQueueQueries, CrawlQueueUpdate, CrawlStatus, DbPool, NewCrawlQueueItem, SiteQueries,
-    SiteStatus, SiteUpdate,
+use crate::database::sqlite::DbPool;
+use crate::database::sqlite::models::{
+    CrawlQueueItem, CrawlQueueUpdate, CrawlStatus, NewCrawlQueueItem, SiteStatus, SiteUpdate,
 };
+use crate::database::sqlite::queries::{CrawlQueueQueries, SiteQueries};
 
 /// Configuration for the web crawler
 #[derive(Debug, Clone)]
@@ -47,7 +48,6 @@ pub struct CrawlerConfig {
 }
 
 impl Default for CrawlerConfig {
-    #[inline]
     fn default() -> Self {
         Self {
             user_agent: "docs-mcp/0.1.0 (Documentation Indexer)".to_string(),
@@ -71,7 +71,6 @@ pub struct HttpClient {
 
 impl HttpClient {
     /// Create a new HTTP client with the given configuration
-    #[inline]
     pub fn new(config: CrawlerConfig) -> Self {
         let agent = Agent::config_builder()
             .timeout_global(Some(Duration::from_secs(config.timeout_seconds)))
@@ -87,7 +86,6 @@ impl HttpClient {
     }
 
     /// Perform an HTTP GET request with rate limiting and retry logic
-    #[inline]
     pub async fn get(&mut self, url: &str) -> Result<String> {
         self.apply_rate_limit().await;
 
@@ -163,7 +161,6 @@ impl HttpClient {
 
 impl Default for HttpClient {
     /// Create a new HTTP client with default configuration
-    #[inline]
     fn default() -> Self {
         Self::new(CrawlerConfig::default())
     }
@@ -195,7 +192,6 @@ fn is_retryable_error(error: &anyhow::Error) -> bool {
 }
 
 /// Validate and normalize a URL
-#[inline]
 pub fn validate_url(url_str: &str) -> Result<Url> {
     let url = Url::parse(url_str).with_context(|| format!("Invalid URL format: {}", url_str))?;
 
@@ -211,7 +207,6 @@ pub fn validate_url(url_str: &str) -> Result<Url> {
 }
 
 /// Check if a URL should be crawled based on base URL filtering rules
-#[inline]
 pub fn should_crawl_url(url: &Url, base_url: &Url) -> bool {
     // Must be same scheme and host
     if url.scheme() != base_url.scheme() || url.host() != base_url.host() {
@@ -249,7 +244,6 @@ fn normalize_path_for_filtering(path: &str) -> Cow<'_, str> {
 }
 
 /// Extract all links from HTML content using proper HTML parsing
-#[inline]
 pub fn extract_links(html: &str, source_url: &Url, base_url: &Url) -> Result<Vec<Url>> {
     let document = Html::parse_document(html);
     let link_selector = Selector::parse("a[href]")
@@ -298,7 +292,6 @@ pub struct SiteCrawler {
     browser_client: Option<BrowserClient>,
     db_pool: DbPool,
     config: CrawlerConfig,
-    extraction_config: ExtractionConfig,
     app_config: Config,
 }
 
@@ -333,7 +326,6 @@ pub struct CrawlStats {
 }
 
 impl CrawlStats {
-    #[inline]
     pub fn total_crawled(&self) -> usize {
         self.successful_crawls + self.failed_crawls + self.robots_blocked
     }
@@ -341,7 +333,6 @@ impl CrawlStats {
 
 impl SiteCrawler {
     /// Create a new site crawler
-    #[inline]
     pub fn new(db_pool: DbPool, config: CrawlerConfig, app_config: Config) -> Self {
         // Initialize browser client if JavaScript rendering is enabled
         let browser_client = if config.enable_js_rendering {
@@ -353,20 +344,17 @@ impl SiteCrawler {
         };
 
         let http_client = HttpClient::new(config.clone());
-        let extraction_config = ExtractionConfig::default();
 
         Self {
             http_client,
             browser_client,
             db_pool,
             config,
-            extraction_config,
             app_config,
         }
     }
 
     /// Crawl a documentation site from the given base URL
-    #[inline]
     pub async fn crawl_site(
         &mut self,
         site_id: i64,
@@ -632,7 +620,7 @@ impl SiteCrawler {
         };
 
         // Extract content
-        let content = match extract_content(&html, &self.extraction_config) {
+        let content = match extract_content(&html) {
             Ok(content) => content,
             Err(e) => {
                 return Ok(CrawlResult {
@@ -687,10 +675,7 @@ impl SiteCrawler {
     }
 
     /// Get the next queue item to process
-    async fn get_next_queue_item(
-        &self,
-        site_id: i64,
-    ) -> Result<Option<crate::database::sqlite::CrawlQueueItem>> {
+    async fn get_next_queue_item(&self, site_id: i64) -> Result<Option<CrawlQueueItem>> {
         CrawlQueueQueries::get_next_pending(&self.db_pool, site_id, self.config.max_retries).await
     }
 

@@ -33,7 +33,6 @@ pub struct BrowserConfig {
 }
 
 impl Default for BrowserConfig {
-    #[inline]
     fn default() -> Self {
         Self {
             max_browsers: 2,
@@ -73,7 +72,6 @@ struct ManagedBrowser {
 
 impl ManagedBrowser {
     /// Create a new managed browser instance
-    #[inline]
     fn new(config: &BrowserConfig) -> Result<Self> {
         let args: Vec<&OsStr> = config.chrome_args.iter().map(OsStr::new).collect();
         let launch_options = LaunchOptions {
@@ -96,13 +94,11 @@ impl ManagedBrowser {
     }
 
     /// Check if browser can accept more tabs
-    #[inline]
     fn can_accept_tab(&self, max_tabs: usize) -> bool {
         self.active_tabs < max_tabs
     }
 
     /// Create a new tab in this browser
-    #[inline]
     fn new_tab(&mut self, config: &BrowserConfig) -> Result<Arc<Tab>> {
         let tab = self
             .browser
@@ -129,7 +125,6 @@ impl ManagedBrowser {
     }
 
     /// Release a tab from this browser
-    #[inline]
     fn release_tab(&mut self) {
         if self.active_tabs > 0 {
             self.active_tabs -= 1;
@@ -138,20 +133,19 @@ impl ManagedBrowser {
     }
 
     /// Check if browser is idle (no active tabs)
-    #[inline]
+    #[allow(dead_code)]
     fn is_idle(&self) -> bool {
         self.active_tabs == 0
     }
 
     /// Get age of browser instance
-    #[inline]
     #[allow(dead_code)]
     fn age(&self) -> Duration {
         self.created_at.elapsed()
     }
 
     /// Get time since last use
-    #[inline]
+    #[allow(dead_code)]
     fn idle_time(&self) -> Duration {
         self.last_used.elapsed()
     }
@@ -166,7 +160,6 @@ pub struct BrowserPool {
 
 impl BrowserPool {
     /// Create a new browser pool with the given configuration
-    #[inline]
     pub fn new(config: BrowserConfig) -> Self {
         let max_concurrent_operations = config.max_browsers * config.max_tabs_per_browser;
 
@@ -178,7 +171,6 @@ impl BrowserPool {
     }
 
     /// Get a browser tab for rendering a page
-    #[inline]
     pub async fn get_tab(&self) -> Result<BrowserTab> {
         // Acquire semaphore permit for resource limiting
         let permit = Arc::clone(&self.semaphore)
@@ -272,7 +264,7 @@ impl BrowserPool {
     }
 
     /// Clean up idle browsers to free resources
-    #[inline]
+    #[allow(dead_code)]
     pub fn cleanup_idle_browsers(&self, max_idle_time: Duration) -> usize {
         let mut browsers = match self.browsers.lock() {
             Ok(browsers) => browsers,
@@ -304,47 +296,6 @@ impl BrowserPool {
 
         removed_count
     }
-
-    /// Get pool statistics for monitoring
-    #[inline]
-    pub fn get_stats(&self) -> BrowserPoolStats {
-        let Ok(browsers) = self.browsers.lock() else {
-            return BrowserPoolStats::default();
-        };
-
-        let total_browsers = browsers.iter().filter(|b| b.is_some()).count();
-        let total_tabs: usize = browsers
-            .iter()
-            .filter_map(|b| b.as_ref())
-            .map(|b| b.active_tabs)
-            .sum();
-        let idle_browsers = browsers
-            .iter()
-            .filter_map(|b| b.as_ref())
-            .filter(|b| b.is_idle())
-            .count();
-        let available_permits = self.semaphore.available_permits();
-
-        BrowserPoolStats {
-            total_browsers,
-            total_tabs,
-            idle_browsers,
-            available_permits,
-            max_browsers: self.config.max_browsers,
-            max_tabs_per_browser: self.config.max_tabs_per_browser,
-        }
-    }
-}
-
-/// Statistics about the browser pool
-#[derive(Debug, Clone, Default)]
-pub struct BrowserPoolStats {
-    pub total_browsers: usize,
-    pub total_tabs: usize,
-    pub idle_browsers: usize,
-    pub available_permits: usize,
-    pub max_browsers: usize,
-    pub max_tabs_per_browser: usize,
 }
 
 /// A managed browser tab with automatic cleanup
@@ -357,7 +308,6 @@ pub struct BrowserTab {
 }
 
 impl BrowserTab {
-    #[inline]
     fn new(
         tab: Arc<Tab>,
         browsers: Arc<Mutex<Vec<Option<ManagedBrowser>>>>,
@@ -375,7 +325,6 @@ impl BrowserTab {
     }
 
     /// Navigate to a URL and wait for the page to load completely
-    #[inline]
     pub async fn navigate_and_wait(&self, url: &Url) -> Result<()> {
         let url_str = url.as_str();
         debug!("Navigating to URL: {}", url_str);
@@ -416,7 +365,6 @@ impl BrowserTab {
     }
 
     /// Get the rendered HTML content of the page
-    #[inline]
     pub fn get_content(&self) -> Result<String> {
         debug!("Extracting rendered HTML content");
 
@@ -434,7 +382,6 @@ impl BrowserTab {
     }
 
     /// Execute JavaScript and return the result
-    #[inline]
     pub fn execute_js(&self, script: &str) -> Result<serde_json::Value> {
         debug!("Executing JavaScript: {}", script);
 
@@ -458,7 +405,6 @@ impl BrowserTab {
     }
 
     /// Check if the page contains dynamic content that requires JavaScript rendering
-    #[inline]
     pub fn has_dynamic_content(&self) -> Result<bool> {
         // Check for common indicators of JavaScript-rendered content
         let checks = vec![
@@ -496,7 +442,6 @@ impl BrowserTab {
     }
 
     /// Get page title from the rendered page
-    #[inline]
     pub fn get_title(&self) -> Result<String> {
         match self.execute_js("document.title") {
             Ok(title) => {
@@ -519,7 +464,6 @@ impl BrowserTab {
 }
 
 impl Drop for BrowserTab {
-    #[inline]
     fn drop(&mut self) {
         // Release the tab from its specific browser when dropped
         if let Ok(mut browsers) = self.browsers.lock() {
@@ -548,7 +492,6 @@ pub struct BrowserClient {
 
 impl BrowserClient {
     /// Create a new browser client with the given configuration
-    #[inline]
     pub fn new(config: BrowserConfig) -> Self {
         Self {
             pool: BrowserPool::new(config),
@@ -556,7 +499,6 @@ impl BrowserClient {
     }
 
     /// Render a URL and return the fully rendered HTML content
-    #[inline]
     pub async fn render_page(&self, url: &Url) -> Result<RenderedPage> {
         let start_time = Instant::now();
 
@@ -595,7 +537,6 @@ impl BrowserClient {
     }
 
     /// Render a URL and return only the HTML content
-    #[inline]
     pub async fn get_rendered_html(&self, url: &Url) -> Result<String> {
         let rendered_page = self.render_page(url).await?;
         Ok(rendered_page.content)
@@ -603,7 +544,6 @@ impl BrowserClient {
 }
 
 impl Default for BrowserClient {
-    #[inline]
     fn default() -> Self {
         Self::new(BrowserConfig::default())
     }
@@ -611,6 +551,7 @@ impl Default for BrowserClient {
 
 /// Result of rendering a page with a browser
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RenderedPage {
     /// The URL that was rendered
     pub url: Url,
@@ -626,7 +567,7 @@ pub struct RenderedPage {
 
 impl BrowserConfig {
     /// Validate the browser configuration
-    #[inline]
+    #[allow(dead_code)]
     pub fn validate(&self) -> Result<()> {
         if self.navigation_timeout_seconds == 0 || self.navigation_timeout_seconds > 300 {
             return Err(anyhow!(
@@ -665,7 +606,7 @@ impl BrowserConfig {
     }
 
     /// Set the maximum number of browsers
-    #[inline]
+    #[allow(dead_code)]
     pub fn set_max_browsers(&mut self, max_browsers: usize) -> Result<()> {
         if max_browsers == 0 || max_browsers > 10 {
             return Err(anyhow!(
@@ -678,7 +619,7 @@ impl BrowserConfig {
     }
 
     /// Set the navigation timeout
-    #[inline]
+    #[allow(dead_code)]
     pub fn set_navigation_timeout(&mut self, timeout_seconds: u64) -> Result<()> {
         if timeout_seconds == 0 || timeout_seconds > 300 {
             return Err(anyhow!(
@@ -691,7 +632,7 @@ impl BrowserConfig {
     }
 
     /// Set the window size
-    #[inline]
+    #[allow(dead_code)]
     pub fn set_window_size(&mut self, width: u32, height: u32) -> Result<()> {
         if !(100..=4000).contains(&width) || !(100..=4000).contains(&height) {
             return Err(anyhow!(
