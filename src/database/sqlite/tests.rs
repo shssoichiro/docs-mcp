@@ -71,7 +71,8 @@ async fn integration_foreign_key_constraints() -> Result<()> {
         vector_id: "test-vector-id".to_string(),
     };
 
-    let chunk = IndexedChunkQueries::create(database.pool(), new_chunk).await?;
+    let chunk =
+        IndexedChunkQueries::create(&mut *database.pool().acquire().await?, new_chunk).await?;
 
     SiteQueries::delete(database.pool(), site.id).await?;
 
@@ -157,7 +158,7 @@ async fn integration_site_workflow() -> Result<()> {
             vector_id: format!("vector-{}", i + 1),
         };
 
-        IndexedChunkQueries::create(database.pool(), new_chunk).await?;
+        IndexedChunkQueries::create(&mut *database.pool().acquire().await?, new_chunk).await?;
 
         let completed_update = CrawlQueueUpdate {
             status: Some(CrawlStatus::Completed),
@@ -282,7 +283,7 @@ async fn integration_concurrent_access() -> Result<()> {
                 vector_id: format!("concurrent-vector-{}", i),
             };
 
-            IndexedChunkQueries::create(&pool, new_chunk).await
+            IndexedChunkQueries::create(&mut *pool.acquire().await?, new_chunk).await
         });
 
         handles.push(handle);

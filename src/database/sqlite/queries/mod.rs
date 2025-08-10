@@ -4,7 +4,7 @@ mod tests;
 use super::models::*;
 use anyhow::{Context, Result};
 use chrono::Utc;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 pub struct SiteQueries;
 
@@ -541,7 +541,10 @@ impl CrawlQueueQueries {
 pub struct IndexedChunkQueries;
 
 impl IndexedChunkQueries {
-    pub async fn create(pool: &SqlitePool, new_chunk: NewIndexedChunk) -> Result<IndexedChunk> {
+    pub async fn create(
+        conn: &mut SqliteConnection,
+        new_chunk: NewIndexedChunk,
+    ) -> Result<IndexedChunk> {
         let now = Utc::now();
         let id = sqlx::query!(
             r#"
@@ -557,12 +560,12 @@ impl IndexedChunkQueries {
             new_chunk.vector_id,
             now
         )
-        .execute(pool)
+        .execute(&mut *conn)
         .await
         .context("Failed to create indexed chunk")?
         .last_insert_rowid();
 
-        Self::get_by_id(pool, id)
+        Self::get_by_id(conn, id)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Failed to retrieve created chunk"))
     }
@@ -594,7 +597,7 @@ impl IndexedChunkQueries {
         Ok(result)
     }
 
-    pub async fn get_by_id(pool: &SqlitePool, id: i64) -> Result<Option<IndexedChunk>> {
+    pub async fn get_by_id(conn: &mut SqliteConnection, id: i64) -> Result<Option<IndexedChunk>> {
         let result = sqlx::query_as!(
             IndexedChunk,
             r#"
@@ -611,7 +614,7 @@ impl IndexedChunkQueries {
             "#,
             id
         )
-        .fetch_optional(pool)
+        .fetch_optional(conn)
         .await
         .context("Failed to get indexed chunk by id")?;
 

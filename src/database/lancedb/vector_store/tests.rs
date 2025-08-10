@@ -7,7 +7,10 @@ fn create_test_config() -> (Config, TempDir) {
     let temp_dir = TempDir::new().expect("should create temp dir");
     let config = Config {
         base_dir: temp_dir.path().to_path_buf(),
-        ollama: OllamaConfig::default(),
+        ollama: OllamaConfig {
+            embedding_dimension: 5,
+            ..OllamaConfig::default()
+        },
         chunking: ChunkingConfig::default(),
     };
     (config, temp_dir)

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{Pool, Sqlite};
+use sqlx::{Pool, Sqlite, Transaction};
 use std::path::Path;
 use tracing::{debug, info};
 
@@ -101,8 +101,12 @@ impl Database {
         IndexedChunkQueries::list_by_site(&self.pool, site_id).await
     }
 
-    pub async fn insert_indexed_chunk(&self, chunk: &NewIndexedChunk) -> Result<IndexedChunk> {
-        IndexedChunkQueries::create(&self.pool, chunk.clone()).await
+    pub async fn insert_indexed_chunk_with_transaction(
+        &self,
+        chunk: &NewIndexedChunk,
+        tx: &mut Transaction<'_, Sqlite>,
+    ) -> Result<IndexedChunk> {
+        IndexedChunkQueries::create(tx, chunk.clone()).await
     }
 
     pub async fn get_chunk_by_vector_id(&self, vector_id: &str) -> Result<Option<IndexedChunk>> {

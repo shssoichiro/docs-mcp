@@ -182,7 +182,15 @@ impl Indexer {
             .map(|batch| batch.to_vec())
             .collect();
 
-        let mut total_chunks_processed = 0;
+        let mut processed_chunks = Vec::with_capacity(chunks.len());
+
+        // Begin sqlite transaction
+        let mut transaction = self
+            .database
+            .pool()
+            .begin()
+            .await
+            .context("Failed to begin SQLite transaction")?;
 
         for batch in chunk_batches {
             let batch_size = batch.len();
@@ -192,8 +200,8 @@ impl Indexer {
                 bar.set_message(format!(
                     "{} (Generating embeddings {}-{} of {})",
                     crawl_item.url,
-                    total_chunks_processed + 1,
-                    total_chunks_processed + batch.len(),
+                    processed_chunks.len() + 1,
+                    processed_chunks.len() + batch.len(),
                     chunks.len()
                 ));
             }
@@ -203,20 +211,7 @@ impl Indexer {
                 .context("Failed to generate embeddings")?;
 
             // Store embeddings and create indexed chunk records
-            for (i, (chunk, embedding_result)) in batch
-                .into_iter()
-                .zip(embedding_results.into_iter())
-                .enumerate()
-            {
-                if self.verbose {
-                    bar.set_message(format!(
-                        "{} (Saving embeddings for chunk {} of {})",
-                        crawl_item.url,
-                        total_chunks_processed + i + 1,
-                        chunks.len()
-                    ));
-                }
-
+            for (chunk, embedding_result) in batch.into_iter().zip(embedding_results.into_iter()) {
                 let vector_id = Uuid::new_v4().to_string();
 
                 // Create embedding record for LanceDB
@@ -235,14 +230,9 @@ impl Indexer {
                         created_at: Utc::now().to_rfc3339(),
                     },
                 };
+                processed_chunks.push(embedding_record);
 
-                // Store in LanceDB
-                self.vector_store
-                    .store_embeddings_batch(vec![embedding_record])
-                    .await
-                    .context("Failed to store embedding in LanceDB")?;
-
-                // Create indexed chunk record for SQLite
+                // Create indexed chunk record for SQLite (part of transaction)
                 let indexed_chunk = NewIndexedChunk {
                     site_id,
                     url: crawl_item.url.clone(),
@@ -254,25 +244,40 @@ impl Indexer {
                 };
 
                 self.database
-                    .insert_indexed_chunk(&indexed_chunk)
+                    .insert_indexed_chunk_with_transaction(&indexed_chunk, &mut transaction)
                     .await
                     .context("Failed to store indexed chunk in SQLite")?;
             }
 
-            total_chunks_processed += batch_size;
             debug!(
                 "Processed batch of {} chunks for URL: {}",
                 batch_size, crawl_item.url
             );
         }
 
+        // Store in LanceDB
+        // We HAVE to do this as a batch, single insertions are extremely bad for LanceDB performance
+        if self.verbose {
+            bar.set_message(format!("{} (Saving embeddings)", crawl_item.url));
+        }
+        let processed_chunks_count = processed_chunks.len();
+        self.vector_store
+            .store_embeddings_batch(processed_chunks)
+            .await
+            .context("Failed to store embedding in LanceDB")?;
+
         if self.verbose {
             bar.set_message(format!("{} (Finalizing)", crawl_item.url));
         }
+        // Commit sqlite transaction
+        transaction
+            .commit()
+            .await
+            .context("Failed to commit SQLite transaction")?;
 
         self.remove_cached_page(crawl_item.id)?;
 
-        Ok(total_chunks_processed)
+        Ok(processed_chunks_count)
     }
 
     /// Complete indexing for a site

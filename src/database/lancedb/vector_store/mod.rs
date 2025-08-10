@@ -2,7 +2,6 @@
 mod tests;
 
 use super::{ChunkMetadata, EmbeddingRecord};
-use crate::embeddings::ollama::DEFAULT_EMBEDDING_DIMENSION;
 use crate::{DocsError, config::Config};
 use arrow::array::{
     Array, FixedSizeListArray, Float32Array, RecordBatchIterator, StringArray, UInt32Array,
@@ -22,7 +21,7 @@ use tracing::{debug, error, info, warn};
 pub struct VectorStore {
     connection: Connection,
     table_name: String,
-    vector_dimension: Option<usize>,
+    vector_dimension: usize,
 }
 
 /// Search result from vector similarity search
@@ -89,7 +88,7 @@ impl VectorStore {
         let mut store = Self {
             connection,
             table_name,
-            vector_dimension: None,
+            vector_dimension: config.ollama.embedding_dimension as usize,
         };
 
         // Initialize the table if it doesn't exist with corruption handling
@@ -113,7 +112,7 @@ impl VectorStore {
             // Try to detect the vector dimension from existing table
             match self.detect_existing_vector_dimension().await {
                 Ok(dim) => {
-                    self.vector_dimension = Some(dim);
+                    self.vector_dimension = dim;
                     info!("Detected existing vector dimension: {}", dim);
                 }
                 Err(e) => {
@@ -121,7 +120,6 @@ impl VectorStore {
                         "Could not detect vector dimension from existing table: {}",
                         e
                     );
-                    self.vector_dimension = Some(DEFAULT_EMBEDDING_DIMENSION as usize); // Default fallback
                 }
             }
             return Ok(());
@@ -133,7 +131,7 @@ impl VectorStore {
 
         // Create a minimal placeholder schema - the actual schema will be created
         // when we know the vector dimensions from the first batch of data
-        let schema = self.create_schema(DEFAULT_EMBEDDING_DIMENSION as usize);
+        let schema = self.create_schema(self.vector_dimension);
 
         self.connection
             .create_empty_table(&self.table_name, schema)
@@ -141,10 +139,9 @@ impl VectorStore {
             .await
             .map_err(|e| DocsError::Database(format!("Failed to create table: {}", e)))?;
 
-        self.vector_dimension = Some(DEFAULT_EMBEDDING_DIMENSION as usize);
         info!(
             "Embeddings table created successfully with {} dimensions",
-            DEFAULT_EMBEDDING_DIMENSION
+            self.vector_dimension
         );
         Ok(())
     }
@@ -221,13 +218,13 @@ impl VectorStore {
 
         // Auto-detect vector dimension from first record and recreate table if needed
         let vector_dim = records[0].vector.len();
-        if self.vector_dimension != Some(vector_dim) {
+        if self.vector_dimension != vector_dim {
             info!(
                 "Vector dimension changed from {:?} to {}, recreating table",
                 self.vector_dimension, vector_dim
             );
             self.recreate_table_with_dimension(vector_dim).await?;
-            self.vector_dimension = Some(vector_dim);
+            self.vector_dimension = vector_dim;
         }
 
         let record_batch = self.create_record_batch(&records)?;
@@ -278,9 +275,6 @@ impl VectorStore {
     /// Create a RecordBatch from embedding records
     fn create_record_batch(&self, records: &[EmbeddingRecord]) -> Result<RecordBatch, DocsError> {
         let len = records.len();
-        let vector_dim = self
-            .vector_dimension
-            .ok_or_else(|| DocsError::Database("Vector dimension not set".to_string()))?;
 
         let mut ids = Vec::with_capacity(len);
         let mut vectors = Vec::with_capacity(len);
@@ -308,20 +302,22 @@ impl VectorStore {
             created_ats.push(record.metadata.created_at.as_str());
         }
 
-        let schema = self.create_schema(vector_dim);
+        let schema = self.create_schema(self.vector_dimension);
 
         // Create vector array using FixedSizeListArray
-        let mut flat_values = Vec::with_capacity(len * vector_dim);
+        let mut flat_values = Vec::with_capacity(len * self.vector_dimension);
         for vector in &vectors {
             flat_values.extend_from_slice(vector);
         }
         let values_array = Float32Array::from(flat_values);
         let field = Arc::new(Field::new("item", DataType::Float32, false));
-        let vector_array =
-            FixedSizeListArray::try_new(field, vector_dim as i32, Arc::new(values_array), None)
-                .map_err(|e| {
-                    DocsError::Database(format!("Failed to create vector array: {}", e))
-                })?;
+        let vector_array = FixedSizeListArray::try_new(
+            field,
+            self.vector_dimension as i32,
+            Arc::new(values_array),
+            None,
+        )
+        .map_err(|e| DocsError::Database(format!("Failed to create vector array: {}", e)))?;
 
         let arrays: Vec<Arc<dyn arrow::array::Array>> = vec![
             Arc::new(StringArray::from(ids)),

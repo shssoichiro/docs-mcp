@@ -182,7 +182,8 @@ mod integration_tests {
     ];
 
         for chunk in &test_chunks {
-            IndexedChunkQueries::create(database.pool(), chunk.clone()).await?;
+            IndexedChunkQueries::create(&mut *database.pool().acquire().await?, chunk.clone())
+                .await?;
         }
 
         // Verify chunks were inserted
@@ -232,7 +233,7 @@ mod integration_tests {
             vector_id: "missing-vector-id".to_string(),
         };
 
-        IndexedChunkQueries::create(database.pool(), test_chunk).await?;
+        IndexedChunkQueries::create(&mut *database.pool().acquire().await?, test_chunk).await?;
 
         // Run consistency validation
         let report = indexer.validate_consistency().await?;

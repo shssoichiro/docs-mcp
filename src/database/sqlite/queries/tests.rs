@@ -159,9 +159,10 @@ async fn indexed_chunk_operations() {
         vector_id: "test-vector-id".to_string(),
     };
 
-    let created_chunk = IndexedChunkQueries::create(&pool, new_chunk)
-        .await
-        .expect("Failed to create chunk");
+    let created_chunk =
+        IndexedChunkQueries::create(&mut pool.acquire().await.expect("got conn"), new_chunk)
+            .await
+            .expect("Failed to create chunk");
 
     assert_eq!(created_chunk.site_id, site.id);
     assert_eq!(created_chunk.vector_id, "test-vector-id");
