@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod tests;
 
-use super::TurndownOptions;
 use super::utilities::is_block;
 use fancy_regex::Regex;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
+use std::sync::LazyLock;
 
 #[derive(Debug, Clone)]
 pub enum NodeType {
@@ -159,13 +159,10 @@ impl Node {
     }
 
     /// Get flanking whitespace for this node
-    pub fn flanking_whitespace(
-        node: &Rc<RefCell<Node>>,
-        options: &TurndownOptions,
-    ) -> FlankingWhitespace {
+    pub fn flanking_whitespace(node: &Rc<RefCell<Node>>) -> FlankingWhitespace {
         let node_borrow = node.borrow();
 
-        if node_borrow.is_block() || (options.preformatted_code && Self::is_code(node)) {
+        if node_borrow.is_block() {
             return FlankingWhitespace {
                 leading: String::new(),
                 trailing: String::new(),
@@ -176,12 +173,12 @@ impl Node {
         let mut edges = edge_whitespace(&text_content);
 
         // abandon leading ASCII WS if left-flanked by ASCII WS
-        if !edges.leading_ascii.is_empty() && is_flanked_by_whitespace("left", node, options) {
+        if !edges.leading_ascii.is_empty() && is_flanked_by_whitespace("left", node) {
             edges.leading = edges.leading_non_ascii;
         }
 
         // abandon trailing ASCII WS if right-flanked by ASCII WS
-        if !edges.trailing_ascii.is_empty() && is_flanked_by_whitespace("right", node, options) {
+        if !edges.trailing_ascii.is_empty() && is_flanked_by_whitespace("right", node) {
             edges.trailing = edges.trailing_non_ascii;
         }
 
@@ -192,12 +189,14 @@ impl Node {
     }
 }
 
+static EDGE_WHITESPACE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(([ \t\r\n]*)(\s*))(?:(?=\S)[\s\S]*\S)?((\s*?)([ \t\r\n]*))$")
+        .expect("valid regex")
+});
+
 /// Extract edge whitespace from a string
 fn edge_whitespace(string: &str) -> EdgeWhitespace {
-    let regex = Regex::new(r"^(([ \t\r\n]*)(\s*))(?:(?=\S)[\s\S]*\S)?((\s*?)([ \t\r\n]*))$")
-        .expect("valid regex");
-
-    if let Ok(Some(captures)) = regex.captures(string) {
+    if let Ok(Some(captures)) = EDGE_WHITESPACE_REGEX.captures(string) {
         EdgeWhitespace {
             leading: captures
                 .get(1)
@@ -232,37 +231,41 @@ fn edge_whitespace(string: &str) -> EdgeWhitespace {
 }
 
 /// Check if a node is flanked by whitespace on the given side
-fn is_flanked_by_whitespace(
-    side: &str,
-    node: &Rc<RefCell<Node>>,
-    options: &TurndownOptions,
-) -> bool {
-    let (sibling, regex_pattern) = if side == "left" {
-        (node.borrow().previous_sibling.borrow().clone(), r" $")
+fn is_flanked_by_whitespace(side: &str, node: &Rc<RefCell<Node>>) -> bool {
+    let sibling = if side == "left" {
+        node.borrow().previous_sibling.borrow().clone()
     } else {
-        (node.borrow().next_sibling.borrow().clone(), r"^ ")
+        node.borrow().next_sibling.borrow().clone()
     };
 
-    let regex = Regex::new(regex_pattern).expect("valid regex");
+    let Some(sibling_node) = sibling else {
+        return false;
+    };
 
-    sibling.is_some_and(|sibling_node| {
-        let sibling_borrow = sibling_node.borrow();
-        match sibling_borrow.node_type {
-            NodeType::Text => sibling_borrow
-                .data
-                .borrow()
-                .as_ref()
-                .is_some_and(|text| regex.is_match(text).unwrap_or(false)),
-            NodeType::Element => {
-                if options.preformatted_code && sibling_borrow.node_name == "CODE" {
-                    false
-                } else if !sibling_borrow.is_block() {
-                    let text_content = sibling_borrow.text_content();
-                    regex.is_match(&text_content).unwrap_or(false)
-                } else {
-                    false
-                }
+    let sibling_borrow = sibling_node.borrow();
+    match sibling_borrow.node_type {
+        NodeType::Text => {
+            let text = sibling_borrow.data.borrow();
+            let Some(text) = text.as_ref() else {
+                return false;
+            };
+            if side == "left" {
+                text.ends_with(' ')
+            } else {
+                text.starts_with(' ')
             }
         }
-    })
+        NodeType::Element => {
+            if !sibling_borrow.is_block() {
+                let text_content = sibling_borrow.text_content();
+                if side == "left" {
+                    text_content.ends_with(' ')
+                } else {
+                    text_content.starts_with(' ')
+                }
+            } else {
+                false
+            }
+        }
+    }
 }

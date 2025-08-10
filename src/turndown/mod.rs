@@ -15,106 +15,46 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::LazyLock;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HeadingStyle {
-    Atx,
-    Setext,
-}
+static ESCAPE_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
+    vec![
+        (Regex::new(r"\\").expect("valid regex"), r"\\"),
+        (Regex::new(r"\*").expect("valid regex"), r"\*"),
+        (Regex::new(r"^-").expect("valid regex"), r"\-"),
+        (Regex::new(r"^\+ ").expect("valid regex"), r"\+ "),
+        (Regex::new(r"^(=+)").expect("valid regex"), r"\$1"),
+        (Regex::new(r"^(#{1,6}) ").expect("valid regex"), r"\$1 "),
+        (Regex::new(r"`").expect("valid regex"), r"\`"),
+        (Regex::new(r"^~~~").expect("valid regex"), r"\~~~"),
+        (Regex::new(r"\[").expect("valid regex"), r"\["),
+        (Regex::new(r"\]").expect("valid regex"), r"\]"),
+        (Regex::new(r"^>").expect("valid regex"), r"\>"),
+        (Regex::new(r"_").expect("valid regex"), r"\_"),
+        (Regex::new(r"^(\d+)\. ").expect("valid regex"), r"$1\. "),
+    ]
+});
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CodeBlockStyle {
-    Fenced,
-    Indented,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LinkStyle {
-    Inlined,
-    Referenced,
-}
-
-pub struct TurndownOptions {
-    pub br: &'static str,
-    pub heading_style: HeadingStyle,
-    pub bullet_list_marker: &'static str,
-    pub code_block_style: CodeBlockStyle,
-    pub fence: &'static str,
-    pub hr: &'static str,
-    pub link_style: LinkStyle,
-    pub em_delimiter: &'static str,
-    pub strong_delimiter: &'static str,
-    pub preformatted_code: bool,
-}
-
-impl Default for TurndownOptions {
-    fn default() -> Self {
-        TurndownOptions {
-            br: "  ",
-            heading_style: HeadingStyle::Setext,
-            bullet_list_marker: "*",
-            code_block_style: CodeBlockStyle::Indented,
-            fence: "```",
-            hr: "* * *",
-            link_style: LinkStyle::Inlined,
-            em_delimiter: "_",
-            strong_delimiter: "**",
-            preformatted_code: false,
-        }
-    }
-}
+const BR_MARKER: &str = "  ";
+const BULLET_LIST_MARKER: &str = "-";
+const FENCE_CHAR: char = '`';
+const DEFAULT_FENCE_SIZE: usize = 3;
+const HR_MARKER: &str = "* * *";
+const EM_DELIMITER: &str = "_";
+const STRONG_DELIMITER: &str = "**";
 
 pub struct TurndownService {
-    pub options: TurndownOptions,
     pub rules: Rules,
     custom_rules: HashMap<String, Rule>,
-    escape_patterns: Vec<(Regex, String)>,
 }
 
 impl TurndownService {
-    pub fn new(options: Option<TurndownOptions>) -> Self {
-        let default_options = TurndownOptions::default();
-
-        let final_options = options.unwrap_or(default_options);
+    pub fn new() -> Self {
         let rules = Rules::default();
 
-        // Initialize escape patterns
-        let escape_patterns = vec![
-            (Regex::new(r"\\").expect("valid regex"), r"\\".to_string()),
-            (Regex::new(r"\*").expect("valid regex"), r"\*".to_string()),
-            (Regex::new(r"^-").expect("valid regex"), r"\-".to_string()),
-            (
-                Regex::new(r"^\+ ").expect("valid regex"),
-                r"\+ ".to_string(),
-            ),
-            (
-                Regex::new(r"^(=+)").expect("valid regex"),
-                r"\$1".to_string(),
-            ),
-            (
-                Regex::new(r"^(#{1,6}) ").expect("valid regex"),
-                r"\$1 ".to_string(),
-            ),
-            (Regex::new(r"`").expect("valid regex"), r"\`".to_string()),
-            (
-                Regex::new(r"^~~~").expect("valid regex"),
-                r"\~~~".to_string(),
-            ),
-            (Regex::new(r"\[").expect("valid regex"), r"\[".to_string()),
-            (Regex::new(r"\]").expect("valid regex"), r"\]".to_string()),
-            (Regex::new(r"^>").expect("valid regex"), r"\>".to_string()),
-            (Regex::new(r"_").expect("valid regex"), r"\_".to_string()),
-            (
-                Regex::new(r"^(\d+)\. ").expect("valid regex"),
-                r"$1\. ".to_string(),
-            ),
-        ];
-
         TurndownService {
-            options: final_options,
             rules,
             custom_rules: Default::default(),
-            escape_patterns,
         }
     }
 
@@ -132,7 +72,7 @@ impl TurndownService {
 
         let root_node = RootNode::new(input);
         let output = self.process(&root_node)?;
-        Ok(self.post_process(output))
+        Ok(self.post_process(&output))
     }
 
     pub fn add_rule(&mut self, key: &str, rule: Rule) -> &mut Self {
@@ -141,10 +81,10 @@ impl TurndownService {
     }
 
     pub fn escape(&self, string: &str) -> String {
-        self.escape_patterns
+        ESCAPE_PATTERNS
             .iter()
             .fold(string.to_string(), |acc, (regex, replacement)| {
-                regex.replace_all(&acc, replacement.as_str()).to_string()
+                regex.replace_all(&acc, *replacement).to_string()
             })
     }
 
@@ -177,21 +117,8 @@ impl TurndownService {
         Ok(output)
     }
 
-    fn post_process(&mut self, mut output: String) -> String {
-        // Handle reference links append functionality
-        let reference_output = self.rules.get_references("referenceLink", false);
-        if !reference_output.is_empty() {
-            output = Self::join(&output, &reference_output);
-        }
-
-        // Trim leading and trailing whitespace/newlines
-        let leading_regex = Regex::new(r"^[\t\r\n]+").expect("valid regex");
-        let trailing_regex = Regex::new(r"[\t\r\n\s]+$").expect("valid regex");
-
-        output = leading_regex.replace(&output, "").to_string();
-        output = trailing_regex.replace(&output, "").to_string();
-
-        output
+    fn post_process(&self, output: &str) -> String {
+        output.trim().to_string()
     }
 
     fn replacement_for_node(&mut self, node: &Rc<RefCell<Node>>) -> anyhow::Result<Cow<'_, str>> {
@@ -202,7 +129,7 @@ impl TurndownService {
         let content = self.process(&temp_root)?;
 
         // Get flanking whitespace
-        let whitespace = Node::flanking_whitespace(node, &self.options);
+        let whitespace = Node::flanking_whitespace(node);
 
         let trimmed_content = if !whitespace.leading.is_empty() || !whitespace.trailing.is_empty() {
             content.trim()
@@ -213,24 +140,16 @@ impl TurndownService {
         // Find matching rule by trying different rule names
         let node_name = node.borrow().node_name.to_lowercase();
         let mut replacement_result = match node_name.as_str() {
-            "p" => {
-                if let Some(rule) = self.rules.get("paragraph") {
-                    (rule.replacement)(trimmed_content, node, &self.options)
-                } else {
-                    Cow::Owned(format!("\n\n{}\n\n", trimmed_content))
-                }
-            }
-            "br" => {
-                if let Some(rule) = self.rules.get("lineBreak") {
-                    (rule.replacement)(trimmed_content, node, &self.options)
-                } else {
-                    Cow::Owned(format!("{}\\n", self.options.br))
-                }
-            }
-            "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-                if let Some(rule) = self.rules.get("heading") {
-                    (rule.replacement)(trimmed_content, node, &self.options)
-                } else {
+            "p" => self.rules.get("paragraph").map_or_else(
+                || Cow::Owned(format!("\n\n{}\n\n", trimmed_content)),
+                |rule| (rule.replacement)(trimmed_content, node),
+            ),
+            "br" => self.rules.get("lineBreak").map_or_else(
+                || Cow::Owned(format!("{}\\n", BR_MARKER)),
+                |rule| (rule.replacement)(trimmed_content, node),
+            ),
+            "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => self.rules.get("heading").map_or_else(
+                || {
                     let level = node_name
                         .chars()
                         .nth(1)
@@ -239,40 +158,28 @@ impl TurndownService {
                         .unwrap_or(1) as usize;
                     let hashes = "#".repeat(level);
                     Cow::Owned(format!("\n\n{} {}\n\n", hashes, trimmed_content))
-                }
-            }
-            "blockquote" => {
-                if let Some(rule) = self.rules.get("blockquote") {
-                    (rule.replacement)(trimmed_content, node, &self.options)
-                } else {
+                },
+                |rule| (rule.replacement)(trimmed_content, node),
+            ),
+            "blockquote" => self.rules.get("blockquote").map_or_else(
+                || {
                     let prefixed = trimmed_content
                         .lines()
                         .map(|line| format!("> {}", line))
                         .collect::<Vec<_>>()
                         .join("\n");
                     Cow::Owned(format!("\n\n{}\n\n", prefixed))
-                }
-            }
+                },
+                |rule| (rule.replacement)(trimmed_content, node),
+            ),
             _ => {
                 // Check for other common rules by name mapping
                 let rule_name = match node_name.as_str() {
                     "ul" | "ol" => "list",
                     "li" => "listItem",
-                    "pre" => {
-                        if self.options.code_block_style == CodeBlockStyle::Indented {
-                            "indentedCodeBlock"
-                        } else {
-                            "fencedCodeBlock"
-                        }
-                    }
+                    "pre" => "fencedCodeBlock",
                     "hr" => "horizontalRule",
-                    "a" => {
-                        if self.options.link_style == LinkStyle::Inlined {
-                            "inlineLink"
-                        } else {
-                            "referenceLink"
-                        }
-                    }
+                    "a" => "inlineLink",
                     "em" | "i" => "emphasis",
                     "strong" | "b" => "strong",
                     "code" => "code",
@@ -281,16 +188,16 @@ impl TurndownService {
                 };
 
                 if !rule_name.is_empty() {
-                    if let Some(rule) = self.rules.get(rule_name) {
-                        (rule.replacement)(trimmed_content, node, &self.options)
-                    } else {
-                        // Fallback default replacement
-                        if node.borrow().is_block() {
-                            Cow::Owned(format!("\n\n{}\n\n", trimmed_content))
-                        } else {
-                            Cow::Borrowed(trimmed_content)
-                        }
-                    }
+                    self.rules.get(rule_name).map_or_else(
+                        || {
+                            if node.borrow().is_block() {
+                                Cow::Owned(format!("\n\n{}\n\n", trimmed_content))
+                            } else {
+                                Cow::Borrowed(trimmed_content)
+                            }
+                        },
+                        |rule| (rule.replacement)(trimmed_content, node),
+                    )
                 } else {
                     // Default replacement
                     if node.borrow().is_block() {
@@ -303,11 +210,9 @@ impl TurndownService {
         };
 
         for rule in self.custom_rules.values() {
-            if rule.filter.matches(node, &self.options) {
+            if rule.filter.matches(node) {
                 let content = replacement_result;
-                replacement_result = (rule.replacement)(&content, node, &self.options)
-                    .to_string()
-                    .into();
+                replacement_result = (rule.replacement)(&content, node).to_string().into();
             }
         }
 

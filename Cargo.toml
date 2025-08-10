@@ -74,9 +74,6 @@ opt-level = 2
 [profile.dev.package.scraper]
 opt-level = 2
 
-[profile.dev.package.regex]
-opt-level = 2
-
 [lints.clippy]
 # Performance
 clear_with_drain = "warn"

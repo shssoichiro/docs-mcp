@@ -1,9 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::turndown::{
-    CodeBlockStyle, Filter, HeadingStyle, Rule, TurndownOptions, TurndownService,
-};
+use crate::turndown::{Filter, Rule, TurndownService};
 use anyhow::Result;
 use itertools::Itertools;
 use pulldown_cmark::HeadingLevel;
@@ -39,13 +37,7 @@ pub struct ExtractedContent {
 
 /// Extract structured content from HTML document
 pub fn extract_content(html: &str) -> Result<ExtractedContent> {
-    let opts = TurndownOptions {
-        heading_style: HeadingStyle::Atx,
-        code_block_style: CodeBlockStyle::Fenced,
-        bullet_list_marker: "-",
-        ..TurndownOptions::default()
-    };
-    let mut turndown = TurndownService::new(Some(opts));
+    let mut turndown = TurndownService::new();
     turndown.add_rule(
         "remove_scripts",
         Rule::new(
@@ -62,14 +54,14 @@ pub fn extract_content(html: &str) -> Result<ExtractedContent> {
                 "rustdoc-search",
                 "rostdoc-toolbar",
             ]),
-            Rc::new(|_, _, _| Cow::Borrowed("")),
+            Rc::new(|_, _| Cow::Borrowed("")),
         ),
     );
     turndown.add_rule(
         "clean_code_blocks",
         Rule::new(
             Filter::TagName("pre"),
-            Rc::new(|content, _, _| Cow::Owned(format!("\n```\n{}\n```\n", content))),
+            Rc::new(|content, _| Cow::Owned(format!("\n```\n{}\n```\n", content))),
         ),
     );
 

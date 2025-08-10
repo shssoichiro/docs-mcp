@@ -27,6 +27,10 @@ use super::node::{Node, NodeType};
 use fancy_regex::Regex;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::LazyLock;
+
+static WHITESPACE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[ \r\n\t]+").expect("regex is valid"));
 
 type IsPreFn = Box<dyn Fn(&Rc<RefCell<Node>>) -> bool>;
 
@@ -58,7 +62,6 @@ where
         return;
     }
 
-    let whitespace_regex = Regex::new(r"[ \r\n\t]+").expect("regex is valid");
     let mut prev_text: Option<Rc<RefCell<Node>>> = None;
     let mut keep_leading_ws = false;
 
@@ -81,7 +84,7 @@ where
                     .as_ref()
                     .unwrap_or(&String::new())
                     .clone();
-                text = whitespace_regex.replace_all(&text, " ").to_string();
+                text = WHITESPACE_REGEX.replace_all(&text, " ").to_string();
 
                 // Check if we should remove leading whitespace
                 if (prev_text.is_none()

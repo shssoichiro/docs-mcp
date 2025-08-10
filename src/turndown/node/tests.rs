@@ -115,23 +115,11 @@ fn edge_whitespace() {
 
 #[test]
 fn flanking_whitespace() {
-    let options = TurndownOptions::default();
-
     // Block element should have no flanking whitespace
     let div_node = Node::new(NodeType::Element, "DIV".to_string(), None);
-    let flanking = Node::flanking_whitespace(&div_node, &options);
+    let flanking = Node::flanking_whitespace(&div_node);
     assert_eq!(flanking.leading, "");
     assert_eq!(flanking.trailing, "");
-
-    // Code element with preformatted_code option
-    let code_node = Node::new(NodeType::Element, "CODE".to_string(), None);
-    let preformatted_options = TurndownOptions {
-        preformatted_code: true,
-        ..TurndownOptions::default()
-    };
-    let flanking_code = Node::flanking_whitespace(&code_node, &preformatted_options);
-    assert_eq!(flanking_code.leading, "");
-    assert_eq!(flanking_code.trailing, "");
 }
 
 #[test]
