@@ -201,7 +201,7 @@ pub async fn add_site(
             );
             eprintln!("💡 Use 'docs-mcp list' to see all indexed sites");
 
-            if existing_site.is_completed() {
+            if existing_site.is_completed() || existing_site.progress_percent == 100 {
                 return Ok(existing_site);
             }
 
