@@ -34,12 +34,13 @@ pub struct Indexer {
     chunking_config: ChunkingConfig,
     app_config: Config,
     batch_size: usize,
+    verbose: bool,
 }
 
 impl Indexer {
     /// Create a new indexer
     #[inline]
-    pub async fn new(config: Config) -> Result<Self> {
+    pub async fn new(config: Config, verbose: bool) -> Result<Self> {
         let database = Database::new(config.database_path()?)
             .await
             .context("Failed to initialize SQLite database")?;
@@ -58,6 +59,7 @@ impl Indexer {
             chunking_config: config.chunking,
             app_config: config,
             batch_size: 64,
+            verbose,
         })
     }
 
@@ -109,7 +111,7 @@ impl Indexer {
 
         for crawl_item in items_to_process {
             bar.set_message(crawl_item.url.clone());
-            match self.process_single_page(&crawl_item, site.id).await {
+            match self.process_single_page(&crawl_item, site.id, &bar).await {
                 Ok(chunks_created) => {
                     total_chunks_created += chunks_created;
                     pages_processed += 1;
@@ -155,6 +157,7 @@ impl Indexer {
         &mut self,
         crawl_item: &CrawlQueueItem,
         site_id: i64,
+        bar: &ProgressBar,
     ) -> Result<usize> {
         debug!("Processing page for embeddings: {}", crawl_item.url);
 
@@ -162,6 +165,9 @@ impl Indexer {
         let extracted_content = self.get_extracted_content_for_page(crawl_item.id)?;
 
         // Chunk the content
+        if self.verbose {
+            bar.set_message(format!("{} (Chunking content)", crawl_item.url));
+        }
         let chunks = chunk_content(&extracted_content, &self.chunking_config)
             .context("Failed to chunk content")?;
 
@@ -182,13 +188,35 @@ impl Indexer {
             let batch_size = batch.len();
 
             // Generate embeddings for this batch
+            if self.verbose {
+                bar.set_message(format!(
+                    "{} (Generating embeddings {}-{} of {})",
+                    crawl_item.url,
+                    total_chunks_processed + 1,
+                    total_chunks_processed + batch.len(),
+                    chunks.len()
+                ));
+            }
             let embedding_results = self
                 .ollama_client
                 .generate_chunk_embeddings(&batch)
                 .context("Failed to generate embeddings")?;
 
             // Store embeddings and create indexed chunk records
-            for (chunk, embedding_result) in batch.into_iter().zip(embedding_results.into_iter()) {
+            for (i, (chunk, embedding_result)) in batch
+                .into_iter()
+                .zip(embedding_results.into_iter())
+                .enumerate()
+            {
+                if self.verbose {
+                    bar.set_message(format!(
+                        "{} (Saving embeddings for chunk {} of {})",
+                        crawl_item.url,
+                        total_chunks_processed + i + 1,
+                        chunks.len()
+                    ));
+                }
+
                 let vector_id = Uuid::new_v4().to_string();
 
                 // Create embedding record for LanceDB
@@ -238,6 +266,10 @@ impl Indexer {
             );
         }
 
+        if self.verbose {
+            bar.set_message(format!("{} (Finalizing)", crawl_item.url,));
+        }
+
         Ok(total_chunks_processed)
     }
 
@@ -268,8 +300,6 @@ impl Indexer {
 
     /// Get extracted content for a page from the cached file
     fn get_extracted_content_for_page(&self, page_id: i64) -> Result<ExtractedContent> {
-        debug!("Re-extracting content for page: {}", page_id);
-
         let cached_file_path = self
             .app_config
             .cache_dir_path()?

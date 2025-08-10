@@ -19,7 +19,7 @@ async fn create_test_indexer() -> Result<(Indexer, TempDir)> {
         base_dir: temp_dir.path().to_path_buf(),
     };
 
-    let indexer = Indexer::new(config).await?;
+    let indexer = Indexer::new(config, false).await?;
     Ok((indexer, temp_dir))
 }
 
@@ -120,7 +120,7 @@ mod integration_tests {
         let (config, _temp_dir) = create_test_config();
 
         // Create indexer
-        let indexer = Indexer::new(config).await;
+        let indexer = Indexer::new(config, false).await;
 
         assert!(
             indexer.is_ok(),
@@ -201,7 +201,7 @@ mod integration_tests {
     async fn consistency_validation() -> Result<()> {
         let (config, _temp_dir) = create_test_config();
         let database = create_test_database(&config).await?;
-        let mut indexer = Indexer::new(config).await?;
+        let mut indexer = Indexer::new(config, false).await?;
 
         // Add a test site and chunks
         let new_site = NewSite {
@@ -274,7 +274,7 @@ mod integration_tests {
     #[tokio::test]
     async fn consistency_cleanup_operations() -> Result<()> {
         let (config, _temp_dir) = create_test_config();
-        let mut indexer = Indexer::new(config).await?;
+        let mut indexer = Indexer::new(config, false).await?;
 
         // Create a consistency report with issues to clean up
         let test_report = crate::indexer::ConsistencyReport {
@@ -320,7 +320,7 @@ mod integration_tests {
         config.ollama.host = "nonexistent-host".to_string();
         config.ollama.port = 65535;
 
-        let indexer_result = Indexer::new(config).await;
+        let indexer_result = Indexer::new(config, false).await;
 
         // Indexer creation might succeed even with invalid Ollama config
         // because the connection is only tested when actually used

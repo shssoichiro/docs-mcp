@@ -570,6 +570,7 @@ mod integration_tests {
             database.pool().clone(),
             config,
             Config::load(config_path.path())?,
+            false,
         );
         let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
@@ -657,6 +658,7 @@ mod integration_tests {
             database.pool().clone(),
             config,
             Config::load(config_path.path())?,
+            false,
         );
         let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
@@ -719,6 +721,7 @@ mod integration_tests {
             database.pool().clone(),
             config,
             Config::load(config_path.path())?,
+            false,
         );
         let crawl_error = crawler
             .crawl_site(site.id, &base_url, &base_url)
@@ -806,6 +809,7 @@ mod integration_tests {
             database.pool().clone(),
             config,
             Config::load(config_path.path())?,
+            false,
         );
         let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 

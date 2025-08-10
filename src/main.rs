@@ -36,6 +36,9 @@ enum Commands {
         /// Override the base URL of the documentation site. Useful for cases where the index URL has additional paths.
         #[arg(long)]
         base_url: Option<String>,
+        /// Output additional information during processing
+        #[arg(long, short)]
+        verbose: bool,
     },
     /// List all indexed documentation sites
     List,
@@ -48,6 +51,9 @@ enum Commands {
     Update {
         /// Site ID or name to update
         site: String,
+        /// Output additional information during processing
+        #[arg(long, short)]
+        verbose: bool,
     },
     /// Start MCP server on stdio
     Serve,
@@ -79,10 +85,11 @@ async fn main() -> DocsResult<()> {
             name,
             base_url,
             version,
+            verbose,
         } => {
             let base_url = base_url.as_deref().unwrap_or(url.as_str());
-            let site = add_site(&url, name, version, base_url, &config).await?;
-            Indexer::new(config)
+            let site = add_site(&url, name, version, base_url, &config, verbose).await?;
+            Indexer::new(config, verbose)
                 .await?
                 .process_site_embeddings(&site)
                 .await?;
@@ -93,9 +100,9 @@ async fn main() -> DocsResult<()> {
         Commands::Delete { site } => {
             delete_site(site, &config).await?;
         }
-        Commands::Update { site } => {
-            let site = update_site(site, &config).await?;
-            Indexer::new(config)
+        Commands::Update { site, verbose } => {
+            let site = update_site(site, &config, verbose).await?;
+            Indexer::new(config, verbose)
                 .await?
                 .process_site_embeddings(&site)
                 .await?;

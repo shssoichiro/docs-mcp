@@ -293,6 +293,7 @@ pub struct SiteCrawler {
     db_pool: DbPool,
     config: CrawlerConfig,
     app_config: Config,
+    verbose: bool,
 }
 
 /// Result of crawling a single page
@@ -333,7 +334,7 @@ impl CrawlStats {
 
 impl SiteCrawler {
     /// Create a new site crawler
-    pub fn new(db_pool: DbPool, config: CrawlerConfig, app_config: Config) -> Self {
+    pub fn new(db_pool: DbPool, config: CrawlerConfig, app_config: Config, verbose: bool) -> Self {
         // Initialize browser client if JavaScript rendering is enabled
         let browser_client = if config.enable_js_rendering {
             info!("JavaScript rendering enabled with browser client");
@@ -351,6 +352,7 @@ impl SiteCrawler {
             db_pool,
             config,
             app_config,
+            verbose,
         }
     }
 
@@ -466,7 +468,7 @@ impl SiteCrawler {
 
             // Crawl the page
             bar.set_message(url.to_string());
-            match self.crawl_page(&url, &base_url).await {
+            match self.crawl_page(&url, &base_url, &bar).await {
                 Ok(crawl_result) => {
                     if crawl_result.success {
                         // Write the extracted data to a cache file
@@ -584,10 +586,18 @@ impl SiteCrawler {
     }
 
     /// Crawl a single page and extract content
-    async fn crawl_page(&mut self, url: &Url, base_url: &Url) -> Result<CrawlResult> {
+    async fn crawl_page(
+        &mut self,
+        url: &Url,
+        base_url: &Url,
+        bar: &ProgressBar,
+    ) -> Result<CrawlResult> {
         debug!("Crawling page: {}", url);
 
         // Try JavaScript rendering first if available, fallback to HTTP client
+        if self.verbose {
+            bar.set_message(format!("{} (Fetching via headless browser)", url));
+        }
         let html = match self.try_browser_rendering(url).await {
             Ok(html) => {
                 debug!("Successfully rendered page with JavaScript: {}", url);
@@ -600,6 +610,9 @@ impl SiteCrawler {
                 );
 
                 // Fallback to HTTP client
+                if self.verbose {
+                    bar.set_message(format!("{} (Fetching via curl)", url));
+                }
                 match self.http_client.get(url.as_str()).await {
                     Ok(html) => html,
                     Err(e) => {
@@ -620,6 +633,9 @@ impl SiteCrawler {
         };
 
         // Extract content
+        if self.verbose {
+            bar.set_message(format!("{} (Extracting content)", url));
+        }
         let content = match extract_content(&html) {
             Ok(content) => content,
             Err(e) => {
@@ -638,6 +654,9 @@ impl SiteCrawler {
         };
 
         // Extract links
+        if self.verbose {
+            bar.set_message(format!("{} (Extracting links)", url));
+        }
         let links = match extract_links(&html, url, base_url) {
             Ok(links) => links,
             Err(e) => {
@@ -652,6 +671,9 @@ impl SiteCrawler {
             content.sections.len(),
             links.len()
         );
+        if self.verbose {
+            bar.set_message(format!("{} (Finalizing)", url));
+        }
 
         Ok(CrawlResult {
             url: url.clone(),

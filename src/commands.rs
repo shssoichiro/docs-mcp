@@ -111,6 +111,7 @@ pub async fn add_site(
     version: Option<String>,
     base_url: &str,
     config: &Config,
+    verbose: bool,
 ) -> Result<Site> {
     eprintln!("🚀 Adding new documentation site");
     eprintln!("   URL: {}", url);
@@ -246,6 +247,7 @@ pub async fn add_site(
         database.pool().clone(),
         CrawlerConfig::default(),
         config.clone(),
+        verbose,
     );
 
     match crawler.crawl_site(site.id, url, base_url).await {
@@ -529,7 +531,7 @@ pub async fn delete_site(site_identifier: String, config: &Config) -> Result<()>
 
 /// Update/re-index a documentation site with proper cleanup
 #[inline]
-pub async fn update_site(site_identifier: String, config: &Config) -> Result<Site> {
+pub async fn update_site(site_identifier: String, config: &Config, verbose: bool) -> Result<Site> {
     // Validate input
     validation::validate_site_identifier(&site_identifier).context("Invalid site identifier")?;
 
@@ -660,6 +662,7 @@ pub async fn update_site(site_identifier: String, config: &Config) -> Result<Sit
         database.pool().clone(),
         CrawlerConfig::default(),
         config.clone(),
+        verbose,
     );
 
     match crawler
