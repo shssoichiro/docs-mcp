@@ -6,7 +6,7 @@ pub mod consistency;
 #[cfg(test)]
 mod tests;
 
-use std::fs::File;
+use std::fs::{self, File};
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -267,8 +267,10 @@ impl Indexer {
         }
 
         if self.verbose {
-            bar.set_message(format!("{} (Finalizing)", crawl_item.url,));
+            bar.set_message(format!("{} (Finalizing)", crawl_item.url));
         }
+
+        self.remove_cached_page(crawl_item.id)?;
 
         Ok(total_chunks_processed)
     }
@@ -318,6 +320,18 @@ impl Indexer {
         );
 
         Ok(extracted_content)
+    }
+
+    /// Cleanup extracted content for a page after we are finished
+    fn remove_cached_page(&self, page_id: i64) -> Result<()> {
+        let cached_file_path = self
+            .app_config
+            .cache_dir_path()?
+            .join("pages")
+            .join(format!("{page_id}.json"));
+        let _ = fs::remove_file(cached_file_path);
+
+        Ok(())
     }
 
     /// Validate consistency between SQLite and LanceDB
