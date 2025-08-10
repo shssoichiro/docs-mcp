@@ -168,62 +168,71 @@ pub async fn add_site(
     eprint!("🔍 Checking for existing site... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
-    if let Some(existing_site) = SiteQueries::get_by_index_url(database.pool(), url).await? {
-        eprintln!("⚠️  Found existing site!");
-        eprintln!();
-        eprintln!(
-            "📚 Site already exists: {} (ID: {})",
-            existing_site.name, existing_site.id
-        );
-        eprintln!("   URL: {}", existing_site.index_url);
-        eprintln!("   Status: {}", existing_site.status);
+    let site =
+        if let Some(existing_site) = SiteQueries::get_by_index_url(database.pool(), url).await? {
+            eprintln!("⚠️  Found existing site!");
+            eprintln!();
+            eprintln!(
+                "📚 Site already exists: {} (ID: {})",
+                existing_site.name, existing_site.id
+            );
+            eprintln!("   URL: {}", existing_site.index_url);
+            eprintln!("   Status: {}", existing_site.status);
 
-        if existing_site.progress_percent > 0 {
-            eprintln!("   Progress: {}%", existing_site.progress_percent);
-        }
-
-        // Show statistics if available
-        if let Ok(Some(stats)) =
-            SiteQueries::get_statistics(database.pool(), existing_site.id).await
-        {
-            eprintln!("   Content Chunks: {}", stats.total_chunks);
-            if stats.pending_crawl_items > 0 {
-                eprintln!("   Pending Pages: {}", stats.pending_crawl_items);
+            if existing_site.progress_percent > 0 {
+                eprintln!("   Progress: {}%", existing_site.progress_percent);
             }
-        }
 
-        eprintln!();
-        eprintln!(
-            "💡 Use 'docs-mcp update {}' to re-index this site",
-            existing_site.id
-        );
-        eprintln!("💡 Use 'docs-mcp list' to see all indexed sites");
-        return Ok(existing_site);
-    }
-    eprintln!("✅");
+            // Show statistics if available
+            if let Ok(Some(stats)) =
+                SiteQueries::get_statistics(database.pool(), existing_site.id).await
+            {
+                eprintln!("   Content Chunks: {}", stats.total_chunks);
+                if stats.pending_crawl_items > 0 {
+                    eprintln!("   Pending Pages: {}", stats.pending_crawl_items);
+                }
+            }
 
-    // Create new site entry
-    eprint!("📝 Creating site entry... ");
-    io::stdout().flush().context("Failed to flush stdout")?;
+            eprintln!();
+            eprintln!(
+                "💡 Use 'docs-mcp update {}' to re-index this site",
+                existing_site.id
+            );
+            eprintln!("💡 Use 'docs-mcp list' to see all indexed sites");
 
-    let new_site = NewSite {
-        index_url: url.to_string(),
-        base_url: base_url.to_string(),
-        name: site_name.clone(),
-        version: site_version.to_string(),
-    };
+            if existing_site.is_completed() {
+                return Ok(existing_site);
+            }
 
-    let site = SiteQueries::create(database.pool(), new_site)
-        .await
-        .context("Failed to create site entry")?;
-    eprintln!("✅");
+            existing_site
+        } else {
+            eprintln!("✅");
 
-    eprintln!();
-    eprintln!("✅ Site created successfully!");
-    eprintln!("   📚 Name: {}", site.name);
-    eprintln!("   🆔 ID: {}", site.id);
-    eprintln!("   🌐 URL: {}", site.index_url);
-    eprintln!();
+            // Create new site entry
+            eprint!("📝 Creating site entry... ");
+            io::stdout().flush().context("Failed to flush stdout")?;
+
+            let new_site = NewSite {
+                index_url: url.to_string(),
+                base_url: base_url.to_string(),
+                name: site_name.clone(),
+                version: site_version.to_string(),
+            };
+
+            let site = SiteQueries::create(database.pool(), new_site)
+                .await
+                .context("Failed to create site entry")?;
+            eprintln!("✅");
+
+            eprintln!();
+            eprintln!("✅ Site created successfully!");
+            eprintln!("   📚 Name: {}", site.name);
+            eprintln!("   🆔 ID: {}", site.id);
+            eprintln!("   🌐 URL: {}", site.index_url);
+            eprintln!();
+
+            site
+        };
 
     // Start crawling
     eprintln!("🕷️ Starting web crawling...");
