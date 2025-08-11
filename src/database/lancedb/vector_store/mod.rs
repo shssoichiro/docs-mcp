@@ -50,7 +50,7 @@ impl VectorStore {
             DocsError::Database(format!("Failed to create vector database directory: {}", e))
         })?;
 
-        let uri = format!("file://{}", db_path.display());
+        let uri = db_path.to_string_lossy();
 
         // Attempt to connect with corruption recovery
         let connection = match lancedb::connect(&uri).execute().await {
