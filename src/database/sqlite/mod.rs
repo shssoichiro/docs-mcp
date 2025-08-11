@@ -57,16 +57,18 @@ impl Database {
         Ok(())
     }
 
-    pub async fn initialize_from_config_dir(config_dir: &Path) -> Result<Self> {
-        let db_path = config_dir.join("metadata.db");
+    pub async fn initialize_from_path(db_path: &Path) -> Result<Self> {
         let db_url = db_path.to_string_lossy();
 
-        std::fs::create_dir_all(config_dir).with_context(|| {
-            format!(
-                "Failed to create config directory: {}",
-                config_dir.display()
-            )
-        })?;
+        let config_dir = db_path.parent().expect("file has parent");
+        if !config_dir.exists() {
+            std::fs::create_dir_all(config_dir).with_context(|| {
+                format!(
+                    "Failed to create config directory: {}",
+                    config_dir.display()
+                )
+            })?;
+        }
 
         Self::new(db_url.as_ref()).await
     }

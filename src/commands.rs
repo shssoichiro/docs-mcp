@@ -853,7 +853,7 @@ pub async fn serve_mcp(config: &Config) -> Result<()> {
 
     let db_path = config.database_path()?;
     let sqlite_db = std::sync::Arc::new(
-        crate::database::sqlite::Database::initialize_from_config_dir(&db_path)
+        crate::database::sqlite::Database::initialize_from_path(&db_path)
             .await
             .context("Failed to initialize SQLite database")?,
     );

@@ -7,12 +7,12 @@ use super::*;
 use anyhow::Result;
 use chrono::Utc;
 use std::collections::HashSet;
-use tempfile::TempDir;
+use tempfile::{NamedTempFile, TempPath};
 
-async fn create_test_database() -> Result<(TempDir, Database)> {
-    let temp_dir = TempDir::new()?;
-    let database = Database::initialize_from_config_dir(temp_dir.path()).await?;
-    Ok((temp_dir, database))
+async fn create_test_database() -> Result<(TempPath, Database)> {
+    let temp_file = NamedTempFile::new()?.into_temp_path();
+    let database = Database::initialize_from_path(&temp_file).await?;
+    Ok((temp_file, database))
 }
 
 #[tokio::test]
