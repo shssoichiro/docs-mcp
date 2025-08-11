@@ -387,9 +387,6 @@ impl SiteCrawler {
             }
         };
 
-        // Initialize crawl queue with base URL
-        self.init_crawl_queue(site_id, &index_url).await?;
-
         // Track discovered URLs to avoid duplicates
         let mut discovered_urls = HashSet::new();
         discovered_urls.insert(index_url.as_str().to_string());
@@ -685,7 +682,7 @@ impl SiteCrawler {
     }
 
     /// Initialize the crawl queue with the base URL
-    async fn init_crawl_queue(&self, site_id: i64, index_url: &Url) -> Result<()> {
+    pub async fn init_crawl_queue(&self, site_id: i64, index_url: &Url) -> Result<()> {
         let new_item = NewCrawlQueueItem {
             site_id,
             url: index_url.as_str().to_string(),

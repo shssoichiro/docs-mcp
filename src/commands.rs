@@ -8,7 +8,7 @@ use tokio::task::block_in_place;
 use tracing::{error, info, warn};
 
 use crate::config::Config;
-use crate::crawler::{CrawlerConfig, SiteCrawler};
+use crate::crawler::{CrawlerConfig, SiteCrawler, validate_url};
 use crate::database::lancedb::vector_store::VectorStore;
 use crate::database::sqlite::Database;
 use crate::database::sqlite::models::{NewSite, Site, SiteStatus, SiteUpdate};
@@ -170,8 +170,10 @@ pub async fn add_site(
     eprint!("🔍 Checking for existing site... ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
+    let mut is_resuming = false;
     let site =
         if let Some(existing_site) = SiteQueries::get_by_index_url(database.pool(), url).await? {
+            is_resuming = true;
             eprintln!("⚠️  Found existing site!");
             eprintln!();
             eprintln!(
@@ -250,6 +252,11 @@ pub async fn add_site(
         config.clone(),
         verbose,
     );
+    if !is_resuming {
+        // Initialize crawl queue with base URL
+        let index_url = validate_url(&site.index_url)?;
+        crawler.init_crawl_queue(site.id, &index_url).await?;
+    }
 
     match crawler.crawl_site(site.id, url, base_url).await {
         Ok(stats) => {
@@ -676,6 +683,9 @@ pub async fn update_site(site_identifier: String, config: &Config, verbose: bool
         config.clone(),
         verbose,
     );
+    // Initialize crawl queue with base URL
+    let index_url = validate_url(&site.index_url)?;
+    crawler.init_crawl_queue(site.id, &index_url).await?;
 
     match crawler
         .crawl_site(site.id, &site.index_url, &site.base_url)

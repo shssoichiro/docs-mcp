@@ -572,6 +572,8 @@ mod integration_tests {
             Config::load(config_path.path())?,
             false,
         );
+        let index_url = validate_url_impl(&site.index_url)?;
+        crawler.init_crawl_queue(site.id, &index_url).await?;
         let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
         // Verify crawl statistics
@@ -660,6 +662,8 @@ mod integration_tests {
             Config::load(config_path.path())?,
             false,
         );
+        let index_url = validate_url_impl(&site.index_url)?;
+        crawler.init_crawl_queue(site.id, &index_url).await?;
         let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
         // Verify that the URL was blocked by robots.txt
@@ -723,6 +727,8 @@ mod integration_tests {
             Config::load(config_path.path())?,
             false,
         );
+        let index_url = validate_url_impl(&site.index_url)?;
+        crawler.init_crawl_queue(site.id, &index_url).await?;
         let crawl_error = crawler
             .crawl_site(site.id, &base_url, &base_url)
             .await
@@ -811,6 +817,8 @@ mod integration_tests {
             Config::load(config_path.path())?,
             false,
         );
+        let index_url = validate_url_impl(&site.index_url)?;
+        crawler.init_crawl_queue(site.id, &index_url).await?;
         let stats = crawler.crawl_site(site.id, &base_url, &base_url).await?;
 
         // Verify content was processed
