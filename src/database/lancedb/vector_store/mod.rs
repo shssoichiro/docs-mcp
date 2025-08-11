@@ -558,6 +558,7 @@ impl VectorStore {
     }
 
     /// Optimize the vector database by compacting and reorganizing data
+    /// This includes pruning old versions to prevent disk space bloat
     ///
     /// # Returns
     /// * `Result<(), DocsError>` - Success or error
@@ -571,12 +572,25 @@ impl VectorStore {
             .await
             .map_err(|e| DocsError::Database(format!("Failed to open table: {}", e)))?;
 
+        // First prune old versions to prevent disk space bloat.
+        // We do not need old versions at all, so we can basically remove them all.
+        // Lancedb's versions really add bloat quickly.
+        table
+            .optimize(lancedb::table::OptimizeAction::Prune {
+                older_than: Some(chrono::TimeDelta::minutes(15)),
+                delete_unverified: Some(true),
+                error_if_tagged_old_versions: Some(false),
+            })
+            .await
+            .map_err(|e| DocsError::Database(format!("Failed to prune old versions: {}", e)))?;
+
+        // Then perform general optimization (compaction and indexing)
         table
             .optimize(lancedb::table::OptimizeAction::All)
             .await
             .map_err(|e| DocsError::Database(format!("Failed to optimize table: {}", e)))?;
 
-        info!("Vector database optimization completed");
+        info!("Vector database optimization and old version cleanup completed");
         Ok(())
     }
 
