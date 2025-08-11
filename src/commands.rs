@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use itertools::Itertools;
 use modelcontextprotocol_server::ServerBuilder;
 use modelcontextprotocol_server::transport::StdioTransport;
 use serde_json::from_value;
@@ -300,7 +301,7 @@ pub async fn add_site(
 
 /// List all indexed documentation sites with comprehensive information
 #[inline]
-pub async fn list_sites(config: &Config) -> Result<()> {
+pub async fn list_sites(config: &Config, verbose: bool) -> Result<()> {
     let db_path = config.database_path()?;
     let database = Database::new(db_path.to_string_lossy().as_ref())
         .await
@@ -319,69 +320,80 @@ pub async fn list_sites(config: &Config) -> Result<()> {
     eprintln!("Documentation Sites ({} total):", sites.len());
     eprintln!();
 
-    for site in &sites {
-        eprintln!("📚 {} (ID: {})", site.name, site.id);
-        eprintln!("   URL: {}", site.index_url);
-        eprintln!("   Status: {}", site.status);
+    for site in sites
+        .iter()
+        .sorted_by_key(|s| &s.version)
+        .sorted_by_key(|s| &s.name)
+    {
+        if verbose {
+            eprintln!("📚 {} (ID: {})", site.name, site.id);
+            eprintln!("   URL: {}", site.index_url);
+            eprintln!("   Status: {}", site.status);
 
-        // Show crawl progress
-        if site.total_pages > 0 {
-            eprintln!(
-                "   Crawl Progress: {}/{} pages ({}%)",
-                site.indexed_pages, site.total_pages, site.progress_percent
-            );
-        }
+            // Show crawl progress
+            if site.total_pages > 0 {
+                eprintln!(
+                    "   Crawl Progress: {}/{} pages ({}%)",
+                    site.indexed_pages, site.total_pages, site.progress_percent
+                );
+            }
 
-        // Get comprehensive statistics
-        match SiteQueries::get_statistics(database.pool(), site.id).await {
-            Ok(Some(stats)) => {
-                eprintln!("   Content Chunks: {}", stats.total_chunks);
+            // Get comprehensive statistics
+            match SiteQueries::get_statistics(database.pool(), site.id).await {
+                Ok(Some(stats)) => {
+                    eprintln!("   Content Chunks: {}", stats.total_chunks);
 
-                if stats.pending_crawl_items > 0 {
-                    eprintln!("   Pending Pages: {}", stats.pending_crawl_items);
+                    if stats.pending_crawl_items > 0 {
+                        eprintln!("   Pending Pages: {}", stats.pending_crawl_items);
+                    }
+
+                    if stats.failed_crawl_items > 0 {
+                        eprintln!("   Failed Pages: {}", stats.failed_crawl_items);
+                    }
                 }
+                Ok(None) => eprintln!("   Statistics: Not available"),
+                Err(e) => eprintln!("   Statistics: Error - {}", e),
+            }
 
-                if stats.failed_crawl_items > 0 {
-                    eprintln!("   Failed Pages: {}", stats.failed_crawl_items);
+            // Show indexing dates
+            if let Some(indexed_date) = site.indexed_date {
+                eprintln!(
+                    "   Last Indexed: {}",
+                    indexed_date.format("%Y-%m-%d %H:%M:%S")
+                );
+            }
+
+            if let Some(heartbeat) = site.last_heartbeat {
+                let elapsed = chrono::Utc::now()
+                    .naive_utc()
+                    .signed_duration_since(heartbeat)
+                    .num_seconds();
+
+                if elapsed < 120 {
+                    eprintln!("   Indexer: Active ({}s ago)", elapsed);
+                } else {
+                    eprintln!("   Indexer: Inactive ({}s ago)", elapsed);
                 }
             }
-            Ok(None) => eprintln!("   Statistics: Not available"),
-            Err(e) => eprintln!("   Statistics: Error - {}", e),
-        }
 
-        // Show indexing dates
-        if let Some(indexed_date) = site.indexed_date {
+            // Show errors
+            if let Some(error) = &site.error_message {
+                eprintln!("   ⚠️  Error: {}", error);
+            }
+
+            // Show creation date
             eprintln!(
-                "   Last Indexed: {}",
-                indexed_date.format("%Y-%m-%d %H:%M:%S")
+                "   Created: {}",
+                site.created_date.format("%Y-%m-%d %H:%M:%S")
+            );
+
+            eprintln!();
+        } else {
+            eprintln!(
+                "ID {} - {} ({}) ({})",
+                site.id, site.name, site.version, site.index_url
             );
         }
-
-        if let Some(heartbeat) = site.last_heartbeat {
-            let elapsed = chrono::Utc::now()
-                .naive_utc()
-                .signed_duration_since(heartbeat)
-                .num_seconds();
-
-            if elapsed < 120 {
-                eprintln!("   Indexer: Active ({}s ago)", elapsed);
-            } else {
-                eprintln!("   Indexer: Inactive ({}s ago)", elapsed);
-            }
-        }
-
-        // Show errors
-        if let Some(error) = &site.error_message {
-            eprintln!("   ⚠️  Error: {}", error);
-        }
-
-        // Show creation date
-        eprintln!(
-            "   Created: {}",
-            site.created_date.format("%Y-%m-%d %H:%M:%S")
-        );
-
-        eprintln!();
     }
 
     // Show summary statistics

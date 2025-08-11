@@ -41,7 +41,11 @@ enum Commands {
         verbose: bool,
     },
     /// List all indexed documentation sites
-    List,
+    List {
+        /// Output additional information
+        #[arg(long, short)]
+        verbose: bool,
+    },
     /// Delete a documentation site
     Delete {
         /// Site ID or name to delete
@@ -94,8 +98,8 @@ async fn main() -> DocsResult<()> {
                 .process_site_embeddings(&site)
                 .await?;
         }
-        Commands::List => {
-            list_sites(&config).await?;
+        Commands::List { verbose } => {
+            list_sites(&config, verbose).await?;
         }
         Commands::Delete { site } => {
             delete_site(site, &config).await?;
