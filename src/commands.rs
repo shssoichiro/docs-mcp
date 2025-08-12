@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::{Context, Result, bail};
 use itertools::Itertools;
 use modelcontextprotocol_server::ServerBuilder;
@@ -8,7 +10,7 @@ use tokio::task::block_in_place;
 use tracing::{error, info, warn};
 
 use crate::config::Config;
-use crate::crawler::{CrawlerConfig, SiteCrawler, validate_url};
+use crate::crawler::{CrawlerConfig, INDEX_REGEX, SiteCrawler, validate_url};
 use crate::database::lancedb::vector_store::VectorStore;
 use crate::database::sqlite::Database;
 use crate::database::sqlite::models::{NewSite, Site, SiteStatus, SiteUpdate};
@@ -114,6 +116,20 @@ pub async fn add_site(
     config: &Config,
     verbose: bool,
 ) -> Result<Site> {
+    // Normalize the index url
+    // First strip any trailing `index.html`-esque component
+    let mut url = Cow::Borrowed(url);
+    if INDEX_REGEX.is_match(&url)? {
+        url = Cow::Owned(format!("{}/", url.rsplit_once('/').expect("has /").0));
+    }
+    // Next ensure we have a trailing slash
+    if !url.ends_with('/')
+        && let Some((_, path)) = url.rsplit_once('/')
+        && !path.contains('.')
+    {
+        url = Cow::Owned(format!("{}/", path));
+    }
+
     eprintln!("🚀 Adding new documentation site");
     eprintln!("   URL: {}", url);
 
@@ -124,7 +140,8 @@ pub async fn add_site(
     use std::io::{self, Write};
     io::stdout().flush().context("Failed to flush stdout")?;
 
-    let parsed_url = validation::validate_documentation_url(url).context("Invalid URL provided")?;
+    let parsed_url =
+        validation::validate_documentation_url(&url).context("Invalid URL provided")?;
 
     if let Some(ref site_name) = name {
         validation::validate_site_name(site_name).context("Invalid site name provided")?;
@@ -172,7 +189,7 @@ pub async fn add_site(
 
     let mut is_resuming = false;
     let site =
-        if let Some(existing_site) = SiteQueries::get_by_index_url(database.pool(), url).await? {
+        if let Some(existing_site) = SiteQueries::get_by_index_url(database.pool(), &url).await? {
             is_resuming = true;
             eprintln!("⚠️  Found existing site!");
             eprintln!();
@@ -258,7 +275,7 @@ pub async fn add_site(
         crawler.init_crawl_queue(site.id, &index_url).await?;
     }
 
-    match crawler.crawl_site(site.id, url, base_url).await {
+    match crawler.crawl_site(site.id, &url, base_url).await {
         Ok(stats) => {
             eprintln!("✅ Crawling completed successfully!");
             eprintln!();

@@ -6,12 +6,14 @@ pub mod extractor;
 pub mod robots;
 
 use anyhow::{Context, Result, anyhow, bail};
+use fancy_regex::Regex;
 use indicatif::{ProgressBar, ProgressStyle};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fs::{self, File};
+use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
@@ -243,6 +245,9 @@ fn normalize_path_for_filtering(path: &str) -> Cow<'_, str> {
     }
 }
 
+pub(crate) static INDEX_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"/index(?:\.[a-zA-Z0-9]+)?$").expect("regex is valid"));
+
 /// Extract all links from HTML content using proper HTML parsing
 pub fn extract_links(html: &str, source_url: &Url, base_url: &Url) -> Result<Vec<Url>> {
     let document = Html::parse_document(html);
@@ -263,7 +268,14 @@ pub fn extract_links(html: &str, source_url: &Url, base_url: &Url) -> Result<Vec
             }
 
             match source_url.join(href) {
-                Ok(absolute_url) => {
+                Ok(mut absolute_url) => {
+                    // Trim trailing index.html-esque component to treat it as identical to `/`
+                    let path = absolute_url.path();
+                    if INDEX_REGEX.is_match(path)? {
+                        absolute_url
+                            .set_path(&format!("{}/", path.rsplit_once('/').expect("has /").0));
+                    }
+
                     if should_crawl_url(&absolute_url, base_url) {
                         links.push(absolute_url);
                     }
