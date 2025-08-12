@@ -41,7 +41,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ureq = "3.0"
 url = { version = "2.5", features = ["serde"] }
-uuid = { version = "1.6", features = ["v4", "serde"] }
+uuid = { version = "1.18", features = ["v4", "serde"] }
 
 [dev-dependencies]
 criterion = "0.7.0"
