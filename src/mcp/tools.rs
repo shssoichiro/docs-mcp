@@ -57,25 +57,25 @@ impl SearchDocsHandler {
     pub fn tool_definition() -> Tool {
         Tool {
             name: "search_docs".to_string(),
-            description: Some("Search indexed documentation".to_string()),
+            description: Some("Search indexed documentation. By default this performs a semantic text search of all indexed documentation. This can optionally be filtered via additional parameters.".to_string()),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search query"
+                        "description": "Text string to search for"
                     },
                     "site_id": {
                         "type": "integer",
-                        "description": "Optional: Search specific site by ID"
+                        "description": "Optional: Search specific site by ID (retrieved from `list_sites` tool)"
                     },
                     "sites_filter": {
                         "type": "string",
-                        "description": "Optional: Regex pattern to filter sites (e.g., 'docs.rs')"
+                        "description": "Optional: Regex pattern to filter sites by name or URL (e.g., 'docs.rs')"
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of results (default: 10)"
+                        "description": "Optional: Maximum number of results (default: 10)"
                     }
                 },
                 "required": ["query"],
@@ -253,7 +253,9 @@ impl ListSitesHandler {
     pub fn tool_definition() -> Tool {
         Tool {
             name: "list_sites".to_string(),
-            description: Some("List available documentation sites".to_string()),
+            description: Some(
+                "List the documentation sites which have been indexed for searching.".to_string(),
+            ),
             input_schema: json!({
                 "type": "object",
                 "properties": {},
