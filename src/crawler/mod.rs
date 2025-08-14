@@ -246,7 +246,7 @@ fn normalize_path_for_filtering(path: &str) -> Cow<'_, str> {
 }
 
 pub(crate) static INDEX_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"/index(?:\.[a-zA-Z0-9]+)?$").expect("regex is valid"));
+    LazyLock::new(|| Regex::new(r"/index\.[a-zA-Z0-9]+$").expect("regex is valid"));
 
 /// Extract all links from HTML content using proper HTML parsing
 pub fn extract_links(html: &str, source_url: &Url, base_url: &Url) -> Result<Vec<Url>> {
