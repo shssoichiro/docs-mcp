@@ -20,7 +20,7 @@ dirs = "6.0"
 fancy-regex = "0.16"
 futures = "0.3"
 headless_chrome = "1.0"
-indicatif = "0.18.0"
+indicatif = "0.18.2"
 itertools = "0.14.0"
 lancedb = "0.21"
 modelcontextprotocol-server = "0.1.5"
@@ -35,18 +35,18 @@ sqlx = { version = "0.8", features = [
     "uuid",
 ] }
 thiserror = "2.0"
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.48", features = ["full"] }
 toml = "0.9"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-ureq = "3.0"
+ureq = "3.1"
 url = { version = "2.5", features = ["serde"] }
-uuid = { version = "1.6", features = ["v4", "serde"] }
+uuid = { version = "1.18", features = ["v4", "serde"] }
 
 [dev-dependencies]
 criterion = "0.7.0"
 serial_test = "3.2.0"
-tempfile = "3.8"
+tempfile = "3.23"
 wiremock = "0.6"
 
 [features]
